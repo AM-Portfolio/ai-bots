@@ -24,7 +24,9 @@ class TogetherAIProvider(BaseLLMProvider):
             return
         
         try:
-            self.client = Together(api_key=self.api_key)
+            # Together AI SDK reads from TOGETHER_API_KEY environment variable automatically
+            # No need to pass api_key parameter
+            self.client = Together()
             logger.info(f"Together AI client initialized successfully with model: {self.model}")
         except Exception as e:
             logger.error(f"Failed to initialize Together AI client: {e}")

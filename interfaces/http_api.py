@@ -93,13 +93,14 @@ async def test_llm(prompt: str, provider: str = "together"):
 @app.post("/api/test/github")
 async def test_github(repository: str):
     """Test GitHub integration"""
-    from shared.clients.github_client import github_client
+    from shared.clients.github_replit_client import github_replit_client
     
     try:
-        if not github_client.client:
-            return {"success": False, "error": "GitHub client not initialized"}
+        client = await github_replit_client._get_client()
+        if not client:
+            return {"success": False, "error": "GitHub client not initialized - please set up GitHub integration"}
         
-        repo = github_client.client.get_repo(repository)
+        repo = client.get_repo(repository)
         issues = list(repo.get_issues(state="open")[:5])
         return {
             "success": True,

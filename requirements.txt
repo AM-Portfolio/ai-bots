@@ -48,3 +48,5 @@ sqlalchemy
 uvicorn
 together
 streamlit
+aiohttp
+together>=1.0.0
