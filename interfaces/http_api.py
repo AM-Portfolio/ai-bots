@@ -85,26 +85,6 @@ async def serve_frontend():
             "note": "Frontend not built. Run 'cd frontend && npm run build' to build the frontend."
         }
 
-@app.get("/{full_path:path}", response_class=FileResponse)
-async def serve_frontend_routes(full_path: str):
-    """Serve React app for all non-API routes (SPA routing)"""
-    # Skip API routes
-    if full_path.startswith("api/") or full_path.startswith("health") or full_path.startswith("metrics"):
-        raise HTTPException(status_code=404, detail="Not found")
-    
-    frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
-    index_file = frontend_dist / "index.html"
-    
-    # Try to serve the requested file
-    requested_file = frontend_dist / full_path
-    if requested_file.exists() and requested_file.is_file():
-        return FileResponse(str(requested_file))
-    
-    # Otherwise serve index.html for SPA routing
-    if index_file.exists():
-        return FileResponse(str(index_file))
-    else:
-        raise HTTPException(status_code=404, detail="Frontend not found")
 
 
 @app.get("/health")
@@ -488,3 +468,15 @@ async def process_github_issue(issue_number: int, repository: str):
         await analyze_issue_endpoint(request, BackgroundTasks())
     except Exception as e:
         logger.error(f"Failed to process issue: {e}")
+
+
+@app.get("/{full_path:path}", response_class=FileResponse)
+async def serve_spa_routes(full_path: str):
+    """Catch-all route to serve React SPA for client-side routing"""
+    frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+    index_file = frontend_dist / "index.html"
+    
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    else:
+        raise HTTPException(status_code=404, detail="Not found")
