@@ -392,7 +392,7 @@ class GitHubReplitClient:
         commit_message: str = "docs: Add AI-generated documentation",
         branch: str = "main"
     ) -> Optional[Dict[str, Any]]:
-        """Commit generated documentation to repository"""
+        """Commit generated documentation to repository on a new branch"""
         client = await self._get_client()
         if not client:
             return None
@@ -400,22 +400,39 @@ class GitHubReplitClient:
         try:
             repo = client.get_repo(repo_name)
             
-            # Try to get default branch if specified branch doesn't exist
-            try:
-                repo.get_branch(branch)
-            except GithubException:
-                branch = repo.default_branch
-                logger.info(f"Using default branch '{branch}' for commit")
+            # Get the default branch
+            default_branch = repo.default_branch
+            logger.info(f"Default branch: '{default_branch}'")
             
-            # Create or update the file
+            # Create a new branch name with timestamp
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            new_branch_name = f"docs/ai-generated-{timestamp}"
+            
+            # Get the SHA of the default branch
+            default_branch_ref = repo.get_branch(default_branch)
+            base_sha = default_branch_ref.commit.sha
+            
+            # Create new branch from default branch
             try:
-                existing_file = repo.get_contents(file_path, ref=branch)
+                repo.create_git_ref(
+                    ref=f"refs/heads/{new_branch_name}",
+                    sha=base_sha
+                )
+                logger.info(f"Created new branch '{new_branch_name}' from '{default_branch}'")
+            except GithubException as e:
+                logger.warning(f"Failed to create branch: {e}, using default branch")
+                new_branch_name = default_branch
+            
+            # Create or update the file on the new branch
+            try:
+                existing_file = repo.get_contents(file_path, ref=new_branch_name)
                 repo.update_file(
                     file_path,
                     commit_message,
                     doc_content,
                     existing_file.sha,
-                    branch=branch
+                    branch=new_branch_name
                 )
                 action = "updated"
             except GithubException:
@@ -423,23 +440,27 @@ class GitHubReplitClient:
                     file_path,
                     commit_message,
                     doc_content,
-                    branch=branch
+                    branch=new_branch_name
                 )
                 action = "created"
             
-            # Get the commit URL
-            commits = repo.get_commits(path=file_path, sha=branch)
+            # Get the commit URL and file URL
+            commits = repo.get_commits(path=file_path, sha=new_branch_name)
             latest_commit = commits[0] if commits.totalCount > 0 else None
+            
+            # Build file URL
+            file_url = f"https://github.com/{repo_name}/blob/{new_branch_name}/{file_path}"
             
             result = {
                 "action": action,
                 "file_path": file_path,
-                "branch": branch,
+                "branch": new_branch_name,
                 "commit_url": latest_commit.html_url if latest_commit else None,
-                "commit_sha": latest_commit.sha if latest_commit else None
+                "commit_sha": latest_commit.sha if latest_commit else None,
+                "file_url": file_url
             }
             
-            logger.info(f"{action.capitalize()} documentation file '{file_path}' in {repo_name}")
+            logger.info(f"{action.capitalize()} documentation file '{file_path}' in branch '{new_branch_name}' of {repo_name}")
             return result
             
         except GithubException as e:
