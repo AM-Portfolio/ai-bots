@@ -217,6 +217,50 @@ async def test_generate_tests(code: str, language: str = "python"):
         return {"success": False, "error": str(e)}
 
 
+class DocGenerationRequest(BaseModel):
+    """Request model for documentation generation"""
+    prompt: str
+    repository: Optional[str] = None
+    max_files: int = 10
+    format: str = "markdown"
+
+
+@app.post("/api/generate-docs")
+async def generate_docs_endpoint(request: DocGenerationRequest):
+    """
+    Generate documentation from natural language prompt
+    
+    Example prompts:
+    - "Generate API documentation for owner/repo focusing on authentication"
+    - "Document the user service in myorg/myapp"
+    - "Create architecture docs for owner/repo"
+    """
+    from features.doc_generator import generate_documentation
+    
+    logger.info(f"Generating documentation from prompt: {request.prompt[:100]}...")
+    
+    try:
+        result = await generate_documentation(
+            prompt=request.prompt,
+            repository=request.repository,
+            max_files=request.max_files,
+            format=request.format
+        )
+        
+        return {
+            "success": result.success,
+            "documentation": result.documentation,
+            "files_analyzed": result.files_analyzed,
+            "repository": result.repository,
+            "metadata": result.metadata,
+            "error": result.error_message
+        }
+        
+    except Exception as e:
+        logger.error(f"Documentation generation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/analyze")
 async def analyze_issue_endpoint(
     request: IssueAnalysisRequest,

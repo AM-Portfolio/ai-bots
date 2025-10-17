@@ -204,6 +204,176 @@ class GitHubReplitClient:
         except GithubException as e:
             logger.error(f"Failed to create/update file {file_path} in {repo_name}: {e}")
             return False
+    
+    async def get_repository_tree(
+        self,
+        repo_name: str,
+        ref: str = "main",
+        recursive: bool = True
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Get repository file tree structure"""
+        client = await self._get_client()
+        if not client:
+            return None
+        
+        try:
+            repo = client.get_repo(repo_name)
+            tree = repo.get_git_tree(ref, recursive=recursive)
+            
+            files = []
+            for item in tree.tree:
+                files.append({
+                    "path": item.path,
+                    "type": item.type,
+                    "size": item.size,
+                    "sha": item.sha,
+                    "url": item.url
+                })
+            
+            logger.info(f"Fetched {len(files)} items from {repo_name} tree")
+            return files
+        except GithubException as e:
+            logger.error(f"Failed to get repository tree for {repo_name}: {e}")
+            return None
+    
+    async def list_directory(
+        self,
+        repo_name: str,
+        path: str = "",
+        ref: str = "main"
+    ) -> Optional[List[Dict[str, Any]]]:
+        """List files and directories at a specific path"""
+        client = await self._get_client()
+        if not client:
+            return None
+        
+        try:
+            repo = client.get_repo(repo_name)
+            contents = repo.get_contents(path, ref=ref)
+            
+            items = []
+            if isinstance(contents, list):
+                for content in contents:
+                    items.append({
+                        "name": content.name,
+                        "path": content.path,
+                        "type": content.type,
+                        "size": content.size,
+                        "sha": content.sha
+                    })
+            else:
+                items.append({
+                    "name": contents.name,
+                    "path": contents.path,
+                    "type": contents.type,
+                    "size": contents.size,
+                    "sha": contents.sha
+                })
+            
+            logger.info(f"Listed {len(items)} items in {repo_name}/{path}")
+            return items
+        except GithubException as e:
+            logger.error(f"Failed to list directory {path} in {repo_name}: {e}")
+            return None
+    
+    async def get_multiple_files(
+        self,
+        repo_name: str,
+        file_paths: List[str],
+        ref: str = "main"
+    ) -> Dict[str, Optional[str]]:
+        """Fetch multiple files at once"""
+        client = await self._get_client()
+        if not client:
+            return {}
+        
+        results = {}
+        try:
+            repo = client.get_repo(repo_name)
+            
+            for file_path in file_paths:
+                try:
+                    content = repo.get_contents(file_path, ref=ref)
+                    if hasattr(content, 'decoded_content'):
+                        results[file_path] = content.decoded_content.decode('utf-8')
+                    else:
+                        results[file_path] = None
+                except GithubException as e:
+                    logger.warning(f"Could not fetch {file_path}: {e}")
+                    results[file_path] = None
+            
+            logger.info(f"Fetched {len(results)} files from {repo_name}")
+            return results
+        except Exception as e:
+            logger.error(f"Failed to fetch multiple files from {repo_name}: {e}")
+            return results
+    
+    async def search_code(
+        self,
+        repo_name: str,
+        query: str,
+        max_results: int = 10
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Search for code in repository"""
+        client = await self._get_client()
+        if not client:
+            return None
+        
+        try:
+            search_query = f"{query} repo:{repo_name}"
+            results = client.search_code(search_query)
+            
+            items = []
+            for i, result in enumerate(results):
+                if i >= max_results:
+                    break
+                items.append({
+                    "name": result.name,
+                    "path": result.path,
+                    "sha": result.sha,
+                    "url": result.html_url,
+                    "repository": result.repository.full_name
+                })
+            
+            logger.info(f"Found {len(items)} code results for '{query}' in {repo_name}")
+            return items
+        except GithubException as e:
+            logger.error(f"Failed to search code in {repo_name}: {e}")
+            return None
+    
+    async def get_issues(
+        self,
+        repo_name: str,
+        state: str = "open",
+        limit: int = 10
+    ) -> Optional[List[Dict[str, Any]]]:
+        """List issues from repository"""
+        client = await self._get_client()
+        if not client:
+            return None
+        
+        try:
+            repo = client.get_repo(repo_name)
+            issues = repo.get_issues(state=state)
+            
+            result = []
+            for i, issue in enumerate(issues):
+                if i >= limit:
+                    break
+                result.append({
+                    "number": issue.number,
+                    "title": issue.title,
+                    "state": issue.state,
+                    "labels": [label.name for label in issue.labels],
+                    "created_at": issue.created_at.isoformat() if issue.created_at else None,
+                    "url": issue.html_url
+                })
+            
+            logger.info(f"Fetched {len(result)} issues from {repo_name}")
+            return result
+        except GithubException as e:
+            logger.error(f"Failed to get issues from {repo_name}: {e}")
+            return None
 
 
 github_replit_client = GitHubReplitClient()
