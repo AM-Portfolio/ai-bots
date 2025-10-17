@@ -203,16 +203,77 @@ const DocOrchestratorPanel = () => {
 
       {result && result.success && (
         <div className="card bg-green-50 border-green-200">
-          <div className="flex items-center space-x-3 mb-3">
+          <div className="flex items-center space-x-3 mb-4">
             <CheckCircle className="w-6 h-6 text-green-600" />
             <h3 className="text-lg font-semibold text-green-900">
               Documentation Workflow Complete!
             </h3>
           </div>
-          <p className="text-green-800">
+          <p className="text-green-800 mb-4">
             All steps completed successfully. Documentation has been generated, committed, and
             published.
           </p>
+          
+          {/* Clickable Links Section */}
+          <div className="space-y-3 mt-4 pt-4 border-t border-green-300">
+            <h4 className="font-semibold text-green-900 text-sm">📎 Quick Links:</h4>
+            
+            {result.github_commit && result.github_commit.file_url && (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-green-800">📄 GitHub File:</span>
+                <a
+                  href={result.github_commit.file_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 hover:text-blue-800 underline font-medium"
+                >
+                  {result.github_commit.file_path} (branch: {result.github_commit.branch})
+                </a>
+              </div>
+            )}
+            
+            {result.github_commit && result.github_commit.commit_url && (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-green-800">💾 Commit:</span>
+                <a
+                  href={result.github_commit.commit_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 hover:text-blue-800 underline font-medium"
+                >
+                  {result.github_commit.commit_sha?.substring(0, 7)}
+                </a>
+              </div>
+            )}
+            
+            {result.confluence_page && result.confluence_page.url && (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-green-800">📚 Confluence Page:</span>
+                <a
+                  href={result.confluence_page.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 hover:text-blue-800 underline font-medium"
+                >
+                  {result.confluence_page.title}
+                </a>
+              </div>
+            )}
+            
+            {result.jira_ticket && result.jira_ticket.url && (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-green-800">🎫 Jira Ticket:</span>
+                <a
+                  href={result.jira_ticket.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 hover:text-blue-800 underline font-medium"
+                >
+                  {result.jira_ticket.key}
+                </a>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
