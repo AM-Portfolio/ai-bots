@@ -38,14 +38,16 @@ The project employs a clean architecture approach, separating concerns into dist
 -   **Navigation:** Streamlined 4-tab interface - Voice Assistant, LLM Testing, Integrations Hub (unified integrations & configuration), and Doc Orchestrator.
 -   **Components:** Organized into Layout (Sidebar, Header) and Panels (VoiceAssistantPanel, LLMTestPanel, IntegrationsHub, DocOrchestratorPanel).
 -   **Integrations Hub:** Unified, extensible integration management system with:
-    -   Category-based organization (Version Control, Issue Tracking, Knowledge Base, Monitoring, Databases, APIs, Cloud, AI Providers)
-    -   Service registry with declarative configuration schema
-    -   Visual service cards with status indicators (connected/disconnected/error/testing)
-    -   Modal drawer for configuration with form validation
-    -   Built-in test connection functionality
-    -   Support for multiple auth types (basic, token, OAuth, API key, connection string)
-    -   Pre-configured services: GitHub, Jira, Confluence, Grafana, PostgreSQL, MongoDB, OpenAI, Azure, Stripe, Twilio, SendGrid, REST API
-    -   Extensible architecture for adding new services with minimal code
+    -   **Modern UI:** Clean, streamlined layout without redundant headers
+    -   **Live Status Bar:** Top navbar showing connected services count and quick status chips at a glance
+    -   **Real-time Updates:** Auto-refresh service statuses after connect/test operations with manual refresh button
+    -   **Connection History:** Sliding sidebar panel tracking all service connection events with timestamps and messages
+    -   **Category-based organization:** Version Control, Issue Tracking, Knowledge Base, Monitoring, Databases, APIs, Cloud, AI Providers
+    -   **Service Cards:** Visual cards with live status indicators (connected/disconnected/error/testing) and configuration summaries
+    -   **Configuration Modal:** Full-featured drawer with form validation, secret visibility toggles, and test connection functionality
+    -   **Auth Support:** Multiple auth types (basic, token, OAuth, API key, connection string)
+    -   **Pre-configured Services:** GitHub, Jira, Confluence, Grafana, PostgreSQL, MongoDB, OpenAI, Azure, Stripe, Twilio, SendGrid, REST API
+    -   **Extensible Architecture:** Declarative service registry enabling new services with minimal code
 -   **Compact Settings:** Modern settings bar positioned below chat input with model selector, voice toggle, and backend details in a single streamlined row.
 -   **Doc Orchestrator UI:** User-friendly checkbox-based interface allowing selective publishing to GitHub, Confluence, and/or Jira with expandable configuration fields and visual service icons.
 -   **API Client:** Axios-based HTTP client with strong TypeScript typing for API responses.
