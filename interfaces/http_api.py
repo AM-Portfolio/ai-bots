@@ -7,6 +7,7 @@ from typing import Dict, Any, Optional
 import logging
 import os
 from pathlib import Path
+from datetime import datetime
 
 from features.context_resolver import resolve_context
 from features.context_resolver.dto import ContextResolverInput
@@ -93,30 +94,85 @@ async def health_check():
 
 
 @app.post("/api/test/llm")
-async def test_llm(prompt: str, provider: str = "together"):
+async def test_llm(prompt: str, provider: str = "together", show_thinking: bool = False):
     """Test LLM provider with a simple prompt"""
     from shared.llm import llm_client
+    from shared.thinking_process import create_llm_thinking_process
+    import uuid
     
     logger.info(f"Testing LLM with provider: {provider}, prompt: {prompt[:50]}...")
     
+    # Create thinking process
+    workflow_id = str(uuid.uuid4())
+    thinking = create_llm_thinking_process(workflow_id)
+    
     try:
+        # Step 1: Validate input
+        thinking.start_step("validate_input")
+        if not prompt or len(prompt.strip()) == 0:
+            thinking.fail_step("validate_input", "Empty prompt provided")
+            return {"success": False, "error": "Empty prompt", "thinking": thinking.to_dict() if show_thinking else None}
+        thinking.complete_step("validate_input", {"prompt_length": len(prompt)})
+        
+        # Step 2: Check GitHub context
+        thinking.start_step("check_github")
+        github_context = None
+        if "repo" in prompt.lower() or "repository" in prompt.lower() or "github" in prompt.lower():
+            # Extract potential repo mentions
+            import re
+            repo_pattern = r'([a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+)'
+            repos = re.findall(repo_pattern, prompt)
+            if repos:
+                github_context = {"mentioned_repos": repos}
+                thinking.complete_step("check_github", {"repos_found": repos})
+            else:
+                thinking.skip_step("check_github", "No specific repo format found")
+        else:
+            thinking.skip_step("check_github", "No GitHub keywords detected")
+        
+        # Step 3: Select provider
+        thinking.start_step("select_provider")
+        thinking.complete_step("select_provider", {"provider": provider})
+        
+        # Step 4: Prepare prompt
+        thinking.start_step("prepare_prompt")
+        messages = [{"role": "user", "content": prompt}]
+        if github_context:
+            messages[0]["content"] = f"[GitHub Context: {github_context}]\n\n{prompt}"
+        thinking.complete_step("prepare_prompt", {"message_count": len(messages)})
+        
+        # Step 5: Call LLM
+        thinking.start_step("call_llm")
         response = await llm_client.chat_completion(
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
             temperature=0.7
         )
+        thinking.complete_step("call_llm", {"response_length": len(response) if response else 0})
+        
+        # Step 6: Process response
+        thinking.start_step("process_response")
+        thinking.complete_step("process_response", {"final_response_length": len(response) if response else 0})
+        
+        thinking.end_time = datetime.now()
         
         result = {
             "success": True,
             "provider": provider,
-            "response": response
+            "response": response,
+            "github_context": github_context,
+            "thinking": thinking.to_dict() if show_thinking else None
         }
         
-        logger.info(f"LLM test successful: {result}")
+        logger.info(f"LLM test successful with thinking process")
         return result
         
     except Exception as e:
         logger.error(f"LLM test failed: {e}")
-        return {"success": False, "error": str(e)}
+        if thinking.steps:
+            current_step = [s for s in thinking.steps if s.status.value == "in_progress"]
+            if current_step:
+                thinking.fail_step(current_step[0].id, str(e))
+        return {"success": False, "error": str(e), "thinking": thinking.to_dict() if show_thinking else None}
 
 
 @app.post("/api/test/github")

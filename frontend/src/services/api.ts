@@ -39,9 +39,9 @@ class ApiClient {
     return data;
   }
 
-  async testLLM(prompt: string, provider: Provider = 'together'): Promise<LLMTestResponse> {
-    const { data } = await this.client.post<LLMTestResponse>(
-      `/api/test/llm?prompt=${encodeURIComponent(prompt)}&provider=${provider}`
+  async testLLM(prompt: string, provider: Provider = 'together', showThinking: boolean = false): Promise<LLMTestResponse> {
+    const { data} = await this.client.post<LLMTestResponse>(
+      `/api/test/llm?prompt=${encodeURIComponent(prompt)}&provider=${provider}&show_thinking=${showThinking}`
     );
     return data;
   }

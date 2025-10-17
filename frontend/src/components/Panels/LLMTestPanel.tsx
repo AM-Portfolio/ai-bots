@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, ChevronDown, ChevronRight, Settings, Mic, MicOff, Volume2, Sparkles } from 'lucide-react';
+import { Send, Loader2, Settings, Mic, MicOff, Volume2, Sparkles } from 'lucide-react';
 import { apiClient } from '../../services/api';
-import type { Provider } from '../../types/api';
+import type { Provider, ThinkingProcessData } from '../../types/api';
+import ThinkingProcess from '../Shared/ThinkingProcess';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -10,19 +11,13 @@ interface Message {
   duration?: number;
 }
 
-interface ThinkingStep {
-  title: string;
-  details: string[];
-}
-
 const LLMTestPanel = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('What are some best practices for writing clean Python code?');
   const [provider, setProvider] = useState<Provider>('together');
   const [isLoading, setIsLoading] = useState(false);
-  const [showBackendDetails, setShowBackendDetails] = useState(false);
-  const [thinkingSteps, setThinkingSteps] = useState<ThinkingStep[]>([]);
-  const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set());
+  const [showBackendDetails, setShowBackendDetails] = useState(true);
+  const [thinkingData, setThinkingData] = useState<ThinkingProcessData | null>(null);
   
   // Voice features
   const [isListening, setIsListening] = useState(false);
@@ -103,50 +98,16 @@ const LLMTestPanel = () => {
     const messageText = input;
     setInput('');
     setIsLoading(true);
-    setThinkingSteps([]);
-
-    if (showBackendDetails && !thinkingMode) {
-      setThinkingSteps([
-        {
-          title: '🔍 Step 1: Provider Selection',
-          details: [
-            `Selected Provider: ${provider}`,
-            provider === 'together' ? 'Model: Llama-3.3-70B-Instruct-Turbo' : 'Model: GPT-4',
-            `Fallback: ${provider === 'together' ? 'Azure OpenAI' : 'Together AI'} (if configured)`,
-          ],
-        },
-        {
-          title: '📤 Step 2: Sending API Request',
-          details: [
-            `Provider: ${provider}`,
-            `Prompt Length: ${messageText.length} characters`,
-            'Endpoint: /api/test/llm',
-            'Method: POST',
-          ],
-        },
-      ]);
-    }
+    setThinkingData(null);
 
     try {
       const startTime = performance.now();
-      const result = await apiClient.testLLM(messageText, provider);
+      const result = await apiClient.testLLM(messageText, provider, showBackendDetails);
       const duration = (performance.now() - startTime) / 1000;
-
-      if (showBackendDetails && !thinkingMode) {
-        setThinkingSteps((prev) => [
-          ...prev,
-          {
-            title: '📥 Step 3: API Response Received',
-            details: [
-              `Response Time: ${duration.toFixed(2)}s`,
-              `Success: ${result.success}`,
-              result.response ? `Response Length: ${result.response.length} characters` : '',
-              result.provider_used ? `Provider Used: ${result.provider_used}` : '',
-              result.fallback_used ? '⚠️ Fallback was used' : '',
-              result.tokens ? `Token Usage: ${result.tokens} tokens` : '',
-            ].filter(Boolean),
-          },
-        ]);
+      
+      // Update thinking data if available
+      if (result.thinking) {
+        setThinkingData(result.thinking);
       }
 
       if (result.success && result.response) {
@@ -178,18 +139,6 @@ const LLMTestPanel = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const toggleStep = (index: number) => {
-    setExpandedSteps((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(index)) {
-        newSet.delete(index);
-      } else {
-        newSet.add(index);
-      }
-      return newSet;
-    });
   };
 
   return (
@@ -291,37 +240,8 @@ const LLMTestPanel = () => {
             </div>
           ))}
 
-          {isLoading && showBackendDetails && thinkingSteps.length > 0 && (
-            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-              <div className="flex items-center space-x-2 text-sm font-medium text-gray-700 mb-3">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Processing...</span>
-              </div>
-              {thinkingSteps.map((step, index) => (
-                <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
-                  <button
-                    onClick={() => toggleStep(index)}
-                    className="w-full flex items-center justify-between p-3 bg-white hover:bg-gray-50 transition-colors"
-                  >
-                    <span className="text-sm font-medium text-gray-700">{step.title}</span>
-                    {expandedSteps.has(index) ? (
-                      <ChevronDown className="w-4 h-4 text-gray-500" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4 text-gray-500" />
-                    )}
-                  </button>
-                  {expandedSteps.has(index) && (
-                    <div className="px-3 pb-3 bg-white space-y-1">
-                      {step.details.map((detail, detailIndex) => (
-                        <p key={detailIndex} className="text-sm text-gray-600">
-                          {detail}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+          {showBackendDetails && thinkingData && (
+            <ThinkingProcess data={thinkingData} title="Backend Processing Steps" />
           )}
 
           {isLoading && (!showBackendDetails || thinkingMode) && (

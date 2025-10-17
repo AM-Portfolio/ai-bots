@@ -9,6 +9,28 @@ export interface ServiceInfo {
   };
 }
 
+export interface ThinkingStep {
+  id: string;
+  title: string;
+  description: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
+  start_time: string | null;
+  end_time: string | null;
+  metadata: Record<string, any>;
+  error: string | null;
+  duration_ms: number | null;
+}
+
+export interface ThinkingProcessData {
+  workflow_id: string;
+  workflow_type: string;
+  steps: ThinkingStep[];
+  start_time: string;
+  end_time: string | null;
+  total_duration_ms: number | null;
+  status: string;
+}
+
 export interface LLMTestResponse {
   success: boolean;
   response?: string;
@@ -16,6 +38,8 @@ export interface LLMTestResponse {
   provider_used?: string;
   fallback_used?: boolean;
   tokens?: number;
+  github_context?: any;
+  thinking?: ThinkingProcessData;
 }
 
 export interface GitHubTestResponse {
