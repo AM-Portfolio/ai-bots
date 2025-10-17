@@ -33,6 +33,17 @@ const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     if (activeTab === 'llm') {
       loadConversations();
     }
+
+    // Listen for conversation saved event to refresh list
+    const handleConversationSaved = () => {
+      loadConversations();
+    };
+
+    window.addEventListener('conversationSaved', handleConversationSaved);
+
+    return () => {
+      window.removeEventListener('conversationSaved', handleConversationSaved);
+    };
   }, [activeTab]);
 
   const loadConversations = async () => {

@@ -28,8 +28,9 @@ const LLMTestPanel = () => {
 
   // Listen for sidebar events
   useEffect(() => {
-    const handleLoadConversation = async (e: CustomEvent) => {
-      const conversationId = e.detail.conversationId;
+    const handleLoadConversation = async (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const conversationId = customEvent.detail.conversationId;
       await loadConversation(conversationId);
     };
 
@@ -40,12 +41,12 @@ const LLMTestPanel = () => {
       setInput('');
     };
 
-    window.addEventListener('loadConversation', handleLoadConversation as EventListener);
-    window.addEventListener('clearChat', handleClearChat as EventListener);
+    window.addEventListener('loadConversation', handleLoadConversation);
+    window.addEventListener('clearChat', handleClearChat);
 
     return () => {
-      window.removeEventListener('loadConversation', handleLoadConversation as EventListener);
-      window.removeEventListener('clearChat', handleClearChat as EventListener);
+      window.removeEventListener('loadConversation', handleLoadConversation);
+      window.removeEventListener('clearChat', handleClearChat);
     };
   }, []);
 
