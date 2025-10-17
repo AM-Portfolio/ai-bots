@@ -15,7 +15,7 @@ class TogetherAIProvider(BaseLLMProvider):
     def __init__(self, api_key: Optional[str] = None, model: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo"):
         self.api_key = api_key or os.environ.get("TOGETHER_API_KEY")
         self.model = model
-        self.client: Optional[Together] = None
+        self.client: Any = None
         self._initialize_client()
     
     def _initialize_client(self):

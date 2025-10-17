@@ -22,7 +22,7 @@ class AzureOpenAIProvider(BaseLLMProvider):
         self.api_key = api_key
         self.deployment_name = deployment_name
         self.api_version = api_version
-        self.client: Optional[AzureOpenAI] = None
+        self.client: Any = None
         self._initialize_client()
     
     def _initialize_client(self):

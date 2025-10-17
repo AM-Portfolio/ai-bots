@@ -26,7 +26,14 @@ AZURE_CLIENT_ID=your-client-id
 AZURE_CLIENT_SECRET=your-client-secret
 AZURE_KEY_VAULT_URL=https://your-keyvault.vault.azure.net/
 
-# ===== Azure OpenAI =====
+# ===== LLM Provider =====
+LLM_PROVIDER=together  # Options: together, azure
+
+# ===== Together AI (Default Provider) =====
+TOGETHER_API_KEY=your-together-api-key
+TOGETHER_MODEL=meta-llama/Llama-3.3-70B-Instruct-Turbo
+
+# ===== Azure OpenAI (Alternative Provider) =====
 AZURE_OPENAI_ENDPOINT=https://your-openai.openai.azure.com/
 AZURE_OPENAI_API_KEY=your-api-key
 AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4
@@ -107,7 +114,38 @@ AZURE_CLIENT_SECRET=your-client-secret
 AZURE_KEY_VAULT_URL=https://your-keyvault.vault.azure.net/
 ```
 
-### 2. Azure OpenAI
+### 2. LLM Provider Setup
+
+The system supports multiple LLM providers via a factory pattern. **Together AI is the default provider**.
+
+#### Together AI (Default - Recommended)
+
+**Get API Key:**
+1. Go to [Together AI Platform](https://api.together.xyz/)
+2. Sign up or log in
+3. Navigate to "API Keys"
+4. Create a new API key
+
+**Configure:**
+```env
+LLM_PROVIDER=together
+TOGETHER_API_KEY=your-together-api-key
+TOGETHER_MODEL=meta-llama/Llama-3.3-70B-Instruct-Turbo
+```
+
+**Popular Models:**
+- `meta-llama/Llama-3.3-70B-Instruct-Turbo` (Default - Best performance)
+- `meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo` (Fast responses)
+- `deepseek/DeepSeek-R1` (Advanced reasoning)
+- `Qwen/Qwen2.5-72B-Instruct-Turbo` (High quality)
+
+**Benefits:**
+- ✅ Fast inference
+- ✅ Open-source models
+- ✅ Cost-effective
+- ✅ No Azure subscription required
+
+#### Azure OpenAI (Alternative Provider)
 
 **Create Azure OpenAI Resource:**
 1. Go to Azure Portal
@@ -122,6 +160,18 @@ AZURE_KEY_VAULT_URL=https://your-keyvault.vault.azure.net/
    - API Key
 
 **Configure:**
+```env
+LLM_PROVIDER=azure
+AZURE_OPENAI_ENDPOINT=https://your-openai.openai.azure.com/
+AZURE_OPENAI_API_KEY=your-api-key
+AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4
+AZURE_OPENAI_API_VERSION=2024-02-15-preview
+```
+
+**Fallback Behavior:**
+If Together AI is configured but unavailable, the system automatically falls back to Azure OpenAI if configured.
+
+**Legacy Configuration:**
 ```env
 AZURE_OPENAI_ENDPOINT=https://your-openai.openai.azure.com/
 AZURE_OPENAI_API_KEY=abc123...
