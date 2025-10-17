@@ -21,6 +21,7 @@ from shared.models import SourceType, EnrichedContext
 from shared.logger import get_logger, set_request_context, clear_request_context
 from shared.config import settings
 from db import ChatRepository, ChatConversation, ChatMessage
+from interfaces.services_api import router as services_router
 
 logger = get_logger(__name__)
 
@@ -92,6 +93,9 @@ async def log_requests(request: Request, call_next):
         raise
     finally:
         clear_request_context()
+
+# Include service management API router
+app.include_router(services_router)
 
 # Serve React frontend static files in production
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
