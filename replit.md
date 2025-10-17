@@ -26,7 +26,8 @@ The project employs a clean architecture approach, separating concerns into dist
 -   **Styling:** Tailwind CSS 3, featuring a modern vertical component architecture.
 -   **UI/UX:** Designed with a ChatGPT-like interface for LLM interaction, professional panels for integrations and workflows, and a clean "Thinking Mode" for focused interaction.
 -   **Voice Features:** Integrates browser-native Web Speech API for both speech-to-text input and text-to-speech output, providing voice assistance without external API keys.
--   **Components:** Organized into Layout (Sidebar, Header) and Panels (LLMTestPanel, GitHubTestPanel, IntegrationsPanel, DocOrchestratorPanel, FullAnalysisPanel).
+-   **Voice Assistant Panel:** Dedicated animated UI with auto-greeting, continuous voice conversation, circular voice visualization with pulsing animations, and real-time visual feedback for listening/speaking states.
+-   **Components:** Organized into Layout (Sidebar, Header) and Panels (VoiceAssistantPanel, LLMTestPanel, GitHubTestPanel, IntegrationsPanel, DocOrchestratorPanel, FullAnalysisPanel).
 -   **API Client:** Axios-based HTTP client with strong TypeScript typing for API responses.
 
 ### Deployment
