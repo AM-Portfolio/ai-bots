@@ -163,7 +163,15 @@ See `API_ENDPOINTS.md` for complete documentation.
 
 ## Recent Changes
 
-**2025-10-17:**
+**2025-10-17 (Latest):**
+- ✅ Created comprehensive Streamlit testing UI in `ui/` package
+- ✅ Added 8 test endpoints for individual feature testing
+- ✅ Implemented dual workflow setup: API (port 5000) + UI (port 8501)
+- ✅ Built UI-API integration layer with automatic URL detection
+- ✅ Added comprehensive UI Testing Guide documentation
+- ✅ All features now testable through intuitive web interface
+
+**2025-10-17 (Earlier):**
 - ✅ Integrated Together AI as default LLM provider
 - ✅ Implemented factory pattern for multi-provider support
 - ✅ Added automatic fallback (Together AI → Azure OpenAI)
@@ -208,6 +216,11 @@ None specified yet - will be updated as preferences are communicated.
 python main.py
 ```
 
+**Start testing UI:**
+```bash
+cd ui && streamlit run app.py --server.port 8501 --server.address 0.0.0.0
+```
+
 **Test health:**
 ```bash
 curl http://localhost:5000/health
@@ -225,11 +238,22 @@ curl -X POST http://localhost:5000/api/analyze \
   -d '{"issue_id": "123", "source": "github", "repository": "owner/repo"}'
 ```
 
+**Test individual features:**
+```bash
+# Test LLM
+curl -X POST "http://localhost:5000/api/test/llm?prompt=Hello&provider=together"
+
+# Test GitHub
+curl -X POST "http://localhost:5000/api/test/github?repository=owner/repo"
+```
+
 ## Support Documentation
 
 - `README.md` - Project overview and quick start
 - `CONFIGURATION.md` - Complete setup guide for all integrations
 - `API_ENDPOINTS.md` - Detailed API documentation
+- `UI_TESTING_GUIDE.md` - Comprehensive UI testing guide
+- `LLM_PROVIDER_GUIDE.md` - LLM provider setup and usage
 - `.env.example` - Environment variables template
 
 ## Project Status

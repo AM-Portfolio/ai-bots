@@ -39,7 +39,7 @@ cd ui && streamlit run app.py --server.port 8501 --server.address 0.0.0.0
 
 ## 🎯 Testing Interface Features
 
-The UI is organized into **9 tabs**, each testing a specific component or workflow:
+The UI is organized into **9 tabs**: 8 for individual feature testing and 1 for the complete workflow:
 
 ### 1. 🧠 LLM Testing
 
@@ -240,7 +240,7 @@ Test the complete end-to-end workflow.
 
 ## 📡 Test API Endpoints
 
-The following REST endpoints are available for testing:
+The following **8 test endpoints** are available for individual feature testing:
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
