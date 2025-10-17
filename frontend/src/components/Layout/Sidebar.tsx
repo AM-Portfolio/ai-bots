@@ -1,4 +1,4 @@
-import { Brain, Github, Plug, FileText, BarChart3 } from 'lucide-react';
+import { Brain, Github, Plug, FileText, BarChart3, Mic } from 'lucide-react';
 import type { Tab } from '../../App';
 
 interface SidebarProps {
@@ -8,6 +8,7 @@ interface SidebarProps {
 
 const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const menuItems = [
+    { id: 'voice' as Tab, label: 'Voice Assistant', icon: Mic },
     { id: 'llm' as Tab, label: 'LLM Testing', icon: Brain },
     { id: 'github' as Tab, label: 'GitHub', icon: Github },
     { id: 'integrations' as Tab, label: 'Integrations', icon: Plug },

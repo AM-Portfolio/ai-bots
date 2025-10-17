@@ -6,6 +6,7 @@ interface HeaderProps {
 }
 
 const titles: Record<Tab, string> = {
+  voice: 'AI Voice Assistant',
   llm: 'LLM Provider Testing',
   github: 'GitHub Integration',
   integrations: 'Integration Testing',
@@ -14,6 +15,7 @@ const titles: Record<Tab, string> = {
 };
 
 const descriptions: Record<Tab, string> = {
+  voice: 'Hands-free AI conversation with auto-greeting, continuous listening, and voice responses',
   llm: 'Test Together AI and Azure OpenAI language models with real-time responses',
   github: 'Test GitHub integration and repository access',
   integrations: 'Test Jira, Confluence, and Grafana integrations',

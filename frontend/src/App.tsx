@@ -6,8 +6,9 @@ import GitHubTestPanel from './components/Panels/GitHubTestPanel'
 import IntegrationsPanel from './components/Panels/IntegrationsPanel'
 import DocOrchestratorPanel from './components/Panels/DocOrchestratorPanel'
 import FullAnalysisPanel from './components/Panels/FullAnalysisPanel'
+import VoiceAssistantPanel from './components/Panels/VoiceAssistantPanel'
 
-export type Tab = 'llm' | 'github' | 'integrations' | 'docs' | 'analysis';
+export type Tab = 'llm' | 'github' | 'integrations' | 'docs' | 'analysis' | 'voice';
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('llm');
@@ -20,13 +21,17 @@ function App() {
         <Header activeTab={activeTab} />
         
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl mx-auto px-6 py-8">
-            {activeTab === 'llm' && <LLMTestPanel />}
-            {activeTab === 'github' && <GitHubTestPanel />}
-            {activeTab === 'integrations' && <IntegrationsPanel />}
-            {activeTab === 'docs' && <DocOrchestratorPanel />}
-            {activeTab === 'analysis' && <FullAnalysisPanel />}
-          </div>
+          {activeTab === 'voice' ? (
+            <VoiceAssistantPanel />
+          ) : (
+            <div className="max-w-7xl mx-auto px-6 py-8">
+              {activeTab === 'llm' && <LLMTestPanel />}
+              {activeTab === 'github' && <GitHubTestPanel />}
+              {activeTab === 'integrations' && <IntegrationsPanel />}
+              {activeTab === 'docs' && <DocOrchestratorPanel />}
+              {activeTab === 'analysis' && <FullAnalysisPanel />}
+            </div>
+          )}
         </main>
       </div>
     </div>
