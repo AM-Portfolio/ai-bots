@@ -273,16 +273,25 @@ async def test_jira(project_key: str):
 
 
 @app.post("/api/test/confluence")
-async def test_confluence(space_key: str):
+async def test_confluence():
     """Test Confluence integration"""
-    from shared.clients.confluence_client import confluence_client
+    from shared.clients.confluence_replit_client import confluence_replit_client
     
     try:
-        pages = confluence_client.search_pages(space_key, limit=5)
+        if not confluence_replit_client.is_configured():
+            return {"success": False, "error": "Confluence credentials not configured"}
+        
+        is_connected = await confluence_replit_client.test_connection()
+        if not is_connected:
+            return {"success": False, "error": "Failed to connect to Confluence"}
+        
+        spaces = await confluence_replit_client.get_spaces()
+        if spaces is None:
+            return {"success": False, "error": "Failed to retrieve spaces"}
+        
         return {
             "success": True,
-            "pages_count": len(pages),
-            "pages": [{"id": p.get("id"), "title": p.get("title")} for p in pages]
+            "spaces": [{"key": s.get("key"), "name": s.get("name")} for s in spaces[:5]]
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
