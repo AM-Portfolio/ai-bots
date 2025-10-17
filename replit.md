@@ -11,17 +11,26 @@ This is an intelligent, autonomous development agent built in Python that:
 
 ## Technology Stack
 
-- **Framework:** FastAPI
+### Backend
+- **Framework:** FastAPI (Python 3.11)
 - **Database:** SQLAlchemy (SQLite default, PostgreSQL supported)
 - **AI:** Together AI (default), Azure OpenAI (alternative) - Factory pattern
 - **Integrations:** GitHub, Jira, Confluence, Grafana, Microsoft Teams
 - **Monitoring:** Prometheus metrics, OpenTelemetry tracing
-- **Language:** Python 3.11
+
+### Frontend (NEW)
+- **Framework:** React 18 + TypeScript
+- **Build Tool:** Vite 5
+- **Styling:** Tailwind CSS 3
+- **Icons:** Lucide React
+- **HTTP Client:** Axios
+- **Design:** Modern vertical component architecture with ChatGPT-like UI
 
 ## Architecture
 
 The project follows a clean architecture with:
 
+### Backend Architecture
 1. **Interfaces Layer** (`interfaces/`): API, webhooks, bot handlers
 2. **Features Layer** (`features/`): Independent business capabilities
    - Context resolution
@@ -33,6 +42,22 @@ The project follows a clean architecture with:
 3. **Shared Layer** (`shared/`): Common utilities and clients
 4. **Data Layer** (`db/`): Database models and repositories
 5. **Observability** (`observability/`): Metrics and tracing
+
+### Frontend Architecture (NEW - React + TypeScript)
+1. **Layout Components** (`frontend/src/components/Layout/`):
+   - Sidebar: Navigation with icons and branding
+   - Header: Contextual titles and descriptions
+2. **Panel Components** (`frontend/src/components/Panels/`):
+   - LLMTestPanel: ChatGPT-like interface with message bubbles
+   - GitHubTestPanel: Repository testing with results
+   - IntegrationsPanel: Jira, Confluence, Grafana cards
+   - DocOrchestratorPanel: Step-by-step workflow tracking
+   - FullAnalysisPanel: Complete issue analysis
+3. **Services Layer** (`frontend/src/services/`):
+   - API client with TypeScript types
+   - Axios-based HTTP client
+4. **Types Layer** (`frontend/src/types/`):
+   - Strong TypeScript interfaces for all API responses
 
 ## Key Features Implemented
 
@@ -71,16 +96,34 @@ The project follows a clean architecture with:
 
 ## Running the Project
 
-The application is already configured to run automatically in Replit on port 5000.
+The application runs both backend API and React frontend automatically.
 
-**Manual start:**
+### Automatic Start (Configured)
+- **Backend API:** Port 8000 (FastAPI with auto-reload)
+- **Frontend UI:** Port 5000 (Vite dev server with HMR)
+- The workflow runs both services simultaneously
+
+### Manual Start
+**Backend only:**
 ```bash
 python main.py
 ```
 
-**Access the API:**
-- Local: http://0.0.0.0:5000
-- Replit: Use the provided webview URL
+**Frontend only:**
+```bash
+cd frontend && npm run dev
+```
+
+**Both (recommended):**
+```bash
+python main.py & cd frontend && npm run dev
+```
+
+### Access URLs
+- **Frontend UI:** http://0.0.0.0:5000 (Replit webview shows this)
+- **Backend API:** http://0.0.0.0:8000
+- **API Docs:** http://0.0.0.0:8000/docs (FastAPI auto-generated)
+- **Metrics:** http://0.0.0.0:8000/metrics
 
 ## Configuration Required
 
@@ -112,6 +155,18 @@ See `.env.example` and `CONFIGURATION.md` for detailed setup.
 
 ```
 ai_dev_agent/
+├── frontend/           # React TypeScript UI (NEW)
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── Layout/      # Sidebar, Header
+│   │   │   └── Panels/      # Feature panels
+│   │   ├── services/        # API client
+│   │   ├── types/           # TypeScript types
+│   │   ├── App.tsx          # Main app component
+│   │   └── main.tsx         # Entry point
+│   ├── package.json
+│   ├── vite.config.ts
+│   └── tailwind.config.js
 ├── shared/              # Core utilities
 │   ├── config.py        # Settings management
 │   ├── models.py        # Pydantic models
@@ -169,7 +224,20 @@ See `API_ENDPOINTS.md` for complete documentation.
 
 ## Recent Changes
 
-**2025-10-17 (Latest - Documentation Orchestration):**
+**2025-10-17 (Latest - React UI Implementation):**
+- ✅ Built complete React + TypeScript frontend in separate `frontend/` module
+- ✅ Implemented modern vertical component architecture
+- ✅ Created ChatGPT-like LLM Testing interface with message bubbles
+- ✅ Built professional panels for GitHub, Integrations, Docs, and Analysis
+- ✅ Added Tailwind CSS for modern styling with custom components
+- ✅ Configured Vite dev server (port 5000) with API proxy to backend (port 8000)
+- ✅ Set up TypeScript with strong typing for all API responses
+- ✅ Created beautiful sidebar navigation and contextual headers
+- ✅ Implemented "Show Backend Details" toggle for debugging visibility
+- ✅ Updated deployment config for VM mode with React build step
+- ✅ Both frontend and backend running successfully in unified workflow
+
+**2025-10-17 (Earlier - Documentation Orchestration):**
 - ✅ Built complete AI-driven documentation orchestration system
 - ✅ Enhanced GitHub client with tree API, multi-branch support, and commit capability
 - ✅ Set up Confluence Replit connector with OAuth authentication
