@@ -28,8 +28,17 @@ The project employs a clean architecture approach, separating concerns into dist
 -   **Chat History:** Full conversation management with SQLite/PostgreSQL storage, sidebar navigation, auto-save functionality, and conversation persistence across sessions.
 -   **Voice Features:** Integrates browser-native Web Speech API for both speech-to-text input and text-to-speech output, providing voice assistance without external API keys.
 -   **Voice Assistant Panel:** Dedicated animated UI with auto-greeting, continuous voice conversation, circular voice visualization with pulsing animations, and real-time visual feedback for listening/speaking states.
--   **Navigation:** Streamlined 5-tab interface - Voice Assistant, LLM Testing, Integrations (includes GitHub/Jira/Confluence/Grafana), Configuration, and Doc Orchestrator.
--   **Components:** Organized into Layout (Sidebar, Header) and Panels (VoiceAssistantPanel, LLMTestPanel, IntegrationsPanel, ConfigurationPanel, DocOrchestratorPanel).
+-   **Navigation:** Streamlined 4-tab interface - Voice Assistant, LLM Testing, Integrations Hub (unified integrations & configuration), and Doc Orchestrator.
+-   **Components:** Organized into Layout (Sidebar, Header) and Panels (VoiceAssistantPanel, LLMTestPanel, IntegrationsHub, DocOrchestratorPanel).
+-   **Integrations Hub:** Unified, extensible integration management system with:
+    -   Category-based organization (Version Control, Issue Tracking, Knowledge Base, Monitoring, Databases, APIs, Cloud, AI Providers)
+    -   Service registry with declarative configuration schema
+    -   Visual service cards with status indicators (connected/disconnected/error/testing)
+    -   Modal drawer for configuration with form validation
+    -   Built-in test connection functionality
+    -   Support for multiple auth types (basic, token, OAuth, API key, connection string)
+    -   Pre-configured services: GitHub, Jira, Confluence, Grafana, PostgreSQL, OpenAI, Azure, REST API
+    -   Extensible architecture for adding new services with minimal code
 -   **Compact Settings:** Modern settings bar positioned below chat input with model selector, voice toggle, and backend details in a single streamlined row.
 -   **Doc Orchestrator UI:** User-friendly checkbox-based interface allowing selective publishing to GitHub, Confluence, and/or Jira with expandable configuration fields and visual service icons.
 -   **API Client:** Axios-based HTTP client with strong TypeScript typing for API responses.
