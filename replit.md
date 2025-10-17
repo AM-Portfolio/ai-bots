@@ -31,6 +31,7 @@ The project employs a clean architecture approach, separating concerns into dist
 -   **Navigation:** Streamlined 5-tab interface - Voice Assistant, LLM Testing, Integrations (includes GitHub/Jira/Confluence/Grafana), Configuration, and Doc Orchestrator.
 -   **Components:** Organized into Layout (Sidebar, Header) and Panels (VoiceAssistantPanel, LLMTestPanel, IntegrationsPanel, ConfigurationPanel, DocOrchestratorPanel).
 -   **Compact Settings:** Modern settings bar positioned below chat input with model selector, voice toggle, and backend details in a single streamlined row.
+-   **Doc Orchestrator UI:** User-friendly checkbox-based interface allowing selective publishing to GitHub, Confluence, and/or Jira with expandable configuration fields and visual service icons.
 -   **API Client:** Axios-based HTTP client with strong TypeScript typing for API responses.
 
 ### Deployment
@@ -38,7 +39,7 @@ The project employs a clean architecture approach, separating concerns into dist
 -   The FastAPI backend serves both API endpoints and the pre-built React frontend (static files from `frontend/dist/`), handling SPA routing.
 
 ### Key Features
--   **Multi-Source Integration:** Connectors for GitHub, Jira, Confluence, and Grafana.
+-   **Multi-Source Integration:** Connectors for GitHub, Jira, Confluence (Basic Auth with API tokens), and Grafana.
 -   **AI-Powered Analysis:** Automated bug diagnosis, fix generation, test code generation, and documentation generation using LLMs.
 -   **Automated Workflows:** End-to-end processes for context enrichment, root cause analysis, code fix generation, pull request creation, and command-driven documentation orchestration (analysis → generation → commit → publish → ticket).
 -   **Thinking Process Visualization:** Shared backend component that tracks workflow execution steps with status, metadata, and timing. Displayed via reusable frontend ThinkingProcess component in both LLM Testing and Doc Orchestrator panels. Provides real-time visibility into backend processing flow.

@@ -82,9 +82,16 @@ export interface AnalyzeResponse {
 
 export interface DocOrchestrationRequest {
   prompt: string;
-  repository: string;
-  confluence_space?: string;
-  jira_project?: string;
+  repository?: string;
+  max_files?: number;
+  commit_to_github?: boolean;
+  commit_path?: string;
+  commit_message?: string;
+  publish_to_confluence?: boolean;
+  confluence_space_key?: string;
+  confluence_parent_id?: string;
+  create_jira_ticket?: boolean;
+  jira_project_key?: string;
 }
 
 export interface DocOrchestrationResponse {
