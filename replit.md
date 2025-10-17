@@ -37,9 +37,9 @@ The project follows a clean architecture with:
 ## Key Features Implemented
 
 ### ✅ Multi-Source Integration
-- GitHub API client with issue/PR management
+- GitHub Replit connector with OAuth (issue/PR management, tree API, commits)
 - Jira API client for ticket management
-- Confluence client for documentation
+- Confluence Replit connector with OAuth for documentation
 - Grafana client for metrics/alerts
 
 ### ✅ AI-Powered Analysis
@@ -48,6 +48,7 @@ The project follows a clean architecture with:
 - Automated bug diagnosis
 - Fix generation with explanations
 - Test code generation
+- AI-driven documentation generation from natural language prompts
 - Automatic fallback between providers
 
 ### ✅ Automated Workflows
@@ -55,7 +56,8 @@ The project follows a clean architecture with:
 - Root cause analysis
 - Code fix generation
 - Pull request creation
-- Documentation publishing
+- **NEW: Command-driven documentation orchestration**
+  - Natural language prompt → GitHub analysis → AI doc generation → Commit → Publish → Ticket
 
 ### ✅ Observability
 - Prometheus metrics export
@@ -122,6 +124,8 @@ ai_dev_agent/
 │   ├── code_generator/
 │   ├── test_orchestrator/
 │   ├── doc_publisher/
+│   ├── doc_generator/
+│   ├── doc_orchestrator/
 │   └── data_injector/
 ├── interfaces/         # External interfaces
 │   ├── http_api.py    # FastAPI app
@@ -140,6 +144,8 @@ ai_dev_agent/
 - `GET /` - Service info
 - `GET /health` - Health check
 - `POST /api/analyze` - Analyze issue
+- `POST /api/generate-docs` - Generate documentation from prompt
+- `POST /api/docs/orchestrate` - Complete doc workflow (analyze → generate → commit → publish → ticket)
 - `POST /api/webhook/{source}` - Receive webhooks
 - `GET /metrics` - Prometheus metrics
 
@@ -163,7 +169,18 @@ See `API_ENDPOINTS.md` for complete documentation.
 
 ## Recent Changes
 
-**2025-10-17 (Latest - Integration Testing):**
+**2025-10-17 (Latest - Documentation Orchestration):**
+- ✅ Built complete AI-driven documentation orchestration system
+- ✅ Enhanced GitHub client with tree API, multi-branch support, and commit capability
+- ✅ Set up Confluence Replit connector with OAuth authentication
+- ✅ Created Confluence client for publishing documentation
+- ✅ Enhanced Jira client to create documentation tracking tickets
+- ✅ Implemented unified orchestrator coordinating full workflow
+- ✅ Added `/api/docs/orchestrate` endpoint for command-driven documentation
+- ✅ Built comprehensive Streamlit UI "Doc Orchestrator" tab
+- ✅ All components tested and architect-reviewed
+
+**2025-10-17 (Earlier - Integration Testing):**
 - ✅ Upgraded Together AI SDK from v0.2.11 to v1.5.26 (OpenAI-compatible API)
 - ✅ Fixed Together AI provider initialization for proper client setup
 - ✅ Created GitHub Replit integration client using Replit connector
