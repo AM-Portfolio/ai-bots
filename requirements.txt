@@ -47,3 +47,4 @@ redis
 sqlalchemy
 uvicorn
 together
+streamlit

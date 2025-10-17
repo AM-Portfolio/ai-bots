@@ -63,6 +63,148 @@ async def health_check():
     return {"status": "healthy"}
 
 
+@app.post("/api/test/llm")
+async def test_llm(prompt: str, provider: str = "together"):
+    """Test LLM provider with a simple prompt"""
+    from shared.llm import llm_client
+    
+    try:
+        response = await llm_client.chat_completion(
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
+        )
+        return {
+            "success": True,
+            "provider": provider,
+            "response": response
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/test/github")
+async def test_github(repository: str):
+    """Test GitHub integration"""
+    from shared.clients.github_client import github_client
+    
+    try:
+        owner, repo = repository.split("/")
+        issues = github_client.get_issues(owner, repo, state="open", labels=["bug"])
+        return {
+            "success": True,
+            "issues_count": len(issues),
+            "issues": [{"number": i.number, "title": i.title} for i in issues[:5]]
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/test/jira")
+async def test_jira(project_key: str):
+    """Test Jira integration"""
+    from shared.clients.jira_client import jira_client
+    
+    try:
+        issues = jira_client.search_issues(f"project = {project_key} AND status = Open", maxResults=5)
+        return {
+            "success": True,
+            "issues_count": len(issues),
+            "issues": [{"key": i.key, "summary": i.fields.summary} for i in issues]
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/test/confluence")
+async def test_confluence(space_key: str):
+    """Test Confluence integration"""
+    from shared.clients.confluence_client import confluence_client
+    
+    try:
+        pages = confluence_client.search_pages(space_key, limit=5)
+        return {
+            "success": True,
+            "pages_count": len(pages),
+            "pages": [{"id": p.get("id"), "title": p.get("title")} for p in pages]
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/test/grafana")
+async def test_grafana():
+    """Test Grafana integration"""
+    from shared.clients.grafana_client import grafana_client
+    
+    try:
+        alerts = grafana_client.get_alerts()
+        return {
+            "success": True,
+            "alerts_count": len(alerts),
+            "alerts": [{"id": a.get("id"), "name": a.get("name")} for a in alerts[:5]]
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/test/context-resolver")
+async def test_context_resolver(issue_id: str, source: str, repository: str = ""):
+    """Test context resolver"""
+    from features.context_resolver import resolve_context
+    from features.context_resolver.dto import ContextResolverInput
+    from shared.models import SourceType
+    
+    try:
+        context_input = ContextResolverInput(
+            issue_id=issue_id,
+            source=SourceType(source),
+            repository=repository,
+            include_logs=True,
+            include_metrics=True,
+            include_related_issues=True
+        )
+        
+        result = await resolve_context(context_input)
+        
+        return {
+            "success": result.success,
+            "data": result.enriched_data if result.success else None,
+            "error": result.error_message
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/test/code-analysis")
+async def test_code_analysis(code: str, context: str):
+    """Test LLM code analysis"""
+    from shared.llm import llm_client
+    
+    try:
+        analysis = await llm_client.analyze_code(code, context, task="analyze")
+        return {
+            "success": True,
+            "analysis": analysis
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/test/generate-tests")
+async def test_generate_tests(code: str, language: str = "python"):
+    """Test test generation"""
+    from shared.llm import llm_client
+    
+    try:
+        tests = await llm_client.generate_tests(code, language)
+        return {
+            "success": True,
+            "tests": tests
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 @app.post("/api/analyze")
 async def analyze_issue_endpoint(
     request: IssueAnalysisRequest,
