@@ -411,7 +411,8 @@ async def orchestrate_docs_endpoint(request: DocOrchestrationRequest):
             "confluence_page": result.confluence_page,
             "jira_ticket": result.jira_ticket,
             "workflow_summary": result.workflow_summary,
-            "error": result.error_message
+            "error": result.error_message,
+            "thinking": result.thinking
         }
         
     except Exception as e:

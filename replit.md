@@ -39,6 +39,8 @@ The project employs a clean architecture approach, separating concerns into dist
 -   **Multi-Source Integration:** Connectors for GitHub, Jira, Confluence, and Grafana.
 -   **AI-Powered Analysis:** Automated bug diagnosis, fix generation, test code generation, and documentation generation using LLMs.
 -   **Automated Workflows:** End-to-end processes for context enrichment, root cause analysis, code fix generation, pull request creation, and command-driven documentation orchestration (analysis → generation → commit → publish → ticket).
+-   **Thinking Process Visualization:** Shared backend component that tracks workflow execution steps with status, metadata, and timing. Displayed via reusable frontend ThinkingProcess component in both LLM Testing and Doc Orchestrator panels. Provides real-time visibility into backend processing flow.
+-   **GitHub Context Detection:** LLM automatically detects GitHub repository mentions in prompts and enriches context with repository information.
 -   **Observability:** Prometheus metrics, OpenTelemetry tracing, and structured logging.
 
 ## External Dependencies
