@@ -77,17 +77,50 @@ class DocOrchestrator:
             # Step 2: Analyze code & Generate documentation
             logger.info(f"Starting documentation workflow for prompt: {request.prompt[:100]}...")
             workflow_summary["step_1_generate"] = "started"
-            thinking.start_step("analyze_code")
-            thinking.start_step("generate_docs")
             
-            doc_result = await generate_documentation(
-                prompt=request.prompt,
-                repository=request.repository,
-                max_files=request.max_files,
-                commit_to_github=request.commit_to_github,
-                commit_path=request.commit_path,
-                commit_message=request.commit_message
-            )
+            # Only analyze GitHub if we're committing to GitHub or have a repository specified
+            if request.commit_to_github or request.repository:
+                thinking.start_step("analyze_code")
+                thinking.start_step("generate_docs")
+                
+                doc_result = await generate_documentation(
+                    prompt=request.prompt,
+                    repository=request.repository,
+                    max_files=request.max_files,
+                    commit_to_github=request.commit_to_github,
+                    commit_path=request.commit_path,
+                    commit_message=request.commit_message
+                )
+            else:
+                # Generate documentation directly from prompt without GitHub analysis
+                thinking.skip_step("analyze_code", "GitHub not selected - generating from prompt only")
+                thinking.start_step("generate_docs")
+                
+                from shared.llm_providers.factory import get_llm_client
+                from features.doc_generator.service import DocumentationResult
+                
+                llm_provider = get_llm_client()
+                prompt_for_llm = f"""Generate comprehensive documentation based on this request:
+
+{request.prompt}
+
+Provide well-structured documentation in markdown format with sections, examples, and clear explanations."""
+
+                documentation = await llm_provider.chat_completion(
+                    messages=[{"role": "user", "content": prompt_for_llm}],
+                    temperature=0.5
+                )
+                
+                doc_result = DocumentationResult(
+                    success=True,
+                    documentation=documentation,
+                    files_analyzed=[],
+                    repository=None,
+                    github_commit=None,
+                    metadata={"task_type": "prompt-based", "source": "llm-direct"}
+                )
+                
+                logger.info(f"Generated documentation directly from prompt ({len(documentation or '')} chars)")
             
             if not doc_result.success:
                 error_msg = doc_result.error_message or "Documentation generation failed"
