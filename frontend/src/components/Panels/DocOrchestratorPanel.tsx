@@ -36,7 +36,7 @@ const DocOrchestratorPanel = () => {
         jira_project: jiraProject || undefined,
       });
 
-      const updateStep = (index: number, status: 'complete' | 'error', message?: string) => {
+      const updateStep = (index: number, status: Step['status'], message?: string) => {
         setSteps((prev) =>
           prev.map((step, i) =>
             i === index ? { ...step, status, message } : step

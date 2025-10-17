@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     microsoft_app_password: Optional[str] = None
     
     app_host: str = "0.0.0.0"
-    app_port: int = 5000
+    app_port: int = 8000
     log_level: str = "INFO"
     environment: str = "development"
     

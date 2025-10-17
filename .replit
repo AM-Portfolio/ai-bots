@@ -1,4 +1,4 @@
-modules = ["python-3.11"]
+modules = ["python-3.11", "nodejs-20"]
 [agent]
 expertMode = true
 integrations = ["github:1.0.0", "confluence:1.0.0"]
@@ -17,43 +17,33 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Server"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "UI"
+args = "AI Dev Agent"
 
 [[workflows.workflow]]
-name = "Server"
+name = "AI Dev Agent"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python main.py"
+args = "bash -c \"python main.py & cd frontend && npm run dev\""
 waitForPort = 5000
 
 [workflows.workflow.metadata]
 outputType = "webview"
-
-[[workflows.workflow]]
-name = "UI"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd ui && streamlit run app.py --server.port 8501 --server.address 0.0.0.0"
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [[ports]]
 localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 8501
+localPort = 8000
+externalPort = 8000
+
+[[ports]]
+localPort = 32855
 externalPort = 3000
 
 [deployment]
 deploymentTarget = "vm"
-run = ["bash", "-c", "python main.py & cd ui && streamlit run app.py --server.port 8501 --server.address 0.0.0.0"]
+run = ["bash", "-c", "python main.py & cd frontend && npm run dev"]
+build = ["bash", "-c", "cd frontend && npm install && npm run build"]
