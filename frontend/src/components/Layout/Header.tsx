@@ -8,19 +8,17 @@ interface HeaderProps {
 const titles: Record<Tab, string> = {
   voice: 'AI Voice Assistant',
   llm: 'LLM Provider Testing',
-  github: 'GitHub Integration',
   integrations: 'Integration Testing',
+  config: 'Configuration',
   docs: 'Documentation Orchestrator',
-  analysis: 'Full Issue Analysis',
 };
 
 const descriptions: Record<Tab, string> = {
   voice: 'Hands-free AI conversation with auto-greeting, continuous listening, and voice responses',
   llm: 'Test Together AI and Azure OpenAI language models with real-time responses',
-  github: 'Test GitHub integration and repository access',
-  integrations: 'Test Jira, Confluence, and Grafana integrations',
+  integrations: 'Test GitHub, Jira, Confluence, and Grafana integrations',
+  config: 'Configure your integrations and API credentials',
   docs: 'AI-powered documentation workflow: analyze → generate → commit → publish',
-  analysis: 'Complete end-to-end issue analysis with context enrichment and fix generation',
 };
 
 const Header = ({ activeTab }: HeaderProps) => {

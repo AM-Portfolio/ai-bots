@@ -2,13 +2,12 @@ import { useState } from 'react'
 import Sidebar from './components/Layout/Sidebar'
 import Header from './components/Layout/Header'
 import LLMTestPanel from './components/Panels/LLMTestPanel'
-import GitHubTestPanel from './components/Panels/GitHubTestPanel'
 import IntegrationsPanel from './components/Panels/IntegrationsPanel'
+import ConfigurationPanel from './components/Panels/ConfigurationPanel'
 import DocOrchestratorPanel from './components/Panels/DocOrchestratorPanel'
-import FullAnalysisPanel from './components/Panels/FullAnalysisPanel'
 import VoiceAssistantPanel from './components/Panels/VoiceAssistantPanel'
 
-export type Tab = 'llm' | 'github' | 'integrations' | 'docs' | 'analysis' | 'voice';
+export type Tab = 'voice' | 'llm' | 'integrations' | 'config' | 'docs';
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('llm');
@@ -26,10 +25,9 @@ function App() {
           ) : (
             <div className="max-w-7xl mx-auto px-6 py-8">
               {activeTab === 'llm' && <LLMTestPanel />}
-              {activeTab === 'github' && <GitHubTestPanel />}
               {activeTab === 'integrations' && <IntegrationsPanel />}
+              {activeTab === 'config' && <ConfigurationPanel />}
               {activeTab === 'docs' && <DocOrchestratorPanel />}
-              {activeTab === 'analysis' && <FullAnalysisPanel />}
             </div>
           )}
         </main>

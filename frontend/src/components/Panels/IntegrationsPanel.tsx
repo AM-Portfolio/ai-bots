@@ -9,14 +9,33 @@ interface TestResult {
 }
 
 const IntegrationsPanel = () => {
+  const [githubRepo, setGithubRepo] = useState('octocat/Hello-World');
+  const [githubResult, setGithubResult] = useState<TestResult | null>(null);
   const [jiraResult, setJiraResult] = useState<TestResult | null>(null);
   const [confluenceResult, setConfluenceResult] = useState<TestResult | null>(null);
   const [grafanaResult, setGrafanaResult] = useState<TestResult | null>(null);
   const [loadingStates, setLoadingStates] = useState({
+    github: false,
     jira: false,
     confluence: false,
     grafana: false,
   });
+
+  const testGitHub = async () => {
+    setLoadingStates((prev) => ({ ...prev, github: true }));
+    setGithubResult(null);
+    try {
+      const response = await apiClient.testGitHub(githubRepo);
+      setGithubResult({ success: response.success, data: response, error: response.error });
+    } catch (error) {
+      setGithubResult({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to connect',
+      });
+    } finally {
+      setLoadingStates((prev) => ({ ...prev, github: false }));
+    }
+  };
 
   const testJira = async () => {
     setLoadingStates((prev) => ({ ...prev, jira: true }));
@@ -81,6 +100,10 @@ const IntegrationsPanel = () => {
     onTest,
     isLoading,
     result,
+    hasInput = false,
+    inputValue = '',
+    onInputChange,
+    inputPlaceholder = '',
   }: {
     title: string;
     description: string;
@@ -88,6 +111,10 @@ const IntegrationsPanel = () => {
     onTest: () => void;
     isLoading: boolean;
     result: TestResult | null;
+    hasInput?: boolean;
+    inputValue?: string;
+    onInputChange?: (value: string) => void;
+    inputPlaceholder?: string;
   }) => (
     <div className="card">
       <div className="flex items-center space-x-3 mb-4">
@@ -99,6 +126,18 @@ const IntegrationsPanel = () => {
           <p className="text-sm text-gray-600">{description}</p>
         </div>
       </div>
+
+      {hasInput && onInputChange && (
+        <div className="mb-4">
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => onInputChange(e.target.value)}
+            placeholder={inputPlaceholder}
+            className="input-field w-full"
+          />
+        </div>
+      )}
 
       <button
         onClick={onTest}
@@ -128,11 +167,21 @@ const IntegrationsPanel = () => {
             </span>
           </div>
 
-          {result.success && result.data && Array.isArray(result.data) && (
+          {result.success && result.data && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-              <p className="text-sm text-green-800">
-                Found {result.data.length} item(s)
-              </p>
+              {Array.isArray(result.data) ? (
+                <p className="text-sm text-green-800">
+                  Found {result.data.length} item(s)
+                </p>
+              ) : result.data.repository ? (
+                <div className="text-sm text-green-800">
+                  <p>Repository: {result.data.repository}</p>
+                  {result.data.default_branch && <p>Branch: {result.data.default_branch}</p>}
+                  {result.data.issues && <p>Issues: {result.data.issues.length}</p>}
+                </div>
+              ) : (
+                <p className="text-sm text-green-800">Connected successfully!</p>
+              )}
             </div>
           )}
 
@@ -148,6 +197,19 @@ const IntegrationsPanel = () => {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <IntegrationCard
+        title="GitHub"
+        description="Test GitHub API connection"
+        icon="🐙"
+        onTest={testGitHub}
+        isLoading={loadingStates.github}
+        result={githubResult}
+        hasInput={true}
+        inputValue={githubRepo}
+        onInputChange={setGithubRepo}
+        inputPlaceholder="owner/repo"
+      />
+      
       <IntegrationCard
         title="Jira"
         description="Test Jira API connection"
