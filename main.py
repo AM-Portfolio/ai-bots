@@ -32,7 +32,8 @@ def init_database():
 async def lifespan(app):
     logger.info("Starting AI Dev Agent...")
     init_database()
-    logger.info(f"AI Dev Agent ready on {settings.app_host}:{settings.app_port}")
+    port = settings.port
+    logger.info(f"AI Dev Agent ready on {settings.app_host}:{port}")
     yield
     logger.info("Shutting down AI Dev Agent...")
 
@@ -46,10 +47,12 @@ async def get_metrics():
 
 
 if __name__ == "__main__":
+    port = settings.port
+    logger.info(f"Starting server on {settings.app_host}:{port}")
     uvicorn.run(
         "main:app",
         host=settings.app_host,
-        port=settings.app_port,
+        port=port,
         reload=settings.is_development,
         log_level=settings.log_level.lower()
     )

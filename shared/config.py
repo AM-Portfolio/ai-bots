@@ -50,6 +50,11 @@ class Settings(BaseSettings):
     environment: str = "development"
     
     @property
+    def port(self) -> int:
+        import os
+        return int(os.environ.get("PORT", self.app_port))
+    
+    @property
     def is_production(self) -> bool:
         return self.environment.lower() == "production"
     

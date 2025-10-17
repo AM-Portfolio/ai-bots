@@ -88,12 +88,15 @@ async def test_github(repository: str):
     from shared.clients.github_client import github_client
     
     try:
-        owner, repo = repository.split("/")
-        issues = github_client.get_issues(owner, repo, state="open", labels=["bug"])
+        if not github_client.client:
+            return {"success": False, "error": "GitHub client not initialized"}
+        
+        repo = github_client.client.get_repo(repository)
+        issues = list(repo.get_issues(state="open")[:5])
         return {
             "success": True,
             "issues_count": len(issues),
-            "issues": [{"number": i.number, "title": i.title} for i in issues[:5]]
+            "issues": [{"number": i.number, "title": i.title} for i in issues]
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -105,11 +108,11 @@ async def test_jira(project_key: str):
     from shared.clients.jira_client import jira_client
     
     try:
-        issues = jira_client.search_issues(f"project = {project_key} AND status = Open", maxResults=5)
+        issues = jira_client.search_issues(f"project = {project_key} AND status = Open", max_results=5)
         return {
             "success": True,
             "issues_count": len(issues),
-            "issues": [{"key": i.key, "summary": i.fields.summary} for i in issues]
+            "issues": [{"key": i.get("key"), "summary": i.get("summary")} for i in issues]
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -137,7 +140,7 @@ async def test_grafana():
     from shared.clients.grafana_client import grafana_client
     
     try:
-        alerts = grafana_client.get_alerts()
+        alerts = await grafana_client.get_alerts()
         return {
             "success": True,
             "alerts_count": len(alerts),
