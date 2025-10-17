@@ -163,7 +163,15 @@ See `API_ENDPOINTS.md` for complete documentation.
 
 ## Recent Changes
 
-**2025-10-17 (Latest):**
+**2025-10-17 (Latest - Integration Testing):**
+- ✅ Upgraded Together AI SDK from v0.2.11 to v1.5.26 (OpenAI-compatible API)
+- ✅ Fixed Together AI provider initialization for proper client setup
+- ✅ Created GitHub Replit integration client using Replit connector
+- ✅ Updated test endpoints to use new Replit GitHub integration
+- ✅ Both Together AI and GitHub integrations tested and working
+- ✅ Configured VM deployment mode for both API and UI in production
+
+**2025-10-17 (Earlier - Testing UI):**
 - ✅ Created comprehensive Streamlit testing UI in `ui/` package
 - ✅ Added 8 test endpoints for individual feature testing
 - ✅ Implemented dual workflow setup: API (port 5000) + UI (port 8501)
@@ -171,7 +179,7 @@ See `API_ENDPOINTS.md` for complete documentation.
 - ✅ Added comprehensive UI Testing Guide documentation
 - ✅ All features now testable through intuitive web interface
 
-**2025-10-17 (Earlier):**
+**2025-10-17 (Earlier - LLM Provider):**
 - ✅ Integrated Together AI as default LLM provider
 - ✅ Implemented factory pattern for multi-provider support
 - ✅ Added automatic fallback (Together AI → Azure OpenAI)
