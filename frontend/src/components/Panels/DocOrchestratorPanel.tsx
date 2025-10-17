@@ -155,28 +155,34 @@ const DocOrchestratorPanel = () => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Confluence Space (optional)
+                Confluence Space <span className="text-gray-500 text-xs">(optional - leave empty to skip)</span>
               </label>
               <input
                 type="text"
                 value={confluenceSpace}
                 onChange={(e) => setConfluenceSpace(e.target.value)}
-                placeholder="SPACE-KEY"
+                placeholder="e.g., AlgoTradin, SPACE-KEY"
                 className="input-field"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                💡 Test Confluence integration to see available spaces
+              </p>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Jira Project (optional)
+                Jira Project <span className="text-gray-500 text-xs">(optional - leave empty to skip)</span>
               </label>
               <input
                 type="text"
                 value={jiraProject}
                 onChange={(e) => setJiraProject(e.target.value)}
-                placeholder="PROJECT-KEY"
+                placeholder="e.g., PROJ, PROJECT-KEY"
                 className="input-field"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                💡 Test Jira integration to see available projects
+              </p>
             </div>
           </div>
 
