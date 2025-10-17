@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Settings, Mic, MicOff, Volume2, Sparkles, MessageSquarePlus, Trash2, Clock } from 'lucide-react';
+import { Send, Loader2, Mic, MicOff, Volume2, Sparkles, MessageSquarePlus, Trash2, Clock } from 'lucide-react';
 import { apiClient } from '../../services/api';
 import type { Provider, ThinkingProcessData } from '../../types/api';
 import ThinkingProcess from '../Shared/ThinkingProcess';
@@ -22,21 +22,20 @@ interface Conversation {
 
 const LLMTestPanel = () => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('What are some best practices for writing clean Python code?');
+  const [input, setInput] = useState('');
   const [provider, setProvider] = useState<Provider>('together');
   const [isLoading, setIsLoading] = useState(false);
-  const [showBackendDetails, setShowBackendDetails] = useState(true);
+  const [showBackendDetails, setShowBackendDetails] = useState(false);
   const [thinkingData, setThinkingData] = useState<ThinkingProcessData | null>(null);
   
   // Chat history state
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
-  const [showHistory, setShowHistory] = useState(true);
+  const showHistory = true;
   
   // Voice features
   const [isListening, setIsListening] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
-  const [thinkingMode, setThinkingMode] = useState(false);
   const recognitionRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -67,7 +66,6 @@ const LLMTestPanel = () => {
       })));
       setCurrentConversationId(conversationId);
       
-      // Set provider from conversation
       const conv = conversations.find(c => c.id === conversationId);
       if (conv) {
         setProvider(conv.provider as Provider);
@@ -81,7 +79,6 @@ const LLMTestPanel = () => {
     if (messages.length === 0) return;
     
     try {
-      // Generate title from first user message
       const firstUserMsg = messages.find(m => m.role === 'user');
       const title = firstUserMsg 
         ? firstUserMsg.content.slice(0, 50) + (firstUserMsg.content.length > 50 ? '...' : '')
@@ -201,8 +198,7 @@ const LLMTestPanel = () => {
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = { role: 'user', content: input };
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
+    setMessages((prev) => [...prev, userMessage]);
     const messageText = input;
     setInput('');
     setIsLoading(true);
@@ -226,7 +222,6 @@ const LLMTestPanel = () => {
         };
         setMessages((prev) => [...prev, assistantMessage]);
         
-        // Auto-save after assistant response
         setTimeout(() => saveConversation(), 500);
         
         if (voiceEnabled) {
@@ -287,9 +282,6 @@ const LLMTestPanel = () => {
                         {new Date(conv.updated_at).toLocaleDateString()}
                       </p>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {conv.message_count} messages
-                    </p>
                   </div>
                   <button
                     onClick={(e) => deleteConversation(conv.id, e)}
@@ -311,79 +303,23 @@ const LLMTestPanel = () => {
       )}
 
       {/* Main Chat Area */}
-      <div className="flex-1 space-y-6">
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-3">
-              <Settings className="w-5 h-5 text-gray-600" />
-              <h3 className="text-lg font-semibold text-gray-900">Settings</h3>
-            </div>
-            <div className="flex items-center space-x-4">
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={voiceEnabled}
-                  onChange={(e) => setVoiceEnabled(e.target.checked)}
-                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
-                />
-                <Volume2 className="w-4 h-4 text-gray-600" />
-                <span className="text-sm text-gray-700">Voice Response</span>
-              </label>
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={thinkingMode}
-                  onChange={(e) => setThinkingMode(e.target.checked)}
-                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
-                />
-                <Sparkles className="w-4 h-4 text-gray-600" />
-                <span className="text-sm text-gray-700">Thinking Mode</span>
-              </label>
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showBackendDetails}
-                  onChange={(e) => setShowBackendDetails(e.target.checked)}
-                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
-                />
-                <span className="text-sm text-gray-700">Backend Details</span>
-              </label>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-4">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Provider
-              </label>
-              <select
-                value={provider}
-                onChange={(e) => setProvider(e.target.value as Provider)}
-                className="input-field"
-              >
-                <option value="together">Together AI (Llama-3.3-70B)</option>
-                <option value="azure">Azure OpenAI (GPT-4)</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div className="card min-h-[500px] flex flex-col">
-          <div className="flex-1 overflow-y-auto mb-4 space-y-4">
-            {messages.length === 0 && (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 bg-primary-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-                  <Send className="w-8 h-8 text-primary-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Ready to chat!
-                </h3>
-                <p className="text-gray-600">
-                  Send a message to start testing the LLM
-                </p>
+      <div className="flex-1 flex flex-col">
+        <div className="flex-1 card overflow-y-auto mb-4 p-6">
+          {messages.length === 0 && (
+            <div className="text-center py-20">
+              <div className="w-16 h-16 bg-primary-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+                <Send className="w-8 h-8 text-primary-600" />
               </div>
-            )}
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Ready to chat!
+              </h3>
+              <p className="text-gray-600">
+                Send a message to start testing the LLM
+              </p>
+            </div>
+          )}
 
+          <div className="space-y-4">
             {messages.map((message, index) => (
               <div
                 key={index}
@@ -413,7 +349,7 @@ const LLMTestPanel = () => {
               <ThinkingProcess data={thinkingData} title="Backend Processing Steps" />
             )}
 
-            {isLoading && (!showBackendDetails || thinkingMode) && (
+            {isLoading && (
               <div className="flex justify-start">
                 <div className="message-bubble message-assistant">
                   <div className="flex items-center space-x-2">
@@ -424,66 +360,107 @@ const LLMTestPanel = () => {
               </div>
             )}
           </div>
+        </div>
 
-          <div className="border-t border-gray-200 pt-4">
-            <div className="flex space-x-3">
-              <div className="flex-1 relative">
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                  placeholder={isListening ? "Listening..." : "Type your message... (Shift+Enter for new line)"}
-                  className={`textarea-field pr-12 ${isListening ? 'ring-2 ring-red-500' : ''}`}
-                  rows={3}
-                  disabled={isListening}
-                />
-                <button
-                  onClick={toggleVoiceInput}
-                  disabled={isLoading}
-                  className={`absolute right-2 top-2 p-2 rounded-lg transition-colors ${
-                    isListening 
-                      ? 'bg-red-500 text-white hover:bg-red-600' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                  title={isListening ? "Stop listening" : "Start voice input"}
-                >
-                  {isListening ? (
-                    <MicOff className="w-5 h-5" />
-                  ) : (
-                    <Mic className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
+        {/* Compact Input Area with Settings */}
+        <div className="card p-4">
+          <div className="flex space-x-3 mb-3">
+            <div className="flex-1 relative">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder={isListening ? "Listening..." : "Message AI Assistant..."}
+                className={`w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none ${isListening ? 'ring-2 ring-red-500' : ''}`}
+                rows={2}
+                disabled={isListening}
+              />
               <button
-                onClick={handleSend}
-                disabled={isLoading || !input.trim()}
-                className="btn-primary flex items-center space-x-2 self-end"
+                onClick={toggleVoiceInput}
+                disabled={isLoading}
+                className={`absolute right-2 top-2 p-2 rounded-lg transition-colors ${
+                  isListening 
+                    ? 'bg-red-500 text-white hover:bg-red-600' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                title={isListening ? "Stop listening" : "Start voice input"}
               >
-                {isLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                {isListening ? (
+                  <MicOff className="w-4 h-4" />
                 ) : (
-                  <Send className="w-5 h-5" />
+                  <Mic className="w-4 h-4" />
                 )}
-                <span>Send</span>
               </button>
             </div>
-            {isListening && (
-              <p className="text-sm text-red-600 mt-2 flex items-center space-x-2">
-                <span className="animate-pulse">🎤</span>
-                <span>Listening... Speak now</span>
-              </p>
-            )}
-            {voiceEnabled && (
-              <p className="text-sm text-blue-600 mt-2 flex items-center space-x-2">
-                <Volume2 className="w-4 h-4" />
-                <span>Voice responses enabled</span>
-              </p>
-            )}
+            <button
+              onClick={handleSend}
+              disabled={isLoading || !input.trim()}
+              className="btn-primary px-6 flex items-center space-x-2 self-end"
+            >
+              {isLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Send className="w-5 h-5" />
+              )}
+            </button>
+          </div>
+
+          {/* Compact Settings Bar */}
+          <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <select
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value as Provider)}
+                  className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                >
+                  <option value="together">Llama-3.3-70B</option>
+                  <option value="azure">GPT-4</option>
+                </select>
+              </div>
+
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={voiceEnabled}
+                  onChange={(e) => setVoiceEnabled(e.target.checked)}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+                <Volume2 className="w-4 h-4 text-gray-600" />
+                <span className="text-sm text-gray-700">Voice</span>
+              </label>
+
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showBackendDetails}
+                  onChange={(e) => setShowBackendDetails(e.target.checked)}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+                <Sparkles className="w-4 h-4 text-gray-600" />
+                <span className="text-sm text-gray-700">Details</span>
+              </label>
+            </div>
+
+            <div className="text-xs text-gray-500">
+              {isListening && (
+                <span className="flex items-center space-x-1 text-red-600">
+                  <span className="animate-pulse">🎤</span>
+                  <span>Listening...</span>
+                </span>
+              )}
+              {voiceEnabled && !isListening && (
+                <span className="flex items-center space-x-1 text-blue-600">
+                  <Volume2 className="w-3 h-3" />
+                  <span>Voice enabled</span>
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
