@@ -218,7 +218,15 @@ class GitHubReplitClient:
         
         try:
             repo = client.get_repo(repo_name)
-            tree = repo.get_git_tree(ref, recursive=recursive)
+            
+            # Try to get the default branch if 'main' doesn't exist
+            try:
+                tree = repo.get_git_tree(ref, recursive=recursive)
+            except GithubException:
+                # Fallback to default branch
+                default_branch = repo.default_branch
+                logger.info(f"Branch '{ref}' not found, using default branch '{default_branch}'")
+                tree = repo.get_git_tree(default_branch, recursive=recursive)
             
             files = []
             for item in tree.tree:
@@ -373,6 +381,68 @@ class GitHubReplitClient:
             return result
         except GithubException as e:
             logger.error(f"Failed to get issues from {repo_name}: {e}")
+            return None
+    
+    async def commit_documentation(
+        self,
+        repo_name: str,
+        doc_content: str,
+        file_path: str = "docs/AI_GENERATED_DOCS.md",
+        commit_message: str = "docs: Add AI-generated documentation",
+        branch: str = "main"
+    ) -> Optional[Dict[str, Any]]:
+        """Commit generated documentation to repository"""
+        client = await self._get_client()
+        if not client:
+            return None
+        
+        try:
+            repo = client.get_repo(repo_name)
+            
+            # Try to get default branch if specified branch doesn't exist
+            try:
+                repo.get_branch(branch)
+            except GithubException:
+                branch = repo.default_branch
+                logger.info(f"Using default branch '{branch}' for commit")
+            
+            # Create or update the file
+            try:
+                existing_file = repo.get_contents(file_path, ref=branch)
+                repo.update_file(
+                    file_path,
+                    commit_message,
+                    doc_content,
+                    existing_file.sha,
+                    branch=branch
+                )
+                action = "updated"
+            except GithubException:
+                repo.create_file(
+                    file_path,
+                    commit_message,
+                    doc_content,
+                    branch=branch
+                )
+                action = "created"
+            
+            # Get the commit URL
+            commits = repo.get_commits(path=file_path, sha=branch)
+            latest_commit = commits[0] if commits.totalCount > 0 else None
+            
+            result = {
+                "action": action,
+                "file_path": file_path,
+                "branch": branch,
+                "commit_url": latest_commit.html_url if latest_commit else None,
+                "commit_sha": latest_commit.sha if latest_commit else None
+            }
+            
+            logger.info(f"{action.capitalize()} documentation file '{file_path}' in {repo_name}")
+            return result
+            
+        except GithubException as e:
+            logger.error(f"Failed to commit documentation to {repo_name}: {e}")
             return None
 
 

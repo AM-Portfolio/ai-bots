@@ -15,6 +15,9 @@ class DocumentationRequest(BaseModel):
     repository: Optional[str] = None
     max_files: int = 10
     format: str = "markdown"
+    commit_to_github: bool = False
+    commit_path: str = "docs/AI_GENERATED_DOCS.md"
+    commit_message: Optional[str] = None
 
 
 class DocumentationResult(BaseModel):
@@ -23,6 +26,7 @@ class DocumentationResult(BaseModel):
     documentation: Optional[str] = None
     files_analyzed: List[str] = []
     repository: Optional[str] = None
+    github_commit: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
     metadata: Dict[str, Any] = {}
 
@@ -211,11 +215,25 @@ Format the documentation in clear Markdown with proper headers, code blocks, and
                 focus_areas=parsed_intent.get("focus_areas", [])
             )
             
+            # Optionally commit to GitHub
+            github_commit_result = None
+            if request.commit_to_github and documentation:
+                commit_msg = request.commit_message or f"docs: Add AI-generated documentation for {parsed_intent.get('task_type', 'general')}"
+                github_commit_result = await self.github_client.commit_documentation(
+                    repo_name=repo_name,
+                    doc_content=documentation,
+                    file_path=request.commit_path,
+                    commit_message=commit_msg
+                )
+                if github_commit_result:
+                    logger.info(f"Documentation committed to GitHub: {github_commit_result.get('commit_url')}")
+            
             return DocumentationResult(
                 success=True,
                 documentation=documentation,
                 files_analyzed=files_to_analyze,
                 repository=repo_name,
+                github_commit=github_commit_result,
                 metadata={
                     "task_type": parsed_intent.get("task_type"),
                     "focus_areas": parsed_intent.get("focus_areas"),
@@ -235,7 +253,10 @@ async def generate_documentation(
     prompt: str,
     repository: Optional[str] = None,
     max_files: int = 10,
-    format: str = "markdown"
+    format: str = "markdown",
+    commit_to_github: bool = False,
+    commit_path: str = "docs/AI_GENERATED_DOCS.md",
+    commit_message: Optional[str] = None
 ) -> DocumentationResult:
     """
     Generate documentation from natural language prompt
@@ -245,6 +266,9 @@ async def generate_documentation(
         repository: Optional repository override (owner/repo)
         max_files: Maximum number of files to analyze
         format: Output format (markdown, html, etc.)
+        commit_to_github: Whether to commit generated docs to GitHub
+        commit_path: Path where to save docs in repo
+        commit_message: Custom commit message
     
     Returns:
         DocumentationResult with generated documentation
@@ -255,7 +279,10 @@ async def generate_documentation(
         prompt=prompt,
         repository=repository,
         max_files=max_files,
-        format=format
+        format=format,
+        commit_to_github=commit_to_github,
+        commit_path=commit_path,
+        commit_message=commit_message
     )
     
     result = await service.generate(request)
