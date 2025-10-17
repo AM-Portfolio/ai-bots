@@ -68,17 +68,25 @@ async def test_llm(prompt: str, provider: str = "together"):
     """Test LLM provider with a simple prompt"""
     from shared.llm import llm_client
     
+    logger.info(f"Testing LLM with provider: {provider}, prompt: {prompt[:50]}...")
+    
     try:
         response = await llm_client.chat_completion(
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7
         )
-        return {
+        
+        result = {
             "success": True,
             "provider": provider,
             "response": response
         }
+        
+        logger.info(f"LLM test successful: {result}")
+        return result
+        
     except Exception as e:
+        logger.error(f"LLM test failed: {e}")
         return {"success": False, "error": str(e)}
 
 

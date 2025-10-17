@@ -12,7 +12,9 @@ class APIClient:
         if domain and owner:
             self.base_url = base_url or f"https://{domain}.{owner}.repl.co"
         else:
-            self.base_url = base_url or os.environ.get("API_BASE_URL", "http://localhost:5000")
+            # Check if PORT is set in environment and use it
+            port = os.environ.get("PORT", "8501")  # Use port 8501
+            self.base_url = base_url or os.environ.get("API_BASE_URL", f"http://localhost:{port}")
     
     def test_llm(self, prompt: str, provider: str = "together") -> Dict[str, Any]:
         """Test LLM provider"""
@@ -22,7 +24,25 @@ class APIClient:
                 params={"prompt": prompt, "provider": provider},
                 timeout=30
             )
-            return response.json()
+            
+            # Check if response is successful
+            if response.status_code != 200:
+                return {"success": False, "error": f"HTTP {response.status_code}: {response.text}"}
+            
+            # Try to parse JSON response
+            try:
+                json_response = response.json()
+                # Check if it's an unexpected response format
+                if "code" in json_response and "message" in json_response:
+                    return {"success": False, "error": f"Unexpected response: {json_response}"}
+                return json_response
+            except ValueError as e:
+                return {"success": False, "error": f"Invalid JSON response: {response.text}"}
+                
+        except requests.exceptions.Timeout:
+            return {"success": False, "error": "Request timeout"}
+        except requests.exceptions.ConnectionError:
+            return {"success": False, "error": "Connection error - is the API server running?"}
         except Exception as e:
             return {"success": False, "error": str(e)}
     

@@ -21,6 +21,22 @@ wheels/
 *.egg
 MANIFEST
 
+# Dependencies
+deps/
+node_modules/
+
+# Build files
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.out
+*.app
+
 # Virtual environments
 venv/
 env/
