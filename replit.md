@@ -37,7 +37,7 @@ The project employs a clean architecture approach, separating concerns into dist
     -   Modal drawer for configuration with form validation
     -   Built-in test connection functionality
     -   Support for multiple auth types (basic, token, OAuth, API key, connection string)
-    -   Pre-configured services: GitHub, Jira, Confluence, Grafana, PostgreSQL, OpenAI, Azure, REST API
+    -   Pre-configured services: GitHub, Jira, Confluence, Grafana, PostgreSQL, MongoDB, OpenAI, Azure, Stripe, Twilio, SendGrid, REST API
     -   Extensible architecture for adding new services with minimal code
 -   **Compact Settings:** Modern settings bar positioned below chat input with model selector, voice toggle, and backend details in a single streamlined row.
 -   **Doc Orchestrator UI:** User-friendly checkbox-based interface allowing selective publishing to GitHub, Confluence, and/or Jira with expandable configuration fields and visual service icons.
