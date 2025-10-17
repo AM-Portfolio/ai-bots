@@ -35,108 +35,120 @@ tabs = st.tabs([
 
 with tabs[0]:
     st.header("🧠 LLM Provider Testing")
-    st.markdown("""
-    **Thinking Mode:** See detailed backend operations in real-time
-    - 🔍 Provider selection & initialization
-    - 📡 API request/response details
-    - ⚡ Performance metrics
-    - 🔄 Fallback behavior (if configured)
-    """)
     
-    col1, col2 = st.columns([3, 1])
+    # Settings row
+    col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
-        prompt = st.text_area(
-            "Enter your prompt:",
-            value="What are some best practices for writing clean Python code?",
-            height=100
-        )
+        st.caption("**Thinking Mode:** See detailed backend operations in real-time")
     with col2:
-        provider = st.selectbox("Provider", ["together", "azure"], index=0)
-        show_details = st.checkbox("Show Backend Details", value=True, help="Display detailed backend operations")
+        provider = st.selectbox("Provider", ["together", "azure"], index=0, label_visibility="collapsed")
+    with col3:
+        show_details = st.checkbox("Show Backend Details", value=False, help="Display detailed backend operations")
     
-    if st.button("Test LLM", key="test_llm", type="primary"):
-        # Create a status container for real-time updates
-        status_container = st.container()
+    # Input area
+    prompt = st.text_area(
+        "Enter your prompt:",
+        value="What are some best practices for writing clean Python code?",
+        height=100,
+        placeholder="Type your message here..."
+    )
+    
+    if st.button("Test LLM", key="test_llm", type="primary", use_container_width=True):
+        import time
         
-        with status_container:
-            st.info("🚀 **Starting LLM Test...**")
+        # Chat-like container
+        chat_container = st.container()
+        
+        with chat_container:
+            # User message bubble
+            st.markdown(f"""
+            <div style="background-color: #f0f0f0; padding: 15px; border-radius: 10px; margin: 10px 0;">
+                <strong>You</strong><br/>
+                {prompt}
+            </div>
+            """, unsafe_allow_html=True)
             
-            # Step 1: Provider Selection
-            with st.expander("📋 Step 1: Provider Selection", expanded=show_details):
-                st.write(f"**Selected Provider:** `{provider}`")
-                if provider == "together":
-                    st.write("- **Model:** Llama-3.3-70B-Instruct-Turbo (default)")
-                    st.write("- **API:** Together AI OpenAI-compatible endpoint")
-                    st.write("- **Fallback:** Azure OpenAI (if configured)")
-                else:
-                    st.write("- **Model:** GPT-4 (Azure deployment)")
-                    st.write("- **API:** Azure OpenAI endpoint")
-                    st.write("- **Fallback:** Together AI (if configured)")
-            
-            # Step 2: API Request
-            with st.expander("📤 Step 2: Sending API Request", expanded=show_details):
-                st.write("**Request Details:**")
-                st.code(f"""
-Provider: {provider}
+            # Thinking process indicator
+            if show_details:
+                with st.status("🚀 **Starting LLM Test...**", expanded=True) as status:
+                    # Step 1: Provider Selection
+                    with st.expander("🔍 Step 1: Provider Selection"):
+                        st.write(f"**Selected Provider:** `{provider}`")
+                        if provider == "together":
+                            st.write("- **Model:** Llama-3.3-70B-Instruct-Turbo")
+                            st.write("- **API:** Together AI OpenAI-compatible")
+                            st.write("- **Fallback:** Azure OpenAI (if configured)")
+                        else:
+                            st.write("- **Model:** GPT-4 (Azure deployment)")
+                            st.write("- **API:** Azure OpenAI endpoint")
+                            st.write("- **Fallback:** Together AI (if configured)")
+                    
+                    # Step 2: API Request
+                    with st.expander("📤 Step 2: Sending API Request"):
+                        st.code(f"""Provider: {provider}
 Prompt Length: {len(prompt)} characters
 Endpoint: /api/test/llm
-Method: POST
-                """, language="text")
-                
-            # Make the actual API call
-            import time
-            start_time = time.time()
-            
-            with st.spinner(f"⏳ Calling {provider.upper()} API..."):
-                result = api_client.test_llm(prompt, provider)
-            
-            end_time = time.time()
-            duration = end_time - start_time
-            
-            # Step 3: API Response
-            with st.expander("📥 Step 3: API Response Received", expanded=show_details):
-                st.write(f"**Response Time:** `{duration:.2f}s`")
-                st.write(f"**Success:** `{result.get('success', False)}`")
-                if result.get("success"):
-                    response_text = result.get("response", "")
-                    st.write(f"**Response Length:** `{len(response_text)} characters`")
+Method: POST""", language="text")
                     
-                    # Try to extract provider info from response
-                    if result.get("provider_used"):
-                        st.write(f"**Provider Used:** `{result.get('provider_used')}`")
-                        if result.get('fallback_used'):
-                            st.warning("⚠️ Primary provider failed, fallback was used")
+                    # Make API call
+                    start_time = time.time()
+                    result = api_client.test_llm(prompt, provider)
+                    end_time = time.time()
+                    duration = end_time - start_time
                     
-                    # Token usage if available
-                    if result.get("tokens"):
-                        st.write(f"**Token Usage:** `{result.get('tokens')} tokens`")
-                
-            # Final Result
-            st.markdown("---")
-            if result.get("success"):
-                st.success("✅ **LLM Response Generated Successfully**")
-                
-                # Response with syntax highlighting
-                with st.container():
-                    st.markdown("### 🤖 AI Response:")
-                    response_box = st.container()
-                    with response_box:
-                        st.markdown(result.get("response", "No response"))
-                
-                # Backend metrics
-                if show_details:
-                    col_a, col_b, col_c = st.columns(3)
-                    with col_a:
-                        st.metric("Provider", provider.upper())
-                    with col_b:
-                        st.metric("Response Time", f"{duration:.2f}s")
-                    with col_c:
-                        st.metric("Status", "✅ Success")
+                    # Step 3: API Response
+                    with st.expander("📥 Step 3: API Response Received"):
+                        st.write(f"**Response Time:** `{duration:.2f}s`")
+                        st.write(f"**Success:** `{result.get('success', False)}`")
+                        if result.get("success"):
+                            response_text = result.get("response", "")
+                            st.write(f"**Response Length:** `{len(response_text)} characters`")
+                            if result.get("provider_used"):
+                                st.write(f"**Provider Used:** `{result.get('provider_used')}`")
+                            if result.get('fallback_used'):
+                                st.warning("⚠️ Fallback was used")
+                            if result.get("tokens"):
+                                st.write(f"**Token Usage:** `{result.get('tokens')} tokens`")
+                    
+                    status.update(label="✅ **Complete!**", state="complete")
             else:
-                st.error(f"❌ **Error:** {result.get('error', 'Unknown error')}")
+                # Minimal spinner without details
+                with st.spinner(f"⏳ Thinking..."):
+                    start_time = time.time()
+                    result = api_client.test_llm(prompt, provider)
+                    end_time = time.time()
+                    duration = end_time - start_time
+            
+            # AI response bubble
+            if result.get("success"):
+                st.markdown(f"""
+                <div style="background-color: #e8f4f8; padding: 15px; border-radius: 10px; margin: 10px 0;">
+                    <strong>🤖 AI Assistant ({provider})</strong><br/>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Response content
+                st.markdown(result.get("response", "No response"))
+                
+                # Metrics footer
+                col_a, col_b, col_c = st.columns(3)
+                with col_a:
+                    st.caption(f"**Provider:** {provider.upper()}")
+                with col_b:
+                    st.caption(f"**Response Time:** {duration:.2f}s")
+                with col_c:
+                    st.caption(f"**Status:** ✅ Success")
+            else:
+                # Error message
+                st.markdown(f"""
+                <div style="background-color: #ffe8e8; padding: 15px; border-radius: 10px; margin: 10px 0;">
+                    <strong>❌ Error</strong><br/>
+                    {result.get('error', 'Unknown error')}
+                </div>
+                """, unsafe_allow_html=True)
                 
                 if show_details:
-                    with st.expander("🔍 Error Details"):
+                    with st.expander("🔍 Full Error Details"):
                         st.json(result)
 
 with tabs[1]:
