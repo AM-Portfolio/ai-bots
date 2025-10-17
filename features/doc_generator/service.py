@@ -4,7 +4,7 @@ from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
 
 from shared.clients.github_replit_client import github_replit_client
-from shared.llm_providers.factory import get_llm_provider
+from shared.llm_providers.factory import get_llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class DocGeneratorService:
     
     async def parse_prompt(self, prompt: str) -> Dict[str, Any]:
         """Use LLM to parse user prompt and extract intent"""
-        llm_provider = get_llm_provider()
+        llm_provider = get_llm_client()
         
         parse_prompt = f"""You are a documentation assistant. Parse this user request and extract:
 1. Repository name (owner/repo format) - if mentioned
@@ -56,7 +56,10 @@ Respond in JSON format:
 """
         
         try:
-            response = await llm_provider.chat(parse_prompt)
+            response = await llm_provider.chat_completion(
+                messages=[{"role": "user", "content": parse_prompt}],
+                temperature=0.3
+            )
             import json
             parsed = json.loads(response.strip().strip('```json').strip('```').strip())
             logger.info(f"Parsed prompt: {parsed}")
@@ -122,7 +125,7 @@ Respond in JSON format:
         focus_areas: List[str]
     ) -> str:
         """Fetch files and generate documentation using LLM"""
-        llm_provider = get_llm_provider()
+        llm_provider = get_llm_client()
         
         # Fetch file contents
         file_contents = await self.github_client.get_multiple_files(
@@ -160,7 +163,11 @@ Format the documentation in clear Markdown with proper headers, code blocks, and
 """
         
         try:
-            documentation = await llm_provider.chat(doc_prompt)
+            documentation = await llm_provider.chat_completion(
+                messages=[{"role": "user", "content": doc_prompt}],
+                temperature=0.5,
+                max_tokens=3000
+            )
             logger.info(f"Generated documentation ({len(documentation)} chars)")
             return documentation
         except Exception as e:
