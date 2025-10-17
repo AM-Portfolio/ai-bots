@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     azure_client_secret: Optional[str] = None
     azure_key_vault_url: Optional[str] = None
     
+    llm_provider: str = "together"
+    
+    together_api_key: Optional[str] = None
+    together_model: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+    
     azure_openai_endpoint: Optional[str] = None
     azure_openai_api_key: Optional[str] = None
     azure_openai_deployment_name: str = "gpt-4"

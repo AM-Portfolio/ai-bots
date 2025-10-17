@@ -1,33 +1,43 @@
-from openai import AzureOpenAI
 from typing import List, Dict, Any, Optional
 import logging
-import json
 
 from .config import settings
+from .llm_providers import get_llm_client, BaseLLMProvider
 
 logger = logging.getLogger(__name__)
 
 
 class LLMClient:
+    """
+    Unified LLM client that supports multiple providers via factory pattern.
+    Defaults to Together AI, with Azure OpenAI as fallback.
+    """
+    
     def __init__(self):
-        self.client: Optional[AzureOpenAI] = None
+        self.provider: Optional[BaseLLMProvider] = None
         self._initialize_client()
     
     def _initialize_client(self):
-        if not settings.azure_openai_endpoint or not settings.azure_openai_api_key:
-            logger.warning("Azure OpenAI credentials not configured")
-            return
-        
+        """Initialize LLM client using factory pattern"""
         try:
-            self.client = AzureOpenAI(
-                api_key=settings.azure_openai_api_key,
-                api_version=settings.azure_openai_api_version,
-                azure_endpoint=settings.azure_openai_endpoint
+            self.provider = get_llm_client(
+                provider_type=settings.llm_provider,
+                together_api_key=settings.together_api_key,
+                together_model=settings.together_model,
+                azure_endpoint=settings.azure_openai_endpoint,
+                azure_api_key=settings.azure_openai_api_key,
+                azure_deployment=settings.azure_openai_deployment_name,
+                azure_api_version=settings.azure_openai_api_version
             )
-            logger.info("Azure OpenAI client initialized successfully")
+            
+            if self.provider.is_available():
+                logger.info(f"LLM client initialized with provider: {settings.llm_provider}")
+            else:
+                logger.warning(f"LLM provider '{settings.llm_provider}' not available")
+                
         except Exception as e:
-            logger.error(f"Failed to initialize Azure OpenAI client: {e}")
-            self.client = None
+            logger.error(f"Failed to initialize LLM client: {e}")
+            self.provider = None
     
     async def chat_completion(
         self,
@@ -36,26 +46,17 @@ class LLMClient:
         max_tokens: int = 2000,
         stream: bool = False
     ) -> Optional[str]:
-        if not self.client:
-            logger.error("Azure OpenAI client not initialized")
+        """Execute chat completion with the configured LLM provider"""
+        if not self.provider:
+            logger.error("LLM provider not initialized")
             return None
         
-        try:
-            response = self.client.chat.completions.create(
-                model=settings.azure_openai_deployment_name,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                stream=stream
-            )
-            
-            if stream:
-                return response
-            
-            return response.choices[0].message.content
-        except Exception as e:
-            logger.error(f"Chat completion failed: {e}")
-            return None
+        return await self.provider.chat_completion(
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stream=stream
+        )
     
     async def analyze_code(
         self,
@@ -63,93 +64,46 @@ class LLMClient:
         context: str,
         task: str = "analyze"
     ) -> Optional[Dict[str, Any]]:
-        system_message = """You are an expert software engineer and code analyst. 
-        Provide detailed, actionable analysis of code issues and suggest fixes."""
-        
-        user_message = f"""
-Task: {task}
-
-Context: {context}
-
-Code:
-```
-{code}
-```
-
-Provide your analysis in JSON format with the following structure:
-{{
-    "root_cause": "description of the issue",
-    "affected_components": ["component1", "component2"],
-    "suggested_fix": "detailed fix description",
-    "fixed_code": "the corrected code",
-    "explanation": "explanation of the fix",
-    "confidence": 0.95
-}}
-"""
-        
-        messages = [
-            {"role": "system", "content": system_message},
-            {"role": "user", "content": user_message}
-        ]
-        
-        response = await self.chat_completion(messages, temperature=0.3)
-        
-        if not response:
+        """Analyze code using the configured LLM provider"""
+        if not self.provider:
+            logger.error("LLM provider not initialized")
             return None
         
-        try:
-            return json.loads(response)
-        except json.JSONDecodeError:
-            logger.error("Failed to parse LLM response as JSON")
-            return {"raw_response": response}
+        return await self.provider.analyze_code(
+            code=code,
+            context=context,
+            task=task
+        )
     
     async def generate_tests(
         self,
         code: str,
         language: str = "python"
     ) -> Optional[str]:
-        system_message = f"""You are an expert test engineer. 
-        Generate comprehensive unit tests for {language} code."""
+        """Generate tests using the configured LLM provider"""
+        if not self.provider:
+            logger.error("LLM provider not initialized")
+            return None
         
-        user_message = f"""
-Generate unit tests for the following code:
-
-```{language}
-{code}
-```
-
-Provide complete, runnable test code with all necessary imports and test cases.
-"""
-        
-        messages = [
-            {"role": "system", "content": system_message},
-            {"role": "user", "content": user_message}
-        ]
-        
-        return await self.chat_completion(messages, temperature=0.5)
+        return await self.provider.generate_tests(
+            code=code,
+            language=language
+        )
     
     async def generate_documentation(
         self,
         content: str,
         doc_type: str = "confluence"
     ) -> Optional[str]:
-        system_message = f"""You are a technical writer. 
-        Create clear, comprehensive documentation in {doc_type} format."""
+        """Generate documentation using the configured LLM provider"""
+        if not self.provider:
+            logger.error("LLM provider not initialized")
+            return None
         
-        user_message = f"""
-Create documentation for the following:
-
-{content}
-
-Format the output as markdown suitable for {doc_type}.
-"""
-        
-        messages = [
-            {"role": "system", "content": system_message},
-            {"role": "user", "content": user_message}
-        ]
-        
-        return await self.chat_completion(messages, temperature=0.7)
+        return await self.provider.generate_documentation(
+            content=content,
+            doc_type=doc_type
+        )
 
 
 llm_client = LLMClient()
