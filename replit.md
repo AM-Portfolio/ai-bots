@@ -98,12 +98,12 @@ The project follows a clean architecture with:
 
 The application runs both backend API and React frontend automatically.
 
-### Automatic Start (Configured)
+### Development Mode (Current)
 - **Backend API:** Port 8000 (FastAPI with auto-reload)
 - **Frontend UI:** Port 5000 (Vite dev server with HMR)
 - The workflow runs both services simultaneously
 
-### Manual Start
+### Manual Start (Development)
 **Backend only:**
 ```bash
 python main.py
@@ -119,9 +119,30 @@ cd frontend && npm run dev
 python main.py & cd frontend && npm run dev
 ```
 
+### Production Deployment (Autoscale)
+The app is configured for **Autoscale deployment** on Replit:
+
+**Build Process:**
+1. Installs frontend dependencies: `cd frontend && npm install`
+2. Builds React production bundle: `npm run build` → `frontend/dist/`
+3. Optimized assets ready for serving
+
+**Run Process:**
+- Single command: `uvicorn main:app --host 0.0.0.0 --port 5000`
+- FastAPI serves both:
+  - **API endpoints:** `/api/*`, `/health`, `/metrics`
+  - **Static frontend:** React app from `frontend/dist/`
+  - **SPA routing:** Catch-all for client-side navigation
+
+**How It Works:**
+- Root `/` → Serves `frontend/dist/index.html`
+- `/assets/*` → Serves static CSS/JS bundles
+- `/api/*` → Backend API endpoints
+- Any other route → Serves `index.html` (React Router handles routing)
+
 ### Access URLs
 - **Frontend UI:** http://0.0.0.0:5000 (Replit webview shows this)
-- **Backend API:** http://0.0.0.0:8000
+- **Backend API:** http://0.0.0.0:8000 (dev) / port 5000 (production)
 - **API Docs:** http://0.0.0.0:8000/docs (FastAPI auto-generated)
 - **Metrics:** http://0.0.0.0:8000/metrics
 
@@ -224,7 +245,17 @@ See `API_ENDPOINTS.md` for complete documentation.
 
 ## Recent Changes
 
-**2025-10-17 (Latest - React UI Implementation):**
+**2025-10-17 (Latest - Production Deployment Fix):**
+- ✅ Fixed production deployment for Autoscale mode
+- ✅ Configured FastAPI to serve pre-built React static files from `frontend/dist/`
+- ✅ Implemented SPA routing catch-all for React Router compatibility
+- ✅ Set up proper build command: builds React production bundle
+- ✅ Set up proper run command: single uvicorn process serving both API and frontend
+- ✅ Removed dev server (`npm run dev`) from production deployment
+- ✅ Verified static file serving for assets, routes, and API endpoints
+- ✅ Production-ready deployment configuration complete
+
+**2025-10-17 (Earlier - React UI Implementation):**
 - ✅ Built complete React + TypeScript frontend in separate `frontend/` module
 - ✅ Implemented modern vertical component architecture
 - ✅ Created ChatGPT-like LLM Testing interface with message bubbles
@@ -234,7 +265,6 @@ See `API_ENDPOINTS.md` for complete documentation.
 - ✅ Set up TypeScript with strong typing for all API responses
 - ✅ Created beautiful sidebar navigation and contextual headers
 - ✅ Implemented "Show Backend Details" toggle for debugging visibility
-- ✅ Updated deployment config for VM mode with React build step
 - ✅ Both frontend and backend running successfully in unified workflow
 
 **2025-10-17 (Earlier - Documentation Orchestration):**
