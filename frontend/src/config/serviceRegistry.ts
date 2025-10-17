@@ -337,6 +337,170 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
     capabilities: ['AKS Management', 'Resource Deployment', 'Service Management']
   },
   {
+    id: 'mongodb',
+    name: 'MongoDB',
+    category: 'databases',
+    description: 'NoSQL document database for modern applications',
+    icon: 'Database',
+    authType: 'connection_string',
+    isConfigured: false,
+    isActive: false,
+    status: 'disconnected',
+    configFields: [
+      {
+        name: 'mongo_uri',
+        label: 'Connection String',
+        type: 'password',
+        required: true,
+        secret: true,
+        placeholder: 'mongodb://username:password@host:port/database',
+        description: 'MongoDB connection URI'
+      },
+      {
+        name: 'mongo_database',
+        label: 'Database Name',
+        type: 'text',
+        required: true,
+        placeholder: 'mydb',
+        description: 'Default database to use'
+      },
+      {
+        name: 'mongo_max_pool_size',
+        label: 'Max Pool Size',
+        type: 'number',
+        required: false,
+        defaultValue: 10,
+        description: 'Maximum connection pool size'
+      }
+    ],
+    testAction: {
+      endpoint: '/api/integrations/mongodb/test',
+      method: 'POST',
+      successMessage: 'MongoDB connection successful!',
+      errorMessage: 'Failed to connect to MongoDB'
+    },
+    capabilities: ['Document Operations', 'Aggregation', 'Indexing', 'Collections Management']
+  },
+  {
+    id: 'stripe',
+    name: 'Stripe',
+    category: 'apis',
+    description: 'Payment processing and subscription management',
+    icon: 'Zap',
+    authType: 'api_key',
+    isConfigured: false,
+    isActive: false,
+    status: 'disconnected',
+    configFields: [
+      {
+        name: 'stripe_secret_key',
+        label: 'Secret Key',
+        type: 'password',
+        required: true,
+        secret: true,
+        placeholder: 'sk_test_...',
+        description: 'Stripe secret API key'
+      },
+      {
+        name: 'stripe_publishable_key',
+        label: 'Publishable Key',
+        type: 'text',
+        required: false,
+        placeholder: 'pk_test_...',
+        description: 'Stripe publishable key for frontend'
+      }
+    ],
+    testAction: {
+      endpoint: '/api/integrations/stripe/test',
+      method: 'POST',
+      successMessage: 'Stripe connection successful!',
+      errorMessage: 'Failed to connect to Stripe'
+    },
+    capabilities: ['Payment Processing', 'Subscriptions', 'Invoicing', 'Webhooks']
+  },
+  {
+    id: 'twilio',
+    name: 'Twilio',
+    category: 'apis',
+    description: 'SMS, voice, and messaging APIs',
+    icon: 'Zap',
+    authType: 'api_key',
+    isConfigured: false,
+    isActive: false,
+    status: 'disconnected',
+    configFields: [
+      {
+        name: 'twilio_account_sid',
+        label: 'Account SID',
+        type: 'text',
+        required: true,
+        placeholder: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+        description: 'Twilio Account SID'
+      },
+      {
+        name: 'twilio_auth_token',
+        label: 'Auth Token',
+        type: 'password',
+        required: true,
+        secret: true,
+        placeholder: 'Your auth token',
+        description: 'Twilio authentication token'
+      },
+      {
+        name: 'twilio_phone_number',
+        label: 'Phone Number',
+        type: 'text',
+        required: false,
+        placeholder: '+1234567890',
+        description: 'Your Twilio phone number'
+      }
+    ],
+    testAction: {
+      endpoint: '/api/integrations/twilio/test',
+      method: 'POST',
+      successMessage: 'Twilio connection successful!',
+      errorMessage: 'Failed to connect to Twilio'
+    },
+    capabilities: ['SMS Messaging', 'Voice Calls', 'WhatsApp', 'Video']
+  },
+  {
+    id: 'sendgrid',
+    name: 'SendGrid',
+    category: 'apis',
+    description: 'Email delivery and marketing platform',
+    icon: 'Zap',
+    authType: 'api_key',
+    isConfigured: false,
+    isActive: false,
+    status: 'disconnected',
+    configFields: [
+      {
+        name: 'sendgrid_api_key',
+        label: 'API Key',
+        type: 'password',
+        required: true,
+        secret: true,
+        placeholder: 'SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+        description: 'SendGrid API key'
+      },
+      {
+        name: 'sendgrid_from_email',
+        label: 'From Email',
+        type: 'text',
+        required: false,
+        placeholder: 'noreply@example.com',
+        description: 'Default sender email address'
+      }
+    ],
+    testAction: {
+      endpoint: '/api/integrations/sendgrid/test',
+      method: 'POST',
+      successMessage: 'SendGrid connection successful!',
+      errorMessage: 'Failed to connect to SendGrid'
+    },
+    capabilities: ['Email Sending', 'Templates', 'Analytics', 'Marketing Campaigns']
+  },
+  {
     id: 'rest_api',
     name: 'REST API',
     category: 'apis',
