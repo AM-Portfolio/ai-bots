@@ -13,7 +13,7 @@ This is an intelligent, autonomous development agent built in Python that:
 
 - **Framework:** FastAPI
 - **Database:** SQLAlchemy (SQLite default, PostgreSQL supported)
-- **AI:** Azure OpenAI (GPT-4)
+- **AI:** Together AI (default), Azure OpenAI (alternative) - Factory pattern
 - **Integrations:** GitHub, Jira, Confluence, Grafana, Microsoft Teams
 - **Monitoring:** Prometheus metrics, OpenTelemetry tracing
 - **Language:** Python 3.11
@@ -43,10 +43,12 @@ The project follows a clean architecture with:
 - Grafana client for metrics/alerts
 
 ### ✅ AI-Powered Analysis
-- Azure OpenAI integration for code analysis
+- Multi-provider LLM support (Together AI default, Azure OpenAI alternative)
+- Factory pattern for easy provider switching
 - Automated bug diagnosis
 - Fix generation with explanations
 - Test code generation
+- Automatic fallback between providers
 
 ### ✅ Automated Workflows
 - Context enrichment from multiple sources
@@ -82,9 +84,18 @@ python main.py
 
 Before full functionality, configure these services in `.env`:
 
-### Required for Core Features:
+### Required for Core Features (LLM - Choose One):
+
+**Option 1: Together AI (Recommended - Default)**
+- `TOGETHER_API_KEY` - For AI analysis
+- `TOGETHER_MODEL` - Model selection (optional, defaults to Llama-3.3-70B)
+
+**Option 2: Azure OpenAI (Alternative)**
 - `AZURE_OPENAI_ENDPOINT` - For AI analysis
 - `AZURE_OPENAI_API_KEY` - For AI analysis
+
+**Both (For Automatic Fallback)**
+- Configure both providers for maximum reliability
 
 ### Optional Integrations:
 - `GITHUB_TOKEN` - For GitHub integration
@@ -151,6 +162,13 @@ See `API_ENDPOINTS.md` for complete documentation.
 - Format: Timestamp, logger name, level, message
 
 ## Recent Changes
+
+**2025-10-17:**
+- ✅ Integrated Together AI as default LLM provider
+- ✅ Implemented factory pattern for multi-provider support
+- ✅ Added automatic fallback (Together AI → Azure OpenAI)
+- ✅ Updated all documentation for new provider architecture
+- ✅ Created comprehensive LLM Provider Guide
 
 **2025-10-16:**
 - Complete project implementation
