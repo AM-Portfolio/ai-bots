@@ -1,8 +1,12 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 import logging
+import os
+from pathlib import Path
 
 from features.context_resolver import resolve_context
 from features.context_resolver.dto import ContextResolverInput
@@ -28,6 +32,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Serve React frontend static files in production
+frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+if frontend_dist.exists() and frontend_dist.is_dir():
+    logger.info(f"Mounting static files from {frontend_dist}")
+    app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="static-assets")
+else:
+    logger.warning(f"Frontend dist directory not found at {frontend_dist}")
+
 
 class WebhookPayload(BaseModel):
     source: str
@@ -44,8 +56,8 @@ class IssueAnalysisRequest(BaseModel):
     confluence_space: Optional[str] = None
 
 
-@app.get("/")
-async def root():
+@app.get("/api")
+async def api_root():
     return {
         "service": "AI Dev Agent",
         "version": "1.0.0",
@@ -56,6 +68,43 @@ async def root():
             "webhook": "/api/webhook"
         }
     }
+
+@app.get("/", response_class=FileResponse)
+async def serve_frontend():
+    """Serve the React frontend"""
+    frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+    index_file = frontend_dist / "index.html"
+    
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    else:
+        return {
+            "service": "AI Dev Agent",
+            "version": "1.0.0",
+            "status": "running",
+            "note": "Frontend not built. Run 'cd frontend && npm run build' to build the frontend."
+        }
+
+@app.get("/{full_path:path}", response_class=FileResponse)
+async def serve_frontend_routes(full_path: str):
+    """Serve React app for all non-API routes (SPA routing)"""
+    # Skip API routes
+    if full_path.startswith("api/") or full_path.startswith("health") or full_path.startswith("metrics"):
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+    index_file = frontend_dist / "index.html"
+    
+    # Try to serve the requested file
+    requested_file = frontend_dist / full_path
+    if requested_file.exists() and requested_file.is_file():
+        return FileResponse(str(requested_file))
+    
+    # Otherwise serve index.html for SPA routing
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    else:
+        raise HTTPException(status_code=404, detail="Frontend not found")
 
 
 @app.get("/health")
