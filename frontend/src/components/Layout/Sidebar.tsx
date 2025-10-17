@@ -1,4 +1,4 @@
-import { Brain, Plug, FileText, Mic, Settings, MessageSquarePlus, Clock, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Brain, Plug, FileText, Mic, MessageSquarePlus, Clock, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import type { Tab } from '../../App';
 
@@ -24,8 +24,7 @@ const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const menuItems = [
     { id: 'voice' as Tab, label: 'Voice Assistant', icon: Mic },
     { id: 'llm' as Tab, label: 'LLM Testing', icon: Brain },
-    { id: 'integrations' as Tab, label: 'Integrations', icon: Plug },
-    { id: 'config' as Tab, label: 'Configuration', icon: Settings },
+    { id: 'integrations' as Tab, label: 'Integrations Hub', icon: Plug },
     { id: 'docs' as Tab, label: 'Doc Orchestrator', icon: FileText },
   ];
 

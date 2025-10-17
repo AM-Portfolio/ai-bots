@@ -8,16 +8,14 @@ interface HeaderProps {
 const titles: Record<Tab, string> = {
   voice: 'AI Voice Assistant',
   llm: 'LLM Provider Testing',
-  integrations: 'Integration Testing',
-  config: 'Configuration',
+  integrations: 'Integrations Hub',
   docs: 'Documentation Orchestrator',
 };
 
 const descriptions: Record<Tab, string> = {
   voice: 'Hands-free AI conversation with auto-greeting, continuous listening, and voice responses',
   llm: 'Test Together AI and Azure OpenAI language models with real-time responses',
-  integrations: 'Test GitHub, Jira, Confluence, and Grafana integrations',
-  config: 'Configure your integrations and API credentials',
+  integrations: 'Connect, configure, and test all your integrations in one place',
   docs: 'AI-powered documentation workflow: analyze → generate → commit → publish',
 };
 
