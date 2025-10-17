@@ -250,6 +250,7 @@ curl -X POST "http://localhost:5000/api/test/github?repository=owner/repo"
 ## Support Documentation
 
 - `README.md` - Project overview and quick start
+- `ACCESS_GUIDE.md` - **How to access API and UI (START HERE!)**
 - `CONFIGURATION.md` - Complete setup guide for all integrations
 - `API_ENDPOINTS.md` - Detailed API documentation
 - `UI_TESTING_GUIDE.md` - Comprehensive UI testing guide

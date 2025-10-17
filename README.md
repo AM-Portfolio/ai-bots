@@ -61,7 +61,25 @@ ai_dev_agent/
 
 ## 🚀 Quick Start
 
-### 1. Installation
+### 📍 **Accessing in Replit (Already Running!)**
+
+Both services are live and ready:
+
+1. **Backend API** (Port 5000)
+   - Click the **Webview** button or use Replit's provided URL
+   - API docs: `https://[your-url].repl.co/docs`
+   - Health check: `https://[your-url].repl.co/health`
+
+2. **Testing UI** (Port 8501)
+   - Access via port forwarding: `https://[your-url].repl.co:8501`
+   - Test all features through web interface
+   - No coding required!
+
+📖 **See [ACCESS_GUIDE.md](ACCESS_GUIDE.md) for complete access instructions**
+
+### 💻 **Local Setup**
+
+#### 1. Installation
 
 ```bash
 # Dependencies are pre-installed in Replit
@@ -69,7 +87,7 @@ ai_dev_agent/
 pip install -r requirements.txt
 ```
 
-### 2. Configuration
+#### 2. Configuration
 
 Copy `.env.example` to `.env` and configure your credentials:
 
@@ -79,13 +97,19 @@ cp .env.example .env
 
 See [CONFIGURATION.md](CONFIGURATION.md) for detailed setup instructions.
 
-### 3. Run the Application
+#### 3. Run the Application
 
 ```bash
+# Backend API
 python main.py
+
+# Testing UI (in separate terminal)
+cd ui && streamlit run app.py --server.port 8501 --server.address 0.0.0.0
 ```
 
-The API will be available at `http://0.0.0.0:5000`
+**URLs:**
+- Backend API: `http://localhost:5000`
+- Testing UI: `http://localhost:8501`
 
 ## 📡 API Endpoints
 
