@@ -4,6 +4,7 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
   {
     id: 'github',
     name: 'GitHub',
+    type: 'github',
     category: 'version_control',
     description: 'Connect to GitHub for repository access and code analysis',
     icon: 'Github',
@@ -41,6 +42,7 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
   {
     id: 'jira',
     name: 'Jira',
+    type: 'jira',
     category: 'issue_tracking',
     description: 'Connect to Jira for issue tracking and project management',
     icon: 'FileText',
@@ -94,6 +96,7 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
   {
     id: 'confluence',
     name: 'Confluence',
+    type: 'confluence',
     category: 'knowledge_base',
     description: 'Publish documentation to Confluence pages',
     icon: 'BookOpen',
@@ -147,6 +150,7 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
   {
     id: 'grafana',
     name: 'Grafana',
+    type: 'grafana',
     category: 'monitoring',
     description: 'Fetch metrics and dashboards from Grafana',
     icon: 'Activity',
@@ -184,6 +188,7 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
   {
     id: 'postgresql',
     name: 'PostgreSQL',
+    type: 'postgresql',
     category: 'databases',
     description: 'Connect to PostgreSQL databases for data operations',
     icon: 'Database',
@@ -244,6 +249,7 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
   {
     id: 'openai',
     name: 'OpenAI',
+    type: 'openai',
     category: 'ai_providers',
     description: 'OpenAI GPT models for AI-powered features',
     icon: 'Sparkles',
@@ -286,6 +292,7 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
   {
     id: 'azure',
     name: 'Azure',
+    type: 'azure',
     category: 'cloud',
     description: 'Microsoft Azure cloud services and resources',
     icon: 'Cloud',
@@ -339,6 +346,7 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
   {
     id: 'mongodb',
     name: 'MongoDB',
+    type: 'mongodb',
     category: 'databases',
     description: 'NoSQL document database for modern applications',
     icon: 'Database',
@@ -384,6 +392,7 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
   {
     id: 'stripe',
     name: 'Stripe',
+    type: 'stripe',
     category: 'apis',
     description: 'Payment processing and subscription management',
     icon: 'Zap',
@@ -421,6 +430,7 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
   {
     id: 'twilio',
     name: 'Twilio',
+    type: 'twilio',
     category: 'apis',
     description: 'SMS, voice, and messaging APIs',
     icon: 'Zap',
@@ -466,6 +476,7 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
   {
     id: 'sendgrid',
     name: 'SendGrid',
+    type: 'sendgrid',
     category: 'apis',
     description: 'Email delivery and marketing platform',
     icon: 'Zap',
@@ -503,6 +514,7 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
   {
     id: 'rest_api',
     name: 'REST API',
+    type: 'rest_api',
     category: 'apis',
     description: 'Custom REST API integration',
     icon: 'Zap',

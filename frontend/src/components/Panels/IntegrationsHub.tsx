@@ -45,30 +45,59 @@ const IntegrationsHub = () => {
   };
 
   const handleTest = async () => {
-    if (!selectedService?.testAction) return;
+    if (!selectedService) return;
     
     setIsTesting(true);
     setTestResult(null);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setTestResult({
-        success: true,
-        message: selectedService.testAction.successMessage
+      // First connect the service
+      const { connectService } = await import('../../api/servicesClient');
+      await connectService({
+        service_name: selectedService.id,
+        service_type: selectedService.type,
+        config: configData
       });
-    } catch (error) {
+      
+      // Then test it
+      const { testService } = await import('../../api/servicesClient');
+      const result = await testService(selectedService.id);
+      
+      setTestResult({
+        success: result.success,
+        message: result.success 
+          ? selectedService.testAction?.successMessage || 'Connection successful'
+          : result.error || 'Connection failed'
+      });
+    } catch (error: any) {
       setTestResult({
         success: false,
-        message: selectedService.testAction?.errorMessage || 'Connection failed'
+        message: error.response?.data?.detail || error.message || 'Connection failed'
       });
     } finally {
       setIsTesting(false);
     }
   };
 
-  const handleSave = () => {
-    console.log('Saving configuration:', configData);
-    setSelectedService(null);
+  const handleSave = async () => {
+    if (!selectedService) return;
+    
+    try {
+      const { connectService } = await import('../../api/servicesClient');
+      await connectService({
+        service_name: selectedService.id,
+        service_type: selectedService.type,
+        config: configData
+      });
+      console.log('Service configuration saved:', selectedService.id);
+      setSelectedService(null);
+    } catch (error: any) {
+      console.error('Failed to save configuration:', error);
+      setTestResult({
+        success: false,
+        message: error.response?.data?.detail || error.message || 'Save failed'
+      });
+    }
   };
 
   const getStatusColor = (status?: string) => {

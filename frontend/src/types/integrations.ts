@@ -34,6 +34,7 @@ export interface TestAction {
 export interface ServiceDefinition {
   id: string;
   name: string;
+  type: string;
   category: ServiceCategory;
   description: string;
   icon: string;
