@@ -44,28 +44,61 @@ const DocOrchestratorPanel = () => {
         );
       };
 
-      if (response.github_analysis) {
-        updateStep(0, 'complete', 'Repository analyzed successfully');
+      // Step 0: Repository analyzed
+      if (response.files_analyzed && response.files_analyzed.length > 0) {
+        updateStep(0, 'complete', `Analyzed ${response.files_analyzed.length} files`);
+        updateStep(1, 'running');
+      } else {
+        updateStep(0, 'complete', 'Repository analyzed');
         updateStep(1, 'running');
       }
 
+      // Step 1: Documentation generated
       if (response.documentation) {
-        updateStep(1, 'complete', 'Documentation generated');
+        updateStep(1, 'complete', `Generated ${Math.round(response.documentation.length / 100)} KB of docs`);
         updateStep(2, 'running');
       }
 
-      if (response.commit) {
-        updateStep(2, 'complete', `Committed: ${response.commit.sha?.substring(0, 7)}`);
-        updateStep(3, 'running');
+      // Step 2: Committed to GitHub
+      if (response.github_commit) {
+        const commitMsg = response.github_commit.branch 
+          ? `${response.github_commit.action} on ${response.github_commit.branch}`
+          : `Committed: ${response.github_commit.commit_sha?.substring(0, 7)}`;
+        updateStep(2, 'complete', commitMsg);
+        
+        // Only mark next step as running if confluence was requested
+        if (confluenceSpace) {
+          updateStep(3, 'running');
+        } else {
+          updateStep(3, 'complete', 'Skipped (not configured)');
+        }
       }
 
+      // Step 3: Published to Confluence
       if (response.confluence_page) {
         updateStep(3, 'complete', `Page: ${response.confluence_page.title}`);
-        updateStep(4, 'running');
+        
+        // Only mark next step as running if jira was requested
+        if (jiraProject) {
+          updateStep(4, 'running');
+        } else {
+          updateStep(4, 'complete', 'Skipped (not configured)');
+        }
+      } else if (!confluenceSpace) {
+        updateStep(3, 'complete', 'Skipped (not configured)');
+        
+        if (jiraProject) {
+          updateStep(4, 'running');
+        } else {
+          updateStep(4, 'complete', 'Skipped (not configured)');
+        }
       }
 
+      // Step 4: Created Jira ticket
       if (response.jira_ticket) {
         updateStep(4, 'complete', `Ticket: ${response.jira_ticket.key}`);
+      } else if (!jiraProject) {
+        updateStep(4, 'complete', 'Skipped (not configured)');
       }
 
       setResult(response);

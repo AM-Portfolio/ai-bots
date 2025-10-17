@@ -89,12 +89,31 @@ export interface DocOrchestrationRequest {
 
 export interface DocOrchestrationResponse {
   success: boolean;
-  github_analysis?: any;
-  documentation?: any;
-  commit?: any;
-  confluence_page?: any;
-  jira_ticket?: any;
+  documentation?: string;
+  files_analyzed?: string[];
+  repository?: string;
+  github_commit?: {
+    action?: string;
+    file_path?: string;
+    branch?: string;
+    commit_url?: string;
+    commit_sha?: string;
+    file_url?: string;
+  };
+  confluence_page?: {
+    id?: string;
+    title?: string;
+    url?: string;
+    space_key?: string;
+  };
+  jira_ticket?: {
+    key?: string;
+    url?: string;
+    id?: string;
+  };
   error?: string;
+  workflow_summary?: Record<string, string>;
+  thinking?: ThinkingProcessData;
 }
 
 export type Provider = 'together' | 'azure';
