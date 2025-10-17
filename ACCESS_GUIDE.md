@@ -188,17 +188,31 @@ curl -X POST "https://[your-url].repl.co/api/analyze" \
 
 ## 🚀 Deployment (Publishing)
 
-To make your app publicly accessible with a persistent URL:
+### ✅ Ready to Deploy with UI Included!
 
-1. **Configure deployment settings** (deployment config is already set up)
-2. Click the **"Deploy"** or **"Publish"** button in Replit
-3. Your app will be deployed to production
-4. You'll get a public URL that's always available
+Your app is now configured to deploy **both the API and Testing UI** to production:
 
-**Deployment Mode:** Autoscale (stateless web app)
-- Automatically scales based on traffic
-- Runs on demand
-- Cost-effective for APIs
+1. Click the **"Deploy"** or **"Publish"** button in Replit
+2. Your app will be deployed with:
+   - **VM mode** (always running, supports multiple ports)
+   - **Backend API** on port 80
+   - **Testing UI** on port 3000
+   - Production-ready settings
+
+3. You'll get a public URL: `https://[your-app].repl.co`
+
+**Access in Production:**
+- **API**: `https://[your-app].repl.co` (default port 80)
+- **Testing UI**: `https://[your-app].repl.co:3000` (port 3000)
+- **API Docs**: `https://[your-app].repl.co/docs`
+
+**Deployment Mode:** VM (Virtual Machine - Always Running)
+- Both API and UI are always available
+- Supports multiple ports (80 for API, 3000 for UI)
+- Great for applications with UI components
+- Persistent and reliable
+
+📄 **See [DEPLOYMENT_FIXES.md](DEPLOYMENT_FIXES.md) for technical details**
 
 ---
 

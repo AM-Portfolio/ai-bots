@@ -77,6 +77,15 @@ Both services are live and ready:
 
 📖 **See [ACCESS_GUIDE.md](ACCESS_GUIDE.md) for complete access instructions**
 
+### 🚀 **Deploy to Production**
+
+The app is configured to deploy **both API and Testing UI**:
+- **Deployment Mode:** VM (supports multiple ports)
+- **API URL:** `https://[your-app].repl.co`
+- **UI URL:** `https://[your-app].repl.co:3000`
+
+Click **Deploy/Publish** in Replit to make it live!
+
 ### 💻 **Local Setup**
 
 #### 1. Installation

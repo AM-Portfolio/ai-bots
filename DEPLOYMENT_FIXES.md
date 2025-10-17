@@ -81,7 +81,19 @@ async def root():
 
 ## 🎯 Deployment Configuration Summary
 
-### For Autoscale Deployments:
+### For VM Deployments (Current):
+
+```yaml
+Deployment Type: VM (Always Running)
+Run Command: python main.py & cd ui && streamlit run app.py
+Ports: 
+  - 5000 (API) → 80 (external)
+  - 8501 (UI) → 3000 (external)
+Host: 0.0.0.0
+Health Check: GET / (returns 200 OK)
+```
+
+### Alternative: Autoscale Deployments (API Only):
 
 ```yaml
 Deployment Type: Autoscale
@@ -103,9 +115,9 @@ The application automatically detects:
 - Backend API: Port 5000
 - Testing UI: Port 8501
 
-**Production (Deployed):**
+**Production (Deployed - VM Mode):**
 - Backend API: Port 80 (via port 5000 internally)
-- Testing UI: Not deployed (development tool only)
+- Testing UI: Port 3000 (via port 8501 internally)
 
 ## ✅ Verification
 
@@ -120,23 +132,24 @@ The server is now running successfully:
 
 ## 🚀 Ready to Deploy
 
-The application is now properly configured for Autoscale deployment:
+The application is now properly configured for VM deployment:
 
 1. **Click the Deploy/Publish button in Replit**
 2. Your app will be deployed with:
-   - Autoscale mode (cost-effective, scales on demand)
-   - Proper port configuration
-   - Fast health checks
+   - VM mode (always running, supports multiple ports)
+   - Backend API on port 80
+   - Testing UI on port 3000
    - Production-ready settings
 
 3. You'll receive a public URL: `https://[your-app].repl.co`
 
 ## 📝 Notes
 
-- **Testing UI** (Streamlit on port 8501) is only available in development mode
-- **Production deployment** only includes the FastAPI backend
-- Use the `/docs` endpoint to access interactive API documentation
-- All 8 test endpoints are available in production via `/api/test/*`
+- **Deployment Mode**: VM (always running)
+- **Backend API**: Available at `https://[your-app].repl.co` (port 80)
+- **Testing UI**: Available at `https://[your-app].repl.co:3000` (port 3000)
+- **API Docs**: Access at `https://[your-app].repl.co/docs`
+- **Test Endpoints**: All 8 available via `/api/test/*`
 
 ## 🔍 Troubleshooting
 
