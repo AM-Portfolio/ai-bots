@@ -1,11 +1,12 @@
 """GitHub client using Replit's GitHub integration"""
 import os
 import json
-import logging
 from typing import Optional, Dict, Any, List
 from github import Github, GithubException
 
-logger = logging.getLogger(__name__)
+from shared.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 async def get_github_access_token() -> Optional[str]:

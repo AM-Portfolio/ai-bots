@@ -41,7 +41,13 @@ The project employs a clean architecture approach, separating concerns into dist
 -   **Automated Workflows:** End-to-end processes for context enrichment, root cause analysis, code fix generation, pull request creation, and command-driven documentation orchestration (analysis → generation → commit → publish → ticket).
 -   **Thinking Process Visualization:** Shared backend component that tracks workflow execution steps with status, metadata, and timing. Displayed via reusable frontend ThinkingProcess component in both LLM Testing and Doc Orchestrator panels. Provides real-time visibility into backend processing flow.
 -   **GitHub Context Detection:** LLM automatically detects GitHub repository mentions in prompts and enriches context with repository information.
--   **Observability:** Prometheus metrics, OpenTelemetry tracing, and structured logging.
+-   **Observability:** Prometheus metrics, OpenTelemetry tracing, and comprehensive structured logging with:
+    -   Request correlation IDs for tracing across services
+    -   LLM interaction logging with request/response metrics
+    -   Timing information for all operations
+    -   JSON-structured metadata for easy parsing
+    -   Method entry/exit tracking with decorators
+    -   API request/response logging middleware
 
 ## External Dependencies
 -   **AI Providers:** Together AI (default), Azure OpenAI (alternative)

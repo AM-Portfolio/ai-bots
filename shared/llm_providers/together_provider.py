@@ -1,12 +1,13 @@
 from together import Together
 from typing import List, Dict, Any, Optional
-import logging
 import json
 import os
+import time
 
 from .base import BaseLLMProvider
+from shared.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class TogetherAIProvider(BaseLLMProvider):
@@ -20,16 +21,25 @@ class TogetherAIProvider(BaseLLMProvider):
     
     def _initialize_client(self):
         if not self.api_key:
-            logger.warning("Together AI API key not configured")
+            logger.warning("Together AI API key not configured", provider="together", status="not_configured")
             return
         
         try:
             # Together AI SDK reads from TOGETHER_API_KEY environment variable automatically
             # No need to pass api_key parameter
             self.client = Together()
-            logger.info(f"Together AI client initialized successfully with model: {self.model}")
+            logger.info(
+                "Together AI client initialized successfully",
+                provider="together",
+                model=self.model,
+                status="ready"
+            )
         except Exception as e:
-            logger.error(f"Failed to initialize Together AI client: {e}")
+            logger.error(
+                "Failed to initialize Together AI client",
+                provider="together",
+                error=str(e)
+            )
             self.client = None
     
     def is_available(self) -> bool:
@@ -43,8 +53,21 @@ class TogetherAIProvider(BaseLLMProvider):
         stream: bool = False
     ) -> Optional[str]:
         if not self.client:
-            logger.error("Together AI client not initialized")
+            logger.error("Together AI client not initialized", provider="together", status="not_initialized")
             return None
+        
+        # Extract prompt for logging
+        prompt = messages[-1].get("content", "") if messages else ""
+        
+        # Log request
+        logger.log_llm_request(
+            provider="Together AI",
+            model=self.model,
+            prompt=prompt,
+            temperature=temperature
+        )
+        
+        start_time = time.time()
         
         try:
             response = self.client.chat.completions.create(
@@ -58,9 +81,28 @@ class TogetherAIProvider(BaseLLMProvider):
             if stream:
                 return response
             
-            return response.choices[0].message.content
+            result = response.choices[0].message.content
+            duration_ms = (time.time() - start_time) * 1000
+            
+            # Log successful response
+            logger.log_llm_response(
+                provider="Together AI",
+                response=result,
+                duration_ms=duration_ms,
+                tokens=getattr(response.usage, 'total_tokens', None) if hasattr(response, 'usage') else None
+            )
+            
+            return result
         except Exception as e:
-            logger.error(f"Together AI chat completion failed: {e}")
+            duration_ms = (time.time() - start_time) * 1000
+            
+            # Log error response
+            logger.log_llm_response(
+                provider="Together AI",
+                response=None,
+                duration_ms=duration_ms,
+                error=str(e)
+            )
             return None
     
     async def analyze_code(

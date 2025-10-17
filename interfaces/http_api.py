@@ -1,11 +1,11 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
-import logging
 import os
+import time
 from pathlib import Path
 from datetime import datetime
 
@@ -16,8 +16,9 @@ from features.code_generator import generate_code_fix
 from features.test_orchestrator import orchestrate_tests
 from features.doc_publisher import publish_documentation
 from shared.models import SourceType, EnrichedContext
+from shared.logger import get_logger, set_request_context, clear_request_context
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 app = FastAPI(
     title="AI Dev Agent API",
@@ -32,6 +33,50 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log all HTTP requests with timing and context"""
+    # Set request context for logging
+    set_request_context()
+    
+    start_time = time.time()
+    method = request.method
+    path = request.url.path
+    
+    logger.info(
+        f"→ Incoming {method} {path}",
+        method=method,
+        path=path,
+        client_host=request.client.host if request.client else "unknown"
+    )
+    
+    try:
+        response = await call_next(request)
+        duration_ms = (time.time() - start_time) * 1000
+        
+        logger.log_api_request(
+            method=method,
+            path=path,
+            status_code=response.status_code,
+            duration_ms=duration_ms
+        )
+        
+        return response
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        logger.error(
+            f"← Request {method} {path} failed",
+            method=method,
+            path=path,
+            error=str(e),
+            duration_ms=duration_ms
+        )
+        raise
+    finally:
+        clear_request_context()
 
 # Serve React frontend static files in production
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
