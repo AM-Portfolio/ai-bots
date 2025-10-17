@@ -5,7 +5,8 @@ An intelligent, autonomous development agent that diagnoses bugs, generates fixe
 ## 🌟 Features
 
 - **Multi-Source Issue Resolution**: Analyze issues from GitHub, Jira, Grafana alerts
-- **AI-Powered Code Analysis**: Uses Azure OpenAI to diagnose bugs and generate fixes
+- **AI-Powered Code Analysis**: Uses Together AI (default) or Azure OpenAI to diagnose bugs and generate fixes
+- **Multi-Provider LLM Support**: Factory pattern with Together AI (default) and Azure OpenAI
 - **Automated Testing**: Generates unit tests for all code fixes
 - **PR Creation**: Automatically creates pull requests with fixes
 - **Documentation**: Auto-generates and publishes Confluence documentation
@@ -21,7 +22,12 @@ ai_dev_agent/
 │   ├── config.py               # Application configuration
 │   ├── models.py               # Global Pydantic models
 │   ├── secrets.py              # Azure Key Vault integration
-│   ├── llm.py                  # Azure OpenAI wrapper
+│   ├── llm.py                  # LLM client with factory pattern
+│   ├── llm_providers/          # LLM provider implementations
+│   │   ├── base.py             # Base provider interface
+│   │   ├── together_provider.py # Together AI (default)
+│   │   ├── azure_provider.py   # Azure OpenAI (alternative)
+│   │   └── factory.py          # Provider factory
 │   └── clients/                # External service clients
 │       ├── github_client.py    # GitHub API integration
 │       ├── jira_client.py      # Jira API integration
