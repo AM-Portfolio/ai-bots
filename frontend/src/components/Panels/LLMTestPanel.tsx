@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, ChevronDown, ChevronRight, Settings, Mic, MicOff, Volume2, VolumeX, Sparkles } from 'lucide-react';
+import { Send, Loader2, ChevronDown, ChevronRight, Settings, Mic, MicOff, Volume2, Sparkles } from 'lucide-react';
 import { apiClient } from '../../services/api';
 import type { Provider } from '../../types/api';
 

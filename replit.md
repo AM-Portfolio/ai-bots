@@ -25,6 +25,7 @@ This is an intelligent, autonomous development agent built in Python that:
 - **Icons:** Lucide React
 - **HTTP Client:** Axios
 - **Design:** Modern vertical component architecture with ChatGPT-like UI
+- **Voice:** Web Speech API (Speech Recognition + Synthesis) - browser-native, no API key needed
 
 ## Architecture
 
@@ -49,6 +50,9 @@ The project follows a clean architecture with:
    - Header: Contextual titles and descriptions
 2. **Panel Components** (`frontend/src/components/Panels/`):
    - LLMTestPanel: ChatGPT-like interface with message bubbles
+     - 🎙️ Voice input (Speech-to-Text) - click mic to speak
+     - 🔊 Voice responses (Text-to-Speech) - AI speaks answers
+     - ✨ Thinking Mode - clean chat with minimal UI
    - GitHubTestPanel: Repository testing with results
    - IntegrationsPanel: Jira, Confluence, Grafana cards
    - DocOrchestratorPanel: Step-by-step workflow tracking
@@ -58,6 +62,10 @@ The project follows a clean architecture with:
    - Axios-based HTTP client
 4. **Types Layer** (`frontend/src/types/`):
    - Strong TypeScript interfaces for all API responses
+5. **Voice Features** (Browser-Native):
+   - Web Speech Recognition API for voice input
+   - Web Speech Synthesis API for voice output
+   - No API keys required - free browser features
 
 ## Key Features Implemented
 
@@ -245,7 +253,17 @@ See `API_ENDPOINTS.md` for complete documentation.
 
 ## Recent Changes
 
-**2025-10-17 (Latest - Production Deployment Fix):**
+**2025-10-17 (Latest - Voice Assistance Features):**
+- ✅ Added voice input with Web Speech Recognition API (click mic to speak)
+- ✅ Added voice responses with Web Speech Synthesis API (AI speaks answers)
+- ✅ Implemented Thinking Mode toggle for clean chat with minimal UI
+- ✅ Browser-native voice features (no API key needed, free)
+- ✅ Visual feedback: red border when listening, mic button animation
+- ✅ Voice indicators: listening status, voice enabled status
+- ✅ Works in Chrome, Edge, Safari (mobile & desktop)
+- ✅ Created comprehensive VOICE_FEATURES_GUIDE.md documentation
+
+**2025-10-17 (Earlier - Production Deployment Fix):**
 - ✅ Fixed production deployment for Autoscale mode
 - ✅ Configured FastAPI to serve pre-built React static files from `frontend/dist/`
 - ✅ Implemented SPA routing catch-all for React Router compatibility
