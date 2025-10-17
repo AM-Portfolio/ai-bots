@@ -18,6 +18,10 @@ author = "agent"
 task = "workflow.run"
 args = "Server"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "UI"
+
 [[workflows.workflow]]
 name = "Server"
 author = "agent"
@@ -30,13 +34,20 @@ waitForPort = 5000
 [workflows.workflow.metadata]
 outputType = "webview"
 
+[[workflows.workflow]]
+name = "UI"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd ui && streamlit run app.py --server.port 8501 --server.address 0.0.0.0"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 37713
-externalPort = 3000
 
 [deployment]
 deploymentTarget = "cloudrun"

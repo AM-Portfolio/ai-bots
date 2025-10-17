@@ -7,7 +7,12 @@ class APIClient:
     """Client for interacting with AI Dev Agent API"""
     
     def __init__(self, base_url: str = None):
-        self.base_url = base_url or os.environ.get("API_BASE_URL", "http://localhost:5000")
+        domain = os.environ.get("REPL_SLUG", "")
+        owner = os.environ.get("REPL_OWNER", "")
+        if domain and owner:
+            self.base_url = base_url or f"https://{domain}.{owner}.repl.co"
+        else:
+            self.base_url = base_url or os.environ.get("API_BASE_URL", "http://localhost:5000")
     
     def test_llm(self, prompt: str, provider: str = "together") -> Dict[str, Any]:
         """Test LLM provider"""
