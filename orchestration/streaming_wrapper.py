@@ -11,7 +11,7 @@ import json
 
 from orchestration.facade import OrchestrationFacade
 from shared.services.manager import ServiceManager
-from shared.llm.factory import LLMFactory
+from shared.llm_providers.factory import LLMFactory
 
 logger = logging.getLogger(__name__)
 
