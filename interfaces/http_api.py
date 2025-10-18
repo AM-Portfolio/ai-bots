@@ -22,6 +22,7 @@ from shared.logger import get_logger, set_request_context, clear_request_context
 from shared.config import settings
 from db import ChatRepository, ChatConversation, ChatMessage
 from interfaces.services_api import router as services_router
+from interfaces.vector_db_api import router as vector_db_router, initialize_vector_db
 
 logger = get_logger(__name__)
 
@@ -41,6 +42,14 @@ app = FastAPI(
     description="AI-powered development agent for automated bug fixing and analysis",
     version="1.0.0"
 )
+
+# Startup event to initialize Vector DB
+@app.on_event("startup")
+async def startup_event():
+    """Initialize Vector DB system on startup"""
+    logger.info("🚀 Application startup - initializing Vector DB...")
+    await initialize_vector_db()
+    logger.info("✅ Vector DB initialization complete")
 
 app.add_middleware(
     CORSMiddleware,
@@ -96,6 +105,9 @@ async def log_requests(request: Request, call_next):
 
 # Include service management API router
 app.include_router(services_router)
+
+# Include Vector DB API router
+app.include_router(vector_db_router)
 
 # Serve React frontend static files in production
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
