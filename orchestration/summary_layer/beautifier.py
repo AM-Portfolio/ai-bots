@@ -76,10 +76,15 @@ class ResponseBeautifier:
             # Use LLM to beautify
             llm_start = time.time()
             logger.info(f"🤖 Calling {self.provider_name.upper()} LLM for beautification...")
-            provider = LLMFactory.create(self.provider_name)
-            beautified = await provider.generate(
-                prompt=prompt,
-                temperature=0.3  # Lower temperature for more focused output
+            
+            # Use the resilient orchestrator for LLM calls
+            from shared.llm_providers.resilient_orchestrator import get_resilient_orchestrator
+            orchestrator = get_resilient_orchestrator()
+            
+            beautified, metadata = await orchestrator.chat_completion_with_fallback(
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                preferred_provider=self.provider_name
             )
             llm_time = (time.time() - llm_start) * 1000
             
