@@ -42,7 +42,7 @@ class GitHubLLMOrchestrator:
     
     async def process_query(self, request: QueryRequest) -> QueryResponse:
         """
-        Process a query using LangGraph-style orchestration
+        Process a query using LangGraph-style orchestration with enhanced logging
         
         Args:
             request: Query request
@@ -51,29 +51,56 @@ class GitHubLLMOrchestrator:
             Processed query response
         """
         start_time = time.time()
-        logger.info(f"🔄 Processing query: '{request.query[:50]}...'")
+        logger.info("=" * 80)
+        logger.info(f"🚀 GITHUB-LLM ORCHESTRATION START")
+        logger.info(f"📝 Query: '{request.query[:100]}...'")
+        logger.info(f"🎯 Query Type: {request.query_type.value}")
+        logger.info(f"📂 Repository Filter: {request.repository or 'All repositories'}")
+        logger.info(f"🔍 Vector Search: {request.include_vector_search}, GitHub Direct: {request.include_github_direct}")
+        logger.info("=" * 80)
         
         # Step 1: Query Planning - determine which sources to use
+        plan_start = time.time()
         sources_to_query = self._plan_query(request)
-        logger.info(f"📋 Query plan: {sources_to_query}")
+        plan_time = (time.time() - plan_start) * 1000
+        logger.info(f"📋 STEP 1: Query Planning ({plan_time:.2f}ms)")
+        logger.info(f"   Sources to query: {sources_to_query}")
         
         # Step 2: Parallel Source Querying
+        query_start = time.time()
         source_results = await self._query_sources(request, sources_to_query)
-        logger.info(f"📦 Retrieved {len(source_results)} source results")
+        query_time = (time.time() - query_start) * 1000
+        logger.info(f"📦 STEP 2: Source Querying ({query_time:.2f}ms)")
+        logger.info(f"   Retrieved {len(source_results)} source results")
+        for i, result in enumerate(source_results[:3], 1):
+            logger.info(f"   Source {i}: {result.source_type} - relevance {result.relevance_score:.2f}")
         
         # Step 3: Result Synthesis - combine and rank results
+        synth_start = time.time()
         synthesized = self._synthesize_results(source_results, request)
+        synth_time = (time.time() - synth_start) * 1000
+        logger.info(f"🔗 STEP 3: Result Synthesis ({synth_time:.2f}ms)")
+        logger.info(f"   Synthesized {len(synthesized)} results")
         
         # Step 4: Summary Generation
+        summary_start = time.time()
         summary = self._generate_summary(synthesized, request)
+        summary_time = (time.time() - summary_start) * 1000
+        logger.info(f"📄 STEP 4: Summary Generation ({summary_time:.2f}ms)")
+        logger.info(f"   Summary length: {len(summary)} characters")
+        logger.info(f"   Summary preview: {summary[:150]}...")
         
         # Step 5: Beautification - format for LLM consumption
+        beautify_start = time.time()
         beautified = await self._beautify_response(
             query=request.query,
             sources=synthesized,
             summary=summary,
             query_type=request.query_type
         )
+        beautify_time = (time.time() - beautify_start) * 1000
+        logger.info(f"✨ STEP 5: Response Beautification ({beautify_time:.2f}ms)")
+        logger.info(f"   Beautified length: {len(beautified) if beautified else 0} characters")
         
         # Calculate confidence score
         confidence = self._calculate_confidence(synthesized)
@@ -90,11 +117,29 @@ class GitHubLLMOrchestrator:
             processing_time_ms=processing_time,
             metadata={
                 'sources_queried': sources_to_query,
-                'total_sources': len(synthesized)
+                'total_sources': len(synthesized),
+                'timing_breakdown': {
+                    'planning_ms': plan_time,
+                    'querying_ms': query_time,
+                    'synthesis_ms': synth_time,
+                    'summary_ms': summary_time,
+                    'beautification_ms': beautify_time
+                }
             }
         )
         
-        logger.info(f"✅ Query processed in {processing_time:.2f}ms (confidence: {confidence:.2f})")
+        logger.info("=" * 80)
+        logger.info(f"✅ GITHUB-LLM ORCHESTRATION COMPLETE")
+        logger.info(f"⏱️  Total Time: {processing_time:.2f}ms")
+        logger.info(f"🎯 Confidence: {confidence:.2%}")
+        logger.info(f"📊 Timing Breakdown:")
+        logger.info(f"   Planning: {plan_time:.2f}ms")
+        logger.info(f"   Querying: {query_time:.2f}ms")
+        logger.info(f"   Synthesis: {synth_time:.2f}ms")
+        logger.info(f"   Summary: {summary_time:.2f}ms")
+        logger.info(f"   Beautification: {beautify_time:.2f}ms")
+        logger.info("=" * 80)
+        
         return response
     
     def _plan_query(self, request: QueryRequest) -> List[str]:

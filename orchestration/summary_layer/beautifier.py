@@ -5,6 +5,7 @@ Cleans and crafts beautiful, well-structured messages for LLM consumption.
 """
 
 import logging
+import time
 from typing import List, Dict, Any
 from orchestration.github_llm.models import SourceResult, QueryType
 from shared.llm_providers.factory import LLMFactory
@@ -33,7 +34,7 @@ class ResponseBeautifier:
         query_type: QueryType
     ) -> str:
         """
-        Beautify response using LLM
+        Beautify response using LLM with enhanced logging
         
         Args:
             query: Original query
@@ -44,34 +45,62 @@ class ResponseBeautifier:
         Returns:
             Beautified, LLM-friendly response
         """
-        logger.info(f"✨ Beautifying response for query: '{query[:50]}...'")
+        logger.info("-" * 60)
+        logger.info(f"✨ RESPONSE BEAUTIFIER START")
+        logger.info(f"📝 Query: '{query[:80]}...'")
+        logger.info(f"🎯 Query Type: {query_type.value}")
+        logger.info(f"📊 Sources: {len(sources)}")
+        logger.info(f"📄 Summary Length: {len(summary)} characters")
+        logger.info("-" * 60)
         
         try:
             # Build context from sources
+            context_start = time.time()
             context = self._build_context(sources, query_type)
+            context_time = (time.time() - context_start) * 1000
+            logger.info(f"🔗 Context built from {len(sources)} sources ({context_time:.2f}ms)")
+            logger.info(f"   Context length: {len(context)} characters")
             
             # Create beautification prompt
+            prompt_start = time.time()
             prompt = self._create_beautification_prompt(
                 query=query,
                 summary=summary,
                 context=context,
                 query_type=query_type
             )
+            prompt_time = (time.time() - prompt_start) * 1000
+            logger.info(f"📝 Beautification prompt created ({prompt_time:.2f}ms)")
+            logger.info(f"   Prompt length: {len(prompt)} characters")
             
             # Use LLM to beautify
+            llm_start = time.time()
+            logger.info(f"🤖 Calling {self.provider_name.upper()} LLM for beautification...")
             provider = LLMFactory.create(self.provider_name)
             beautified = await provider.generate(
                 prompt=prompt,
                 temperature=0.3  # Lower temperature for more focused output
             )
+            llm_time = (time.time() - llm_start) * 1000
             
-            logger.info("✅ Response beautified successfully")
+            logger.info(f"✅ LLM beautification completed ({llm_time:.2f}ms)")
+            logger.info(f"   Response length: {len(beautified)} characters")
+            logger.info(f"   Response preview: {beautified[:200]}...")
+            logger.info("-" * 60)
+            logger.info(f"✅ RESPONSE BEAUTIFIER COMPLETE")
+            logger.info(f"⏱️  Total Time: {context_time + prompt_time + llm_time:.2f}ms")
+            logger.info("-" * 60)
+            
             return beautified
             
         except Exception as e:
-            logger.error(f"❌ Beautification failed: {e}")
+            logger.error(f"❌ Beautification failed: {e}", exc_info=True)
+            logger.info("🔄 Using fallback formatting...")
             # Fallback to basic formatting
-            return self._fallback_formatting(query, summary, sources)
+            fallback = self._fallback_formatting(query, summary, sources)
+            logger.info(f"✅ Fallback formatting complete ({len(fallback)} characters)")
+            logger.info("-" * 60)
+            return fallback
     
     def _build_context(
         self,

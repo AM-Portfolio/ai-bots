@@ -39,7 +39,7 @@ class VectorQueryService:
         filters: Optional[Dict[str, Any]] = None
     ) -> List[VectorSearchResult]:
         """
-        Perform semantic search over vector database
+        Perform semantic search over vector database with enhanced logging
         
         Args:
             query: Natural language query
@@ -50,25 +50,60 @@ class VectorQueryService:
         Returns:
             List of search results
         """
-        logger.info(f"🔍 Semantic search: '{query[:50]}...' in collection '{collection}'")
+        import time
+        start_time = time.time()
+        
+        logger.info("~" * 60)
+        logger.info(f"🔍 VECTOR DB SEMANTIC SEARCH START")
+        logger.info(f"📝 Query: '{query[:80]}...'")
+        logger.info(f"📦 Collection: {collection}")
+        logger.info(f"🎯 Top K: {top_k}")
+        logger.info(f"🔧 Filters: {filters or 'None'}")
+        logger.info("~" * 60)
         
         try:
             # Generate query embedding
+            embed_start = time.time()
+            logger.info(f"🧮 Generating query embedding...")
             query_embedding = await self.embedding_service.generate_embedding(query)
+            embed_time = (time.time() - embed_start) * 1000
+            logger.info(f"✅ Embedding generated ({embed_time:.2f}ms)")
+            logger.info(f"   Embedding dimension: {len(query_embedding)}")
             
             # Search vector database
+            search_start = time.time()
+            logger.info(f"🔎 Searching vector database...")
             results = await self.vector_db.search(
                 collection=collection,
                 query_embedding=query_embedding,
                 top_k=top_k,
                 filter_metadata=filters
             )
+            search_time = (time.time() - search_start) * 1000
             
-            logger.info(f"✅ Found {len(results)} results")
+            total_time = (time.time() - start_time) * 1000
+            
+            logger.info(f"✅ Search completed ({search_time:.2f}ms)")
+            logger.info(f"📊 Results: {len(results)} documents found")
+            
+            # Log top results
+            for i, result in enumerate(results[:3], 1):
+                repo = result.metadata.get('repo_name', 'Unknown')
+                file_path = result.metadata.get('file_path', 'Unknown')
+                logger.info(f"   Result {i}: {repo}/{file_path} (score: {result.score:.4f})")
+            
+            logger.info("~" * 60)
+            logger.info(f"✅ VECTOR DB SEMANTIC SEARCH COMPLETE")
+            logger.info(f"⏱️  Total Time: {total_time:.2f}ms")
+            logger.info(f"   Embedding: {embed_time:.2f}ms")
+            logger.info(f"   Search: {search_time:.2f}ms")
+            logger.info("~" * 60)
+            
             return results
             
         except Exception as e:
-            logger.error(f"❌ Semantic search failed: {e}")
+            logger.error(f"❌ Semantic search failed: {e}", exc_info=True)
+            logger.info("~" * 60)
             return []
     
     async def search_by_repository(
@@ -90,6 +125,7 @@ class VectorQueryService:
         Returns:
             Search results from specific repository
         """
+        logger.info(f"📂 Repository-scoped search: {repo_name}")
         filters = {'repo_name': repo_name}
         return await self.semantic_search(
             query=query,

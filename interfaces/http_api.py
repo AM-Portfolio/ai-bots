@@ -177,12 +177,116 @@ async def health_check():
 
 @app.post("/api/test/llm")
 async def test_llm(prompt: str, provider: str = "together", show_thinking: bool = False):
-    """Test LLM provider - uses orchestration pipeline when show_thinking=True"""
+    """Test LLM provider - uses GitHub-LLM orchestration for GitHub-related queries"""
     from shared.llm import llm_client
     from shared.thinking_process import create_llm_thinking_process
+    from shared.utils.github_query_detector import is_github_query, get_github_context
+    from interfaces.vector_db_api import github_llm_orchestrator
+    from orchestration.github_llm.models import QueryRequest, QueryType
     import uuid
     
-    logger.info(f"Testing LLM with provider: {provider}, prompt: {prompt[:50]}...")
+    logger.info(f"🧪 Testing LLM with provider: {provider}, prompt: {prompt[:50]}...")
+    
+    # STEP 1: Detect if this is a GitHub-related query
+    is_github = is_github_query(prompt)
+    github_context = get_github_context(prompt) if is_github else None
+    
+    logger.info(f"📊 Query Analysis: github_related={is_github}, context={github_context}")
+    
+    # STEP 2: Route to GitHub-LLM Orchestrator if GitHub-related AND orchestrator is initialized
+    if is_github and github_llm_orchestrator is not None:
+        logger.info("🚀 Routing to GitHub-LLM Orchestrator for intelligent processing...")
+        
+        try:
+            # Convert string query_type to QueryType enum
+            query_type_str = github_context.get('query_type', 'semantic_search')
+            query_type_map = {
+                'code_search': QueryType.CODE_SEARCH,
+                'file_explanation': QueryType.FILE_EXPLANATION,
+                'semantic_search': QueryType.SEMANTIC_SEARCH,
+                'documentation': QueryType.DOCUMENTATION,
+                'repo_summary': QueryType.REPO_SUMMARY
+            }
+            query_type_enum = query_type_map.get(query_type_str, QueryType.SEMANTIC_SEARCH)
+            
+            # Create query request
+            query_request = QueryRequest(
+                query=prompt,
+                query_type=query_type_enum,
+                repository=github_context.get('repository'),
+                max_results=5,
+                include_vector_search=True,
+                include_github_direct=True
+            )
+            
+            logger.info(f"📋 GitHub-LLM Request: type={query_request.query_type}, repo={query_request.repository}")
+            
+            # Process through GitHub-LLM orchestrator
+            start_time = datetime.now()
+            response = await github_llm_orchestrator.process_query(query_request)
+            processing_time = (datetime.now() - start_time).total_seconds() * 1000
+            
+            logger.info(f"✅ GitHub-LLM completed in {processing_time:.2f}ms, confidence={response.confidence_score:.2f}")
+            
+            # Build thinking process for UI
+            thinking_data = {
+                "steps": [
+                    {
+                        "id": "github_detection",
+                        "title": "🎯 GitHub Query Detection",
+                        "description": f"Detected as {github_context['query_type']} query",
+                        "status": "completed",
+                        "start_time": start_time.isoformat(),
+                        "end_time": start_time.isoformat(),
+                        "duration_ms": 1,
+                        "metadata": github_context
+                    },
+                    {
+                        "id": "github_llm_orchestration",
+                        "title": "🤖 GitHub-LLM Orchestration",
+                        "description": f"Queried {len(response.sources)} sources with {response.confidence_score:.0%} confidence",
+                        "status": "completed",
+                        "start_time": start_time.isoformat(),
+                        "end_time": datetime.now().isoformat(),
+                        "duration_ms": processing_time,
+                        "metadata": {
+                            "sources_count": len(response.sources),
+                            "confidence": response.confidence_score,
+                            "query_type": response.query_type.value
+                        }
+                    }
+                ],
+                "workflow_id": str(uuid.uuid4()),
+                "workflow_type": "github_llm",
+                "start_time": start_time.isoformat(),
+                "end_time": datetime.now().isoformat(),
+                "total_duration_ms": processing_time,
+                "status": "completed"
+            }
+            
+            return {
+                "success": True,
+                "provider": "github_llm",
+                "response": response.beautified_response or response.summary,
+                "github_orchestration_used": True,
+                "github_context": github_context,
+                "metadata": {
+                    "query_type": response.query_type.value,
+                    "sources_count": len(response.sources),
+                    "confidence_score": response.confidence_score,
+                    "processing_time_ms": response.processing_time_ms
+                },
+                "thinking": thinking_data if show_thinking else None
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ GitHub-LLM orchestration failed: {e}", exc_info=True)
+            logger.info("🔄 Falling back to standard LLM pipeline...")
+            # Fall through to standard pipeline
+    elif is_github and github_llm_orchestrator is None:
+        logger.warning("⚠️  GitHub query detected but orchestrator not initialized yet. Using standard pipeline.")
+    
+    logger.info(f"🔄 Using standard orchestration pipeline...")
     
     # ALWAYS use full orchestration pipeline
     if True:  # Always use orchestration
