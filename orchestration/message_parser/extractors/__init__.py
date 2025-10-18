@@ -9,10 +9,16 @@ from orchestration.message_parser.extractors.repository_registry import (
     get_global_registry,
     initialize_default_repositories
 )
+from orchestration.message_parser.extractors.github_repo_loader import (
+    GitHubRepoLoader,
+    auto_load_github_repos
+)
 
 __all__ = [
     'GitHubExtractor',
     'RepositoryRegistry',
     'get_global_registry',
-    'initialize_default_repositories'
+    'initialize_default_repositories',
+    'GitHubRepoLoader',
+    'auto_load_github_repos'
 ]
