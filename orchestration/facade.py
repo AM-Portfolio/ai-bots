@@ -92,18 +92,30 @@ class OrchestrationFacade:
         # Step 2: Enrich context
         logger.info("🔍 Step 2/4: Enriching context...")
         logger.info(f"   📥 INPUT: {len(parsed_message.references)} references to enrich")
+        logger.info(f"      Passing ParsedMessage to enricher:")
+        logger.info(f"      - original_message: {parsed_message.original_message[:100]}...")
+        logger.info(f"      - references: {[{'type': r.type.value, 'value': r.normalized_value} for r in parsed_message.references]}")
+        
         enriched_context = await self.enricher.enrich(
             parsed_message,
             options=kwargs.get('enrich_options', {})
         )
         logger.info(f"   📤 OUTPUT: {len(enriched_context.context_items)} context items")
         for item in enriched_context.context_items:
-            logger.info(f"      - {item.source_type.value}: {item.source_id}")
+            logger.info(f"      - {item.source_type.value}: {item.source_id} (cache_hit={item.cache_hit})")
+            if item.data:
+                logger.info(f"        Data preview: {str(item.data)[:100]}...")
         logger.info(f"✓ Enriched context: {len(enriched_context.context_items)} items")
         
         # Step 3: Build prompt
         logger.info(f"🏗️  Step 3/4: Building prompt with template '{template_name}'...")
         logger.info(f"   📥 INPUT: {len(enriched_context.context_items)} context items, template='{template_name}'")
+        logger.info(f"      Passing EnrichedContext to prompt builder:")
+        logger.info(f"      - original_message: {enriched_context.parsed_message.original_message[:100]}...")
+        logger.info(f"      - context_items: {len(enriched_context.context_items)} items")
+        for item in enriched_context.context_items:
+            logger.info(f"        * {item.source_type.value}: {item.source_id}")
+        
         formatted_prompt = await self.prompt_builder.build(
             enriched_context,
             template_name=template_name,
@@ -121,14 +133,36 @@ class OrchestrationFacade:
         
         if execute_tasks:
             logger.info("⚡ Step 4/4: Planning and executing tasks...")
+            logger.info(f"   📥 INPUT: Passing enriched context + formatted prompt to agent")
+            logger.info(f"      - enriched_context has {len(enriched_context.context_items)} items")
+            logger.info(f"      - formatted_prompt has {len(formatted_prompt.system_prompt) + len(formatted_prompt.user_prompt)} chars total")
+            
             user_intent = kwargs.get('user_intent', message)
             tasks = await self.agent.plan_tasks(enriched_context, user_intent)
-            logger.info(f"📋 Planned {len(tasks)} tasks")
+            logger.info(f"   📤 OUTPUT (Planning): {len(tasks)} tasks planned")
+            for i, task in enumerate(tasks, 1):
+                logger.info(f"      Task {i}: {task.task_type} - {task.description[:100]}...")
+            
+            logger.info(f"📋 Planned {len(tasks)} tasks, executing...")
             
             for i, task in enumerate(tasks, 1):
                 logger.info(f"🔧 Executing task {i}/{len(tasks)}: {task.task_type}")
+                logger.info(f"   📥 INPUT to task executor:")
+                logger.info(f"      - task_type: {task.task_type}")
+                logger.info(f"      - description: {task.description}")
+                logger.info(f"      - parameters: {task.parameters}")
+                
                 completed_task = await self.agent.execute(task)
                 results.append(completed_task)
+                
+                logger.info(f"   📤 OUTPUT from task {i}:")
+                logger.info(f"      - status: {completed_task.status}")
+                if completed_task.result:
+                    logger.info(f"      - result keys: {list(completed_task.result.keys()) if isinstance(completed_task.result, dict) else 'non-dict result'}")
+                    if isinstance(completed_task.result, dict):
+                        for key, value in completed_task.result.items():
+                            preview = str(value)[:150] if value else 'None'
+                            logger.info(f"        * {key}: {preview}...")
                 logger.info(f"✓ Task {i} completed: {completed_task.status}")
         else:
             logger.info("⏭️  Step 4/4: Task execution skipped")

@@ -258,11 +258,31 @@ async def test_llm(prompt: str, provider: str = "together", show_thinking: bool 
                     elif "diagnosis" in last_result.result:
                         response = last_result.result["diagnosis"]
             
+            # Extract GitHub context from enriched_context object
+            github_context = None
+            if result.get("enriched_context"):
+                enriched = result["enriched_context"]
+                github_items = [
+                    item for item in enriched.context_items 
+                    if item.source_type.value.startswith('GITHUB')
+                ]
+                if github_items:
+                    github_context = {
+                        "items": [
+                            {
+                                "type": item.source_type.value,
+                                "id": item.source_id,
+                                "data_preview": str(item.data)[:200] if item.data else None
+                            }
+                            for item in github_items
+                        ]
+                    }
+            
             return {
                 "success": True,
                 "provider": provider,
                 "response": response,
-                "github_context": result.get("enriched_context", {}).get("github_data"),
+                "github_context": github_context,
                 "thinking": thinking_data if show_thinking else None,
                 "orchestration_result": result
             }
