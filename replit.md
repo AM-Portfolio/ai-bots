@@ -12,6 +12,7 @@ The project employs a clean architecture approach, separating concerns into dist
 ### Backend Architecture
 -   **Framework:** FastAPI (Python 3.11)
 -   **Core Layers:**
+    -   **Orchestration:** Modular pipeline for processing user messages through parser → enricher → prompt builder → agent workflow
     -   **Interfaces:** Handles external communication (API, webhooks, bot, service management API).
     -   **Features:** Encapsulates independent business logic (e.g., context resolution, issue analysis, code generation, test orchestration, documentation publishing).
     -   **Shared:** Provides common utilities, clients, and unified service architecture.
@@ -19,13 +20,21 @@ The project employs a clean architecture approach, separating concerns into dist
     -   **Observability:** Implements monitoring with Prometheus metrics and OpenTelemetry tracing.
 -   **Database:** SQLAlchemy ORM supporting SQLite (default) and PostgreSQL, using a repository pattern.
 -   **AI Integration:** Utilizes a factory pattern for pluggable LLM providers (Together AI, Azure OpenAI) with automatic fallback.
--   **Service Architecture (New):** Modular, LLM-powered service layer with:
+-   **Service Architecture:** Modular, LLM-powered service layer with:
     -   **BaseService:** Abstract base class for all integrations (~85 lines)
     -   **ServiceManager:** Connection pooling, lifecycle management, LLM-enhanced execution (~145 lines)
     -   **ServiceLLMWrapper:** AI-powered query enhancement, response interpretation, error analysis (~135 lines)
     -   **Service Implementations:** GitHub (~240 lines), Confluence (~195 lines), MongoDB (~220 lines)
     -   **Benefits:** Each service file <250 lines, LLM wrapper for intelligent interactions, extensible for future services
     -   **Total Architecture:** ~991 lines across all service files (vs 471 lines for old GitHub client alone)
+-   **Orchestration Layer (New):** Modular, scalable pipeline for intelligent message processing:
+    -   **Message Parser:** Extracts structured references (GitHub URLs, Jira tickets, Confluence pages) from user messages using regex patterns
+    -   **Context Enricher:** Fetches real data from GitHub/Jira/Confluence based on parsed references, with built-in caching for performance
+    -   **Prompt Builder:** Formats enriched context into LLM-ready prompts using templates (default, bug_analysis, documentation, code_review)
+    -   **LangGraph Agent:** Plans and executes tasks (code_analysis, bug_diagnosis, documentation, code_generation) with LLM coordination
+    -   **Orchestration Facade:** Unified interface for full pipeline or individual steps
+    -   **Benefits:** Independently testable modules, easy to extend with new enrichers/templates/tasks, clear separation of concerns
+    -   **Pipeline Flow:** User Message → Parser → Enricher → Prompt Builder → Agent → Results
 
 ### Frontend Architecture
 -   **Framework:** React 18 with TypeScript.
