@@ -201,7 +201,7 @@ class LangGraphAgent(ILangGraphAgent):
     
     async def _execute_code_analysis(self, task: AgentTask) -> Dict[str, Any]:
         """Execute code analysis task"""
-        llm = self.llm_factory.create_llm()
+        llm = self.llm_factory.create_provider()
         
         prompt = f"""Analyze the following code context:
 
@@ -223,7 +223,7 @@ Provide:
     
     async def _execute_bug_diagnosis(self, task: AgentTask) -> Dict[str, Any]:
         """Execute bug diagnosis task"""
-        llm = self.llm_factory.create_llm()
+        llm = self.llm_factory.create_provider()
         
         prompt = f"""Diagnose this bug:
 
@@ -245,7 +245,7 @@ Provide:
     
     async def _execute_documentation(self, task: AgentTask) -> Dict[str, Any]:
         """Execute documentation generation task"""
-        llm = self.llm_factory.create_llm()
+        llm = self.llm_factory.create_provider()
         
         doc_format = task.parameters.get('format', 'markdown')
         
