@@ -214,7 +214,7 @@ Provide:
 4. Security considerations
 """
         
-        response = await llm.generate(prompt)
+        response = await llm.chat_completion([{"role": "user", "content": prompt}])
         
         return {
             'analysis': response,
@@ -236,7 +236,7 @@ Provide:
 4. Prevention strategies
 """
         
-        response = await llm.generate(prompt)
+        response = await llm.chat_completion([{"role": "user", "content": prompt}])
         
         return {
             'diagnosis': response,
@@ -260,7 +260,7 @@ Include:
 4. Configuration details
 """
         
-        response = await llm.generate(prompt)
+        response = await llm.chat_completion([{"role": "user", "content": prompt}])
         
         return {
             'documentation': response,
@@ -285,7 +285,7 @@ Provide:
 3. Usage examples
 """
         
-        response = await llm.generate(prompt)
+        response = await llm.chat_completion([{"role": "user", "content": prompt}])
         
         return {
             'code': response,
@@ -304,7 +304,7 @@ Context:
 Please complete this task comprehensively.
 """
         
-        response = await llm.generate(prompt)
+        response = await llm.chat_completion([{"role": "user", "content": prompt}])
         
         return {
             'response': response,

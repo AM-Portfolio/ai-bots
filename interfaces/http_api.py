@@ -218,43 +218,45 @@ async def test_llm(prompt: str, provider: str = "together", show_thinking: bool 
                     "name": "Enrich Context",
                     "status": "completed",
                     "metadata": {
-                        "context_items": result["enriched_context"].get("context_items", 0),
-                        "cache_hits": result["enriched_context"].get("cache_hits", 0)
+                        "context_items": len(result["enriched_context"].context_items),
+                        "cache_hits": len([item for item in result["enriched_context"].context_items if item.cache_hit])
                     }
                 })
             
-            if result.get("built_prompt"):
+            if result.get("formatted_prompt"):
                 thinking_data["steps"].append({
                     "id": "build_prompt",
                     "name": "Build Prompt",
                     "status": "completed",
                     "metadata": {
-                        "template": result["built_prompt"].get("template", "default")
+                        "prompt_length": len(result["formatted_prompt"].system_prompt) + len(result["formatted_prompt"].user_prompt)
                     }
                 })
             
-            if result.get("tasks"):
+            if result.get("task_results"):
+                successful = len([t for t in result["task_results"] if t.status == "completed"])
                 thinking_data["steps"].append({
                     "id": "execute_tasks",
                     "name": "Execute Tasks",
                     "status": "completed",
                     "metadata": {
-                        "tasks_executed": result["tasks"].get("executed", 0),
-                        "tasks_successful": result["tasks"].get("successful", 0)
+                        "tasks_executed": len(result["task_results"]),
+                        "tasks_successful": successful
                     }
                 })
             
             # Extract the LLM response from task results
             response = "Pipeline executed successfully."
-            if result.get("tasks") and result["tasks"].get("results"):
+            if result.get("task_results") and len(result["task_results"]) > 0:
                 # Get the last task result as the response
-                task_results = result["tasks"]["results"]
-                if task_results and len(task_results) > 0:
-                    last_result = task_results[-1]
-                    if isinstance(last_result, dict) and "output" in last_result:
-                        response = last_result["output"]
-                    elif isinstance(last_result, str):
-                        response = last_result
+                last_result = result["task_results"][-1]
+                if hasattr(last_result, 'result') and isinstance(last_result.result, dict):
+                    if "response" in last_result.result:
+                        response = last_result.result["response"]
+                    elif "analysis" in last_result.result:
+                        response = last_result.result["analysis"]
+                    elif "diagnosis" in last_result.result:
+                        response = last_result.result["diagnosis"]
             
             return {
                 "success": True,
