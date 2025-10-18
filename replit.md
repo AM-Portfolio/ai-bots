@@ -44,8 +44,11 @@ The project employs a clean architecture with a modular design for scalability a
 -   **Real-time Backend Activity Streaming:** Live visualization of orchestration pipeline execution via Server-Sent Events (SSE) with a `StreamingOrchestrationWrapper` and a `BackendActivityStream` React component.
 -   **Thinking Process Visualization:** Shared backend component for tracking workflow steps, displayed via a reusable frontend `ThinkingProcess` component.
 -   **GitHub Context Detection:** Advanced repository reference parser with fuzzy matching. Automatically detects repository mentions in natural language (e.g., "repo marketdata"), normalizes variants (one word, hyphenated, spaced), and resolves to full repository paths using intelligent compound word matching with 85% confidence scoring.
+-   **Vector Database & Semantic Search:** In-memory vector database with 768-dimensional embeddings for GitHub repository code and documentation. Supports semantic search, code search, file explanation, and repository summarization with automatic indexing and intelligent query routing.
+-   **GitHub-LLM Orchestrator:** Specialized orchestration pipeline for GitHub-related queries with automatic detection, vector search integration, LLM-powered response generation, and beautified output. Provides 5-step workflow (planning, querying, synthesis, summary, beautification) with comprehensive timing breakdowns and confidence scoring.
+-   **Automatic Query Detection:** Word-boundary pattern matching for GitHub-related queries in LLM Testing UI. Detects high-confidence keywords (git, repo, pr), medium-confidence code terms (api, function, class, method), and automatically routes to GitHub-LLM orchestrator without false positives.
 -   **Documentation Orchestrator:** Automated workflow for creating branches, committing documentation to GitHub, publishing to Confluence, and creating Jira tickets, with clickable links to all generated artifacts.
--   **Observability:** Prometheus metrics, OpenTelemetry tracing, and comprehensive structured logging including request correlation IDs, LLM interaction logging, and timing information.
+-   **Observability:** Prometheus metrics, OpenTelemetry tracing, and comprehensive structured logging including request correlation IDs, LLM interaction logging, timing information, and enhanced flow tracking across Vector DB, GitHub-LLM, and Summary/Beautify layers.
 
 ## External Dependencies
 -   **AI Providers:** Together AI, Azure OpenAI
@@ -57,3 +60,10 @@ The project employs a clean architecture with a modular design for scalability a
 -   **Database:** SQLAlchemy (for SQLite and PostgreSQL)
 -   **Frontend Libraries:** React, Vite, Tailwind CSS, Lucide React, Axios
 -   **Browser APIs:** Web Speech Recognition API, Web Speech Synthesis API
+
+## Documentation
+-   **Vector DB Usage Guide:** Comprehensive documentation for Vector Database and GitHub-LLM integration available in `VECTOR_DB_USAGE.md`. Includes quick start, API reference, use cases, troubleshooting, and best practices for indexing repositories and performing semantic code search.
+
+## Known Issues & Limitations
+-   **Vector Database Persistence:** In-memory vector database clears on server restart. Re-index repositories after restarts. Consider implementing persistent storage (ChromaDB, Pinecone) for production use.
+-   **Repository Name Matching:** Query filters require full `owner/repo` format. Partial repository names (e.g., "ai-bots") will not match stored documents (e.g., "AM-Portfolio/ai-bots").
