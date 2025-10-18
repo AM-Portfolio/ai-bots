@@ -72,6 +72,13 @@ The project employs a clean architecture approach, separating concerns into dist
 -   **Multi-Source Integration:** Connectors for GitHub, Jira, Confluence (Basic Auth with API tokens), and Grafana.
 -   **AI-Powered Analysis:** Automated bug diagnosis, fix generation, test code generation, and documentation generation using LLMs.
 -   **Automated Workflows:** End-to-end processes for context enrichment, root cause analysis, code fix generation, pull request creation, and command-driven documentation orchestration (analysis → generation → commit → publish → ticket).
+-   **Real-time Backend Activity Streaming:** Live visualization of orchestration pipeline execution via Server-Sent Events (SSE):
+    -   **StreamingOrchestrationWrapper:** Wraps orchestration facade to emit real-time activity events (~320 lines)
+    -   **SSE Endpoint:** `/api/orchestration/stream` streams pipeline steps as they execute
+    -   **BackendActivityStream Component:** React component displaying live activity with color-coded status indicators (~240 lines)
+    -   **Event Details:** Each step includes metrics (references found, cache hits, tasks planned/executed, timing)
+    -   **UI Integration:** Toggle-able streaming mode in LLM Testing panel with "Details" + "Stream" checkboxes
+    -   **User Experience:** Real-time visibility into parsing → enrichment → prompt building → task execution flow
 -   **Thinking Process Visualization:** Shared backend component that tracks workflow execution steps with status, metadata, and timing. Displayed via reusable frontend ThinkingProcess component in both LLM Testing and Doc Orchestrator panels. Provides real-time visibility into backend processing flow.
 -   **GitHub Context Detection:** LLM automatically detects GitHub repository mentions in prompts and enriches context with repository information.
 -   **Documentation Orchestrator:** Automated workflow that creates a new branch, commits documentation to GitHub, publishes to Confluence, and creates Jira tickets. Provides clickable links to GitHub files (with branch name), Confluence pages, commit URLs, and Jira tickets for easy access to all generated artifacts.
@@ -84,6 +91,12 @@ The project employs a clean architecture approach, separating concerns into dist
     -   API request/response logging middleware
 
 ## Recent Changes
+-   **October 18, 2025:** Implemented real-time backend activity streaming feature with Server-Sent Events (SSE):
+    -   Created StreamingOrchestrationWrapper to emit live pipeline events during orchestration
+    -   Added `/api/orchestration/stream` endpoint with JSON request body using Pydantic validation
+    -   Developed BackendActivityStream React component for live log visualization with color-coded status indicators
+    -   Integrated streaming into LLM Testing panel with toggle-able "Stream" mode
+    -   Provides real-time visibility into parsing, enrichment, prompt building, and task execution steps
 -   **October 18, 2025:** Added comprehensive architecture documentation (ARCHITECTURE.md) detailing modular design principles, scalability patterns, and code organization best practices.
 -   **October 18, 2025:** Enhanced orchestration modules with structured logging for improved observability - all modules now include INFO/DEBUG/ERROR level logs with contextual metadata.
 
