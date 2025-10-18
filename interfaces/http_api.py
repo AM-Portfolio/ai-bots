@@ -181,14 +181,53 @@ async def test_llm(prompt: str, provider: str = "together", show_thinking: bool 
             
             logger.info("📋 Orchestration facade initialized with integrations, processing message...")
             
-            # Process message through full pipeline: parser → enricher → prompt builder → agent
-            result = await orchestration.process_message(
-                message=prompt,
-                template_name="default",
-                execute_tasks=True
-            )
+            # Try primary orchestration pipeline with resilient fallback
+            orchestration_error = None
+            try:
+                # Process message through full pipeline: parser → enricher → prompt builder → agent
+                result = await orchestration.process_message(
+                    message=prompt,
+                    template_name="default",
+                    execute_tasks=True
+                )
+                
+                logger.info(f"✅ Orchestration completed successfully. Result keys: {list(result.keys())}")
+            except Exception as e:
+                orchestration_error = e
+                logger.warning(f"⚠️  Orchestration pipeline error: {str(e)[:200]}")
+                logger.info(f"🔄 Attempting resilient fallback with direct LLM providers...")
+                
+                # Try resilient fallback with multiple providers
+                from shared.llm_providers.resilient_orchestrator import get_resilient_orchestrator
+                
+                orchestrator = get_resilient_orchestrator()
+                
+                try:
+                    response_text, metadata = await orchestrator.chat_completion_with_fallback(
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.7,
+                        preferred_provider=provider
+                    )
+                    
+                    logger.info(f"✅ Resilient fallback succeeded with {metadata.get('provider_used')}")
+                    
+                    return {
+                        "success": True,
+                        "provider": metadata.get('provider_used', provider),
+                        "response": response_text,
+                        "fallback_used": True,
+                        "fallback_metadata": metadata,
+                        "thinking": None
+                    }
+                except Exception as fallback_error:
+                    logger.error(f"❌ All fallback attempts failed: {fallback_error}")
+                    return {
+                        "success": False,
+                        "error": f"All providers failed. Pipeline: {str(orchestration_error)[:100]}. Fallback: {str(fallback_error)[:100]}",
+                        "thinking": None
+                    }
             
-            logger.info(f"✅ Orchestration completed successfully. Result keys: {list(result.keys())}")
+            # If we got here, orchestration succeeded
             
             # Convert orchestration result to LLM test format
             thinking_data = {

@@ -18,9 +18,10 @@ class AzureOpenAIProvider(BaseLLMProvider):
         deployment_name: str = "gpt-4",
         api_version: str = "2024-02-15-preview"
     ):
-        self.endpoint = endpoint
-        self.api_key = api_key
-        self.deployment_name = deployment_name
+        import os
+        self.endpoint = endpoint or os.getenv("AZURE_OPENAI_ENDPOINT")
+        self.api_key = api_key or os.getenv("AZURE_OPENAI_API_KEY")
+        self.deployment_name = deployment_name or os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4")
         self.api_version = api_version
         self.client: Any = None
         self._initialize_client()

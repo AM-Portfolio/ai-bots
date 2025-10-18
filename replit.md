@@ -35,6 +35,7 @@ The project employs a clean architecture with a modular design for scalability a
 ### Key Features
 -   **Multi-Source Integration:** Connectors for GitHub, Jira, Confluence, and Grafana.
 -   **AI-Powered Analysis:** Automated bug diagnosis, fix generation, test code generation, and documentation generation using LLMs.
+-   **Resilient LLM Orchestration:** Automatic fallback across multiple LLM providers (Together AI → Azure OpenAI → OpenAI) with circuit breaker pattern, retry logic, and health tracking. If one provider fails, the system automatically tries alternative providers to ensure users always get a response.
 -   **Automated Workflows:** End-to-end processes for context enrichment, root cause analysis, code fix generation, pull request creation, and command-driven documentation orchestration.
 -   **Real-time Backend Activity Streaming:** Live visualization of orchestration pipeline execution via Server-Sent Events (SSE) with a `StreamingOrchestrationWrapper` and a `BackendActivityStream` React component.
 -   **Thinking Process Visualization:** Shared backend component for tracking workflow steps, displayed via a reusable frontend `ThinkingProcess` component.
