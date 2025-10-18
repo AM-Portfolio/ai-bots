@@ -189,6 +189,14 @@ class LangGraphAgent(ILangGraphAgent):
                 context=enriched_context
             ))
         
+        logger.info(
+            "Task planning completed",
+            extra={
+                "tasks_planned": len(tasks),
+                "task_types": [task.task_type for task in tasks]
+            }
+        )
+        
         return tasks
     
     async def _execute_code_analysis(self, task: AgentTask) -> Dict[str, Any]:

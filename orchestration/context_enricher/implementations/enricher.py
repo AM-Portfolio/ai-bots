@@ -162,7 +162,19 @@ class ContextEnricher(IContextEnricher):
                 context_items.append(context_data)
         
         except Exception as e:
-            print(f"Error enriching GitHub reference: {e}")
+            logger.error(
+                "Error enriching GitHub reference",
+                extra={
+                    "reference_type": reference.type.value,
+                    "reference_value": reference.normalized_value,
+                    "owner": reference.metadata.get('owner'),
+                    "repo": reference.metadata.get('repo'),
+                    "issue_number": reference.metadata.get('issue_number'),
+                    "pr_number": reference.metadata.get('pr_number'),
+                    "error": str(e)
+                },
+                exc_info=True
+            )
         
         return context_items
     
@@ -210,7 +222,16 @@ class ContextEnricher(IContextEnricher):
                     self.cache[cache_key] = context_data
         
         except Exception as e:
-            print(f"Error enriching Jira reference: {e}")
+            logger.error(
+                "Error enriching Jira reference",
+                extra={
+                    "reference_type": reference.type.value,
+                    "reference_value": reference.normalized_value,
+                    "ticket_id": reference.metadata.get('ticket_id'),
+                    "error": str(e)
+                },
+                exc_info=True
+            )
         
         return context_items
     
@@ -254,7 +275,17 @@ class ContextEnricher(IContextEnricher):
                     self.cache[cache_key] = context_data
         
         except Exception as e:
-            print(f"Error enriching Confluence reference: {e}")
+            logger.error(
+                "Error enriching Confluence reference",
+                extra={
+                    "reference_type": reference.type.value,
+                    "reference_value": reference.normalized_value,
+                    "space_key": reference.metadata.get('space_key'),
+                    "page_id": reference.metadata.get('page_id'),
+                    "error": str(e)
+                },
+                exc_info=True
+            )
         
         return context_items
     

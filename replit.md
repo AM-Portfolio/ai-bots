@@ -27,14 +27,17 @@ The project employs a clean architecture approach, separating concerns into dist
     -   **Service Implementations:** GitHub (~240 lines), Confluence (~195 lines), MongoDB (~220 lines)
     -   **Benefits:** Each service file <250 lines, LLM wrapper for intelligent interactions, extensible for future services
     -   **Total Architecture:** ~991 lines across all service files (vs 471 lines for old GitHub client alone)
--   **Orchestration Layer (New):** Modular, scalable pipeline for intelligent message processing:
-    -   **Message Parser:** Extracts structured references (GitHub URLs, Jira tickets, Confluence pages) from user messages using regex patterns
-    -   **Context Enricher:** Fetches real data from GitHub/Jira/Confluence based on parsed references, with built-in caching for performance
-    -   **Prompt Builder:** Formats enriched context into LLM-ready prompts using templates (default, bug_analysis, documentation, code_review)
-    -   **LangGraph Agent:** Plans and executes tasks (code_analysis, bug_diagnosis, documentation, code_generation) with LLM coordination
-    -   **Orchestration Facade:** Unified interface for full pipeline or individual steps
+-   **Orchestration Layer:** Modular, scalable pipeline for intelligent message processing:
+    -   **Message Parser:** Extracts structured references (GitHub URLs, Jira tickets, Confluence pages) from user messages using regex patterns (~180 lines)
+    -   **Context Enricher:** Fetches real data from GitHub/Jira/Confluence based on parsed references, with built-in caching for performance (~200 lines)
+    -   **Prompt Builder:** Formats enriched context into LLM-ready prompts using templates (default, bug_analysis, documentation, code_review) (~190 lines)
+    -   **LangGraph Agent:** Plans and executes tasks (code_analysis, bug_diagnosis, documentation, code_generation) with LLM coordination (~220 lines)
+    -   **Orchestration Facade:** Unified interface for full pipeline or individual steps (~140 lines)
     -   **Benefits:** Independently testable modules, easy to extend with new enrichers/templates/tasks, clear separation of concerns
-    -   **Pipeline Flow:** User Message → Parser → Enricher → Prompt Builder → Agent → Results
+    -   **Architecture Philosophy:** Modular-first approach with small focused methods (<30 lines), interface-driven design, dataclass models for type safety, comprehensive logging at every layer
+    -   **Logging:** Structured logging with correlation IDs, method entry/exit tracking, timing metrics, cache hit rates, task execution status, and error details
+    -   **Pipeline Flow:** User Message → Parser (log refs) → Enricher (log cache hits) → Prompt Builder (log templates) → Agent (log task status) → Results
+    -   **Total:** ~767 lines across entire orchestration layer (avg ~153 lines per module)
 
 ### Frontend Architecture
 -   **Framework:** React 18 with TypeScript.
@@ -79,6 +82,10 @@ The project employs a clean architecture approach, separating concerns into dist
     -   JSON-structured metadata for easy parsing
     -   Method entry/exit tracking with decorators
     -   API request/response logging middleware
+
+## Recent Changes
+-   **October 18, 2025:** Added comprehensive architecture documentation (ARCHITECTURE.md) detailing modular design principles, scalability patterns, and code organization best practices.
+-   **October 18, 2025:** Enhanced orchestration modules with structured logging for improved observability - all modules now include INFO/DEBUG/ERROR level logs with contextual metadata.
 
 ## External Dependencies
 -   **AI Providers:** Together AI (default), Azure OpenAI (alternative)
