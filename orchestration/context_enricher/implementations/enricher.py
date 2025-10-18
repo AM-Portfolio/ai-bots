@@ -108,6 +108,11 @@ class ContextEnricher(IContextEnricher):
         try:
             github_service = self.service_manager.get_service('github')
             
+            # If GitHub service is not available, skip enrichment
+            if github_service is None:
+                logger.warning("GitHub service not available, skipping enrichment")
+                return context_items
+            
             owner = reference.metadata.get('owner')
             repo = reference.metadata.get('repo')
             

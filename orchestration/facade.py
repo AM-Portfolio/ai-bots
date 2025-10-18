@@ -100,7 +100,8 @@ class OrchestrationFacade:
             template_name=template_name,
             **kwargs
         )
-        logger.info(f"✓ Built prompt: {len(formatted_prompt.final_prompt)} chars")
+        prompt_len = len(formatted_prompt.system_prompt) + len(formatted_prompt.user_prompt)
+        logger.info(f"✓ Built prompt: {prompt_len} chars")
         
         # Step 4: Execute tasks
         tasks = []
