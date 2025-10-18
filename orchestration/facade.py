@@ -17,7 +17,7 @@ from orchestration.shared.models import (
     AgentTask
 )
 from shared.services.manager import ServiceManager
-from shared.llm.factory import LLMFactory
+from shared.llm_providers.factory import LLMFactory
 
 logger = logging.getLogger(__name__)
 
@@ -71,46 +71,64 @@ class OrchestrationFacade:
             Complete processing result with all pipeline outputs
         """
         logger.info(
-            "Starting orchestration pipeline",
+            "🚀 Starting orchestration pipeline",
             extra={
                 "message_length": len(message),
+                "message_preview": message[:100],
                 "template_name": template_name,
                 "execute_tasks": execute_tasks
             }
         )
         
+        # Step 1: Parse message
+        logger.info("📝 Step 1/4: Parsing message...")
         parsed_message = await self.parser.parse(message)
+        logger.info(f"✓ Parsed message: found {len(parsed_message.references)} references")
         
+        # Step 2: Enrich context
+        logger.info("🔍 Step 2/4: Enriching context...")
         enriched_context = await self.enricher.enrich(
             parsed_message,
             options=kwargs.get('enrich_options', {})
         )
+        logger.info(f"✓ Enriched context: {len(enriched_context.context_items)} items")
         
+        # Step 3: Build prompt
+        logger.info(f"🏗️  Step 3/4: Building prompt with template '{template_name}'...")
         formatted_prompt = await self.prompt_builder.build(
             enriched_context,
             template_name=template_name,
             **kwargs
         )
+        logger.info(f"✓ Built prompt: {len(formatted_prompt.final_prompt)} chars")
         
+        # Step 4: Execute tasks
         tasks = []
         results = []
         
         if execute_tasks:
+            logger.info("⚡ Step 4/4: Planning and executing tasks...")
             user_intent = kwargs.get('user_intent', message)
             tasks = await self.agent.plan_tasks(enriched_context, user_intent)
+            logger.info(f"📋 Planned {len(tasks)} tasks")
             
-            for task in tasks:
+            for i, task in enumerate(tasks, 1):
+                logger.info(f"🔧 Executing task {i}/{len(tasks)}: {task.task_type}")
                 completed_task = await self.agent.execute(task)
                 results.append(completed_task)
+                logger.info(f"✓ Task {i} completed: {completed_task.status}")
+        else:
+            logger.info("⏭️  Step 4/4: Task execution skipped")
         
+        successful_tasks = len([r for r in results if r.status == "completed"])
         logger.info(
-            "Orchestration pipeline completed",
+            f"✅ Orchestration pipeline completed successfully",
             extra={
                 "references_found": len(parsed_message.references),
                 "context_items": len(enriched_context.context_items),
                 "tasks_planned": len(tasks),
                 "tasks_executed": len(results),
-                "successful_tasks": len([r for r in results if r.status == "completed"])
+                "successful_tasks": successful_tasks
             }
         )
         

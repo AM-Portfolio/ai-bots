@@ -172,8 +172,12 @@ async def test_llm(prompt: str, provider: str = "together", show_thinking: bool 
         from shared.services.manager import ServiceManager
         
         try:
+            logger.info(f"🔄 Starting orchestration pipeline for message: {prompt[:100]}...")
+            
             service_manager = ServiceManager()
             orchestration = OrchestrationFacade(service_manager)
+            
+            logger.info("📋 Orchestration facade initialized, processing message...")
             
             # Process message through full pipeline: parser → enricher → prompt builder → agent
             result = await orchestration.process_message(
@@ -181,6 +185,8 @@ async def test_llm(prompt: str, provider: str = "together", show_thinking: bool 
                 template_name="default",
                 execute_tasks=True
             )
+            
+            logger.info(f"✅ Orchestration completed successfully. Result keys: {list(result.keys())}")
             
             # Convert orchestration result to LLM test format
             thinking_data = {
