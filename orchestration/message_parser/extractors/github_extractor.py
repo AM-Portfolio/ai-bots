@@ -98,13 +98,14 @@ class GitHubExtractor:
         references = []
         seen_repos = set()
         
-        logger.debug(f"Extracting GitHub references from message: {message[:100]}...")
+        logger.info(f"📝 Extracting GitHub references from: '{message[:100]}...'")
         
         # Check if message contains GitHub-related keywords
         has_github_context = any(
             keyword in message.lower() 
             for keyword in self.github_keywords
         )
+        logger.info(f"   GitHub context detected: {has_github_context} (keywords: {[k for k in self.github_keywords if k in message.lower()]})")
         
         # Try each pattern in priority order
         for pattern_config in self.patterns:
@@ -112,8 +113,13 @@ class GitHubExtractor:
             pattern = pattern_config['pattern']
             base_confidence = pattern_config['confidence']
             
-            for match in pattern.finditer(message):
+            matches = list(pattern.finditer(message))
+            if matches:
+                logger.info(f"   Pattern '{pattern_name}' found {len(matches)} potential match(es)")
+            
+            for match in matches:
                 try:
+                    logger.debug(f"      Trying match: '{match.group(0)}'")
                     ref = self._create_reference(
                         match, 
                         pattern_name, 
@@ -127,14 +133,88 @@ class GitHubExtractor:
                             references.append(ref)
                             seen_repos.add(ref.normalized_value)
                             logger.info(
-                                f"Extracted GitHub repo: {ref.normalized_value} "
+                                f"   ✓ Extracted GitHub repo: {ref.normalized_value} "
                                 f"(confidence: {ref.confidence:.2f}, pattern: {pattern_name})"
                             )
+                        else:
+                            logger.debug(f"      ✗ Validation failed for: {ref.normalized_value}")
+                    elif ref:
+                        logger.debug(f"      ✗ Duplicate repo: {ref.normalized_value}")
                 except Exception as e:
-                    logger.warning(f"Failed to parse GitHub reference: {e}")
+                    logger.warning(f"   ✗ Failed to parse GitHub reference: {e}")
                     continue
         
-        logger.info(f"Total GitHub references extracted: {len(references)}")
+        # Try to detect bare repo names (repo without owner) if GitHub context exists
+        if has_github_context and len(references) == 0:
+            logger.info("   No owner/repo format found, trying to detect bare repo names...")
+            bare_repo_refs = self._extract_bare_repo_names(message)
+            references.extend(bare_repo_refs)
+        
+        if references:
+            logger.info(f"✅ Total GitHub references extracted: {len(references)}")
+            for ref in references:
+                logger.info(f"   - {ref.normalized_value} (confidence: {ref.confidence:.2f})")
+        else:
+            logger.warning(f"⚠️  No GitHub references found in message")
+            logger.info(f"   💡 Tip: Use format 'owner/repo' or full URL 'https://github.com/owner/repo'")
+        
+        return references
+    
+    def _extract_bare_repo_names(self, message: str) -> List[Reference]:
+        """
+        Extract bare repository names (without owner) when there's strong GitHub context
+        These get low confidence and require manual owner specification
+        
+        Args:
+            message: User message
+            
+        Returns:
+            List of bare repo references (marked as ambiguous)
+        """
+        references = []
+        
+        # Pattern for repo-like names with GitHub keywords nearby
+        # Matches: "am-market-data repo", "repo am-market-data", "repository my-app"
+        bare_repo_pattern = re.compile(
+            r'(?:repo(?:sitory)?|project|codebase)\s+([a-zA-Z0-9_-]{3,100})|'
+            r'([a-zA-Z0-9_-]{3,100})\s+repo(?:sitory)?',
+            re.IGNORECASE
+        )
+        
+        for match in bare_repo_pattern.finditer(message):
+            repo_name = match.group(1) or match.group(2)
+            
+            # Skip if it contains slash (already in owner/repo format)
+            if '/' in repo_name:
+                continue
+            
+            # Skip common words
+            if repo_name.lower() in self.invalid_owners or repo_name.lower() in {
+                'repo', 'repository', 'project', 'code', 'data', 'the', 'this', 'that'
+            }:
+                continue
+            
+            # Create a reference with UNKNOWN owner
+            ref = Reference(
+                type=ReferenceType.GITHUB_URL,
+                raw_text=match.group(0).strip(),
+                normalized_value=f"UNKNOWN/{repo_name}",
+                metadata={
+                    'owner': 'UNKNOWN',
+                    'repo': repo_name,
+                    'pattern_matched': 'bare_repo_name',
+                    'needs_owner': True,
+                    'warning': f'Repository name "{repo_name}" found but owner is unknown. Please specify as "owner/{repo_name}"'
+                },
+                confidence=0.5  # Low confidence - needs owner
+            )
+            
+            references.append(ref)
+            logger.warning(
+                f"   ⚠️  Bare repo name detected: '{repo_name}' (missing owner)\n"
+                f"      Please provide full path like 'owner/{repo_name}' or 'https://github.com/owner/{repo_name}'"
+            )
+        
         return references
     
     def _create_reference(
