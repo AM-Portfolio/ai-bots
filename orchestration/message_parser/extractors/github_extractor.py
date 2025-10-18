@@ -8,6 +8,7 @@ import re
 import logging
 from typing import List, Dict, Any, Optional
 from orchestration.shared.models import Reference, ReferenceType
+from orchestration.message_parser.extractors.repository_registry import get_global_registry
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,9 @@ class GitHubExtractor:
     """
     
     def __init__(self):
+        # Get repository registry for intelligent matching
+        self.repo_registry = get_global_registry()
+        
         # Pattern priority order (higher priority first)
         self.patterns = [
             # Full HTTPS/HTTP GitHub URLs with optional paths
@@ -147,7 +151,7 @@ class GitHubExtractor:
         # Try to detect bare repo names (repo without owner) if GitHub context exists
         if has_github_context and len(references) == 0:
             logger.info("   No owner/repo format found, trying to detect bare repo names...")
-            bare_repo_refs = self._extract_bare_repo_names(message)
+            bare_repo_refs = self._extract_bare_repo_names_with_registry(message)
             references.extend(bare_repo_refs)
         
         if references:
@@ -157,6 +161,87 @@ class GitHubExtractor:
         else:
             logger.warning(f"⚠️  No GitHub references found in message")
             logger.info(f"   💡 Tip: Use format 'owner/repo' or full URL 'https://github.com/owner/repo'")
+        
+        return references
+    
+    def _extract_bare_repo_names_with_registry(self, message: str) -> List[Reference]:
+        """
+        Extract bare repository names using registry for intelligent owner matching
+        
+        Args:
+            message: User message
+            
+        Returns:
+            List of repo references with matched owners
+        """
+        references = []
+        
+        # Pattern for repo-like names with GitHub keywords nearby
+        bare_repo_pattern = re.compile(
+            r'(?:repo(?:sitory)?|project|codebase)\s+([a-zA-Z0-9_-]{3,100})|'
+            r'([a-zA-Z0-9_-]{3,100})\s+repo(?:sitory)?',
+            re.IGNORECASE
+        )
+        
+        for match in bare_repo_pattern.finditer(message):
+            repo_name = match.group(1) or match.group(2)
+            
+            # Skip if it contains slash (already in owner/repo format)
+            if '/' in repo_name:
+                continue
+            
+            # Skip common words
+            if repo_name.lower() in self.invalid_owners or repo_name.lower() in {
+                'repo', 'repository', 'project', 'code', 'data', 'the', 'this', 'that'
+            }:
+                continue
+            
+            # Try to find in registry
+            logger.info(f"   🔍 Looking up '{repo_name}' in repository registry...")
+            match_info = self.repo_registry.find_repository(repo_name, threshold=0.6)
+            
+            if match_info:
+                # Found a match in registry!
+                ref = Reference(
+                    type=ReferenceType.GITHUB_URL,
+                    raw_text=match.group(0).strip(),
+                    normalized_value=match_info['full_path'],
+                    metadata={
+                        'owner': match_info['owner'],
+                        'repo': match_info['repo'],
+                        'pattern_matched': 'bare_repo_with_registry',
+                        'registry_match_type': match_info['match_type'],
+                        'registry_confidence': match_info['confidence']
+                    },
+                    confidence=match_info['confidence']
+                )
+                
+                references.append(ref)
+                logger.info(
+                    f"   ✅ Registry match: '{repo_name}' → {match_info['full_path']} "
+                    f"(confidence: {match_info['confidence']:.2f}, type: {match_info['match_type']})"
+                )
+            else:
+                # Not in registry - create UNKNOWN reference
+                ref = Reference(
+                    type=ReferenceType.GITHUB_URL,
+                    raw_text=match.group(0).strip(),
+                    normalized_value=f"UNKNOWN/{repo_name}",
+                    metadata={
+                        'owner': 'UNKNOWN',
+                        'repo': repo_name,
+                        'pattern_matched': 'bare_repo_name',
+                        'needs_owner': True,
+                        'warning': f'Repository "{repo_name}" not found in registry. Please specify as "owner/{repo_name}"'
+                    },
+                    confidence=0.3
+                )
+                
+                references.append(ref)
+                logger.warning(
+                    f"   ⚠️  Bare repo name '{repo_name}' not in registry (missing owner)\n"
+                    f"      Please provide full path like 'owner/{repo_name}' or register it in the repository registry"
+                )
         
         return references
     
