@@ -88,8 +88,8 @@ class VectorQueryService:
             
             # Log top results
             for i, result in enumerate(results[:3], 1):
-                repo = result.metadata.get('repo_name', 'Unknown')
-                file_path = result.metadata.get('file_path', 'Unknown')
+                repo = getattr(result.metadata, 'repo_name', 'Unknown')
+                file_path = getattr(result.metadata, 'file_path', 'Unknown')
                 logger.info(f"   Result {i}: {repo}/{file_path} (score: {result.score:.4f})")
             
             logger.info("~" * 60)
