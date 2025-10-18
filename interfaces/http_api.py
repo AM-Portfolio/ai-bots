@@ -174,10 +174,12 @@ async def test_llm(prompt: str, provider: str = "together", show_thinking: bool 
         try:
             logger.info(f"🔄 Starting orchestration pipeline for message: {prompt[:100]}...")
             
-            service_manager = ServiceManager()
+            # Use connection factory to get service manager with integrations
+            from orchestration.shared.connection_factory import get_service_manager
+            service_manager = await get_service_manager()
             orchestration = OrchestrationFacade(service_manager)
             
-            logger.info("📋 Orchestration facade initialized, processing message...")
+            logger.info("📋 Orchestration facade initialized with integrations, processing message...")
             
             # Process message through full pipeline: parser → enricher → prompt builder → agent
             result = await orchestration.process_message(
@@ -203,10 +205,10 @@ async def test_llm(prompt: str, provider: str = "together", show_thinking: bool 
                     "name": "Parse Message",
                     "status": "completed",
                     "metadata": {
-                        "references_found": result["parsed_message"].get("references_count", 0),
-                        "github_refs": result["parsed_message"].get("github_refs", []),
-                        "jira_refs": result["parsed_message"].get("jira_refs", []),
-                        "confluence_refs": result["parsed_message"].get("confluence_refs", [])
+                        "references_found": len(result["parsed_message"].references),
+                        "github_refs": [r.normalized_value for r in result["parsed_message"].references if r.type.value.startswith('github')],
+                        "jira_refs": [r.normalized_value for r in result["parsed_message"].references if r.type.value.startswith('jira')],
+                        "confluence_refs": [r.normalized_value for r in result["parsed_message"].references if r.type.value.startswith('confluence')]
                     }
                 })
             

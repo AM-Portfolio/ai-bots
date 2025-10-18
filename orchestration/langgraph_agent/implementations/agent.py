@@ -270,7 +270,7 @@ Include:
     
     async def _execute_code_generation(self, task: AgentTask) -> Dict[str, Any]:
         """Execute code generation task"""
-        llm = self.llm_factory.create_llm()
+        llm = self.llm_factory.create_provider()
         
         prompt = f"""Generate code based on this context:
 
@@ -294,7 +294,7 @@ Provide:
     
     async def _execute_generic_task(self, task: AgentTask) -> Dict[str, Any]:
         """Execute generic task"""
-        llm = self.llm_factory.create_llm()
+        llm = self.llm_factory.create_provider()
         
         prompt = f"""Task: {task.description}
 

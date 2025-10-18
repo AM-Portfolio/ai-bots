@@ -82,25 +82,37 @@ class OrchestrationFacade:
         
         # Step 1: Parse message
         logger.info("📝 Step 1/4: Parsing message...")
+        logger.info(f"   📥 INPUT: {message[:200]}")
         parsed_message = await self.parser.parse(message)
+        logger.info(f"   📤 OUTPUT: {len(parsed_message.references)} references found")
+        for ref in parsed_message.references:
+            logger.info(f"      - {ref.type.value}: {ref.normalized_value}")
         logger.info(f"✓ Parsed message: found {len(parsed_message.references)} references")
         
         # Step 2: Enrich context
         logger.info("🔍 Step 2/4: Enriching context...")
+        logger.info(f"   📥 INPUT: {len(parsed_message.references)} references to enrich")
         enriched_context = await self.enricher.enrich(
             parsed_message,
             options=kwargs.get('enrich_options', {})
         )
+        logger.info(f"   📤 OUTPUT: {len(enriched_context.context_items)} context items")
+        for item in enriched_context.context_items:
+            logger.info(f"      - {item.source_type.value}: {item.source_id}")
         logger.info(f"✓ Enriched context: {len(enriched_context.context_items)} items")
         
         # Step 3: Build prompt
         logger.info(f"🏗️  Step 3/4: Building prompt with template '{template_name}'...")
+        logger.info(f"   📥 INPUT: {len(enriched_context.context_items)} context items, template='{template_name}'")
         formatted_prompt = await self.prompt_builder.build(
             enriched_context,
             template_name=template_name,
             **kwargs
         )
         prompt_len = len(formatted_prompt.system_prompt) + len(formatted_prompt.user_prompt)
+        logger.info(f"   📤 OUTPUT: system_prompt={len(formatted_prompt.system_prompt)} chars, user_prompt={len(formatted_prompt.user_prompt)} chars")
+        logger.info(f"      System prompt preview: {formatted_prompt.system_prompt[:150]}...")
+        logger.info(f"      User prompt preview: {formatted_prompt.user_prompt[:150]}...")
         logger.info(f"✓ Built prompt: {prompt_len} chars")
         
         # Step 4: Execute tasks

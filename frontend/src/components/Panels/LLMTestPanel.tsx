@@ -179,9 +179,15 @@ const LLMTestPanel = () => {
     setIsLoading(true);
     setThinkingData(null);
 
-    // Use streaming if backend details are enabled
-    if (showBackendDetails && useStreaming) {
+    // Use streaming if enabled - set message to trigger BackendActivityStream
+    if (useStreaming) {
       setStreamingMessage(messageText);
+      // Don't return - let the component handle the stream
+    }
+
+    // Skip normal API call if streaming is active - let BackendActivityStream handle it
+    if (useStreaming) {
+      // Loading state will be managed by stream callbacks
       return;
     }
 
@@ -296,7 +302,7 @@ const LLMTestPanel = () => {
           ))}
 
           {/* Streaming backend activity */}
-          {streamingMessage && showBackendDetails && useStreaming && (
+          {streamingMessage && useStreaming && (
             <BackendActivityStream
               message={streamingMessage}
               templateName="default"

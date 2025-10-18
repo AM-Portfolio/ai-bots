@@ -91,6 +91,24 @@ The project employs a clean architecture approach, separating concerns into dist
     -   API request/response logging middleware
 
 ## Recent Changes
+-   **October 18, 2025:** Created **Connection Factory** module for unified integration management:
+    -   Centralized service connection management using IntegrationsHub configurations
+    -   Automatic initialization from database-configured integrations (GitHub, Confluence, Jira, Grafana, etc.)
+    -   Orchestration pipeline now uses connection factory to access configured services
+    -   Graceful degradation when services are not configured (logs warnings, continues processing)
+-   **October 18, 2025:** Enhanced **orchestration logging** with detailed input/output at every step:
+    -   Added 📥 INPUT and 📤 OUTPUT logging to all 4 orchestration steps (parse → enrich → build → execute)
+    -   Logs show reference counts, context items fetched, prompt lengths, task status with rich emoji indicators
+    -   Complete visibility into data flow through the pipeline for debugging and monitoring
+-   **October 18, 2025:** Fixed **streaming UI** bugs to enable real-time backend activity visualization:
+    -   Removed early return bug in handleSend() that prevented streaming endpoint calls
+    -   Stream now properly triggers when "Stream" checkbox is enabled
+    -   BackendActivityStream component displays live SSE events from orchestration pipeline
+    -   Real-time logs show parsing, enrichment, prompt building, and task execution as they happen
+-   **October 18, 2025:** Fixed **LLM factory** and **data model** errors:
+    -   Updated agent to use `create_provider()` instead of `create_llm()`
+    -   Fixed ParsedMessage attribute access (direct attributes instead of .get() calls)
+    -   Proper error handling for missing services in context enricher
 -   **October 18, 2025:** Implemented real-time backend activity streaming feature with Server-Sent Events (SSE):
     -   Created StreamingOrchestrationWrapper to emit live pipeline events during orchestration
     -   Added `/api/orchestration/stream` endpoint with JSON request body using Pydantic validation
