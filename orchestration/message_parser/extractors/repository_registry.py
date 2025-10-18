@@ -147,14 +147,23 @@ class RepositoryRegistry:
         Uses multiple strategies:
         - Sequence matching
         - Substring matching
-        - Token matching (handles dashes, underscores)
+        - Token matching (handles dashes, underscores, spaces)
+        - Compound word matching (e.g., "marketdata" matches "market-data")
         """
+        # Normalize: remove spaces, convert to lowercase
+        norm1 = str1.replace(' ', '').replace('-', '').replace('_', '')
+        norm2 = str2.replace(' ', '').replace('-', '').replace('_', '')
+        
+        # Exact match after normalization (e.g., "market data" = "market-data" = "marketdata")
+        if norm1 == norm2:
+            return 1.0
+        
         # Basic sequence matching
         seq_score = SequenceMatcher(None, str1, str2).ratio()
         
-        # Token-based matching (split on - and _)
-        tokens1 = set(re.split(r'[-_]', str1))
-        tokens2 = set(re.split(r'[-_]', str2))
+        # Token-based matching (split on -, _, and spaces)
+        tokens1 = set(re.split(r'[-_\s]+', str1.lower()))
+        tokens2 = set(re.split(r'[-_\s]+', str2.lower()))
         
         if tokens1 and tokens2:
             common_tokens = tokens1.intersection(tokens2)
@@ -167,12 +176,27 @@ class RepositoryRegistry:
         if str1 in str2 or str2 in str1:
             substring_score = 0.3
         
-        # Weighted combination
-        final_score = (
-            seq_score * 0.5 +
-            token_score * 0.3 +
-            substring_score * 0.2
-        )
+        # Compound word matching (e.g., "marketdata" contains both "market" and "data")
+        # This is critical for matching user input like "marketdata" to registered repos like "market-data"
+        compound_match = False
+        if len(tokens2) > 1:  # If the registered repo has multiple tokens
+            # Check if all significant tokens from the registered repo appear in the user input
+            significant_tokens = [token for token in tokens2 if len(token) > 2]
+            if significant_tokens:
+                all_tokens_in_str1 = all(token in norm1 for token in significant_tokens)
+                if all_tokens_in_str1:
+                    compound_match = True
+        
+        # If compound matching succeeds, this is a strong match - boost score significantly
+        if compound_match:
+            final_score = max(0.85, seq_score)  # At least 0.85 confidence for compound matches
+        else:
+            # Weighted combination for non-compound matches
+            final_score = (
+                seq_score * 0.5 +
+                token_score * 0.3 +
+                substring_score * 0.2
+            )
         
         return min(1.0, final_score)
     

@@ -17,7 +17,8 @@ The project employs a clean architecture with a modular design for scalability a
 -   **AI Integration:** Factory pattern for pluggable LLM providers (Together AI, Azure OpenAI) with automatic fallback.
 -   **Service Architecture:** Modular, LLM-powered service layer with `BaseService`, `ServiceManager`, and `ServiceLLMWrapper` for intelligent interactions across integrations like GitHub, Confluence, and MongoDB.
 -   **Integration Wrappers:** Unified wrapper pattern for all external services (GitHub, Jira, Confluence) that uses ENV config by default and automatically falls back to Replit connectors. Makes integrations easily removable and switchable without changing business logic.
--   **Orchestration Layer:** Modular pipeline for message processing including `Message Parser`, `Context Enricher` (with caching), `Prompt Builder` (with templates), and a `LangGraph Agent` for task execution. Provides a unified facade for the pipeline and extensive structured logging.
+-   **Orchestration Layer:** Modular pipeline for message processing including `Message Parser` (with intelligent GitHub repository detection), `Context Enricher` (with caching), `Prompt Builder` (with templates), and a `LangGraph Agent` for task execution. Provides a unified facade for the pipeline and extensive structured logging.
+-   **Intelligent Repository Matching:** Advanced fuzzy matching system that automatically resolves partial repository names to full paths. Supports compound word matching (e.g., "marketdata", "market data", "market-data" all match "am-market-data"), auto-loads repositories from GitHub organizations, and provides high-confidence matches using normalized similarity scoring.
 -   **Logging:** Comprehensive structured logging with correlation IDs, method tracking, timing metrics, cache hit rates, and task execution status.
 
 ### Frontend Architecture
@@ -42,7 +43,7 @@ The project employs a clean architecture with a modular design for scalability a
 -   **Automated Workflows:** End-to-end processes for context enrichment, root cause analysis, code fix generation, pull request creation, and command-driven documentation orchestration.
 -   **Real-time Backend Activity Streaming:** Live visualization of orchestration pipeline execution via Server-Sent Events (SSE) with a `StreamingOrchestrationWrapper` and a `BackendActivityStream` React component.
 -   **Thinking Process Visualization:** Shared backend component for tracking workflow steps, displayed via a reusable frontend `ThinkingProcess` component.
--   **GitHub Context Detection:** LLM automatically detects and enriches context from GitHub repository mentions.
+-   **GitHub Context Detection:** Advanced repository reference parser with fuzzy matching. Automatically detects repository mentions in natural language (e.g., "repo marketdata"), normalizes variants (one word, hyphenated, spaced), and resolves to full repository paths using intelligent compound word matching with 85% confidence scoring.
 -   **Documentation Orchestrator:** Automated workflow for creating branches, committing documentation to GitHub, publishing to Confluence, and creating Jira tickets, with clickable links to all generated artifacts.
 -   **Observability:** Prometheus metrics, OpenTelemetry tracing, and comprehensive structured logging including request correlation IDs, LLM interaction logging, and timing information.
 

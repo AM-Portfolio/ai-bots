@@ -175,72 +175,98 @@ class GitHubExtractor:
             List of repo references with matched owners
         """
         references = []
+        seen_attempts = set()
         
-        # Pattern for repo-like names with GitHub keywords nearby
-        bare_repo_pattern = re.compile(
-            r'(?:repo(?:sitory)?|project|codebase)\s+([a-zA-Z0-9_-]{3,100})|'
-            r'([a-zA-Z0-9_-]{3,100})\s+repo(?:sitory)?',
-            re.IGNORECASE
-        )
+        # Find all positions where "repo" keyword appears
+        repo_keyword_pattern = re.compile(r'\b(repo(?:sitory)?|project|codebase)\b', re.IGNORECASE)
         
-        for match in bare_repo_pattern.finditer(message):
-            repo_name = match.group(1) or match.group(2)
+        for keyword_match in repo_keyword_pattern.finditer(message):
+            keyword_end = keyword_match.end()
             
-            # Skip if it contains slash (already in owner/repo format)
-            if '/' in repo_name:
+            # Extract text after the keyword (up to next punctuation or 50 chars)
+            remaining_text = message[keyword_end:keyword_end + 50].strip()
+            
+            # Extract 1-3 words after the keyword
+            words_after_pattern = re.match(r'^([a-zA-Z0-9_-]+(?:\s+[a-zA-Z0-9_-]+){0,2})', remaining_text)
+            
+            if not words_after_pattern:
                 continue
             
-            # Skip common words
-            if repo_name.lower() in self.invalid_owners or repo_name.lower() in {
-                'repo', 'repository', 'project', 'code', 'data', 'the', 'this', 'that'
+            candidate = words_after_pattern.group(1).strip()
+            
+            # Skip if it contains slash (already in owner/repo format)
+            if '/' in candidate or not candidate:
+                continue
+            
+            # Skip common words (but not 'data' as it's often part of repo names like 'market-data')
+            if candidate.lower() in self.invalid_owners or candidate.lower() in {
+                'repo', 'repository', 'project', 'code', 'the', 'this', 'that'
             }:
                 continue
             
-            # Try to find in registry
-            logger.info(f"   🔍 Looking up '{repo_name}' in repository registry...")
-            match_info = self.repo_registry.find_repository(repo_name, threshold=0.6)
+            # Try multiple normalization variations
+            candidates_to_try = [
+                candidate,  # original: "market data"
+                candidate.replace(' ', ''),  # compact: "marketdata"
+                candidate.replace(' ', '-'),  # hyphenated: "market-data"
+                candidate.replace(' ', '_'),  # underscored: "market_data"
+            ]
             
-            if match_info:
-                # Found a match in registry!
-                ref = Reference(
-                    type=ReferenceType.GITHUB_URL,
-                    raw_text=match.group(0).strip(),
-                    normalized_value=match_info['full_path'],
-                    metadata={
-                        'owner': match_info['owner'],
-                        'repo': match_info['repo'],
-                        'pattern_matched': 'bare_repo_with_registry',
-                        'registry_match_type': match_info['match_type'],
-                        'registry_confidence': match_info['confidence']
-                    },
-                    confidence=match_info['confidence']
-                )
+            for repo_name in candidates_to_try:
+                if repo_name in seen_attempts:
+                    continue
+                seen_attempts.add(repo_name)
                 
-                references.append(ref)
-                logger.info(
-                    f"   ✅ Registry match: '{repo_name}' → {match_info['full_path']} "
-                    f"(confidence: {match_info['confidence']:.2f}, type: {match_info['match_type']})"
-                )
-            else:
-                # Not in registry - create UNKNOWN reference
+                # Try to find in registry
+                logger.info(f"   🔍 Looking up '{repo_name}' in repository registry...")
+                match_info = self.repo_registry.find_repository(repo_name, threshold=0.6)
+                
+                if match_info:
+                    # Found a match in registry!
+                    ref = Reference(
+                        type=ReferenceType.GITHUB_URL,
+                        raw_text=f"{keyword_match.group(0)} {candidate}",
+                        normalized_value=match_info['full_path'],
+                        metadata={
+                            'owner': match_info['owner'],
+                            'repo': match_info['repo'],
+                            'pattern_matched': 'bare_repo_with_registry',
+                            'registry_match_type': match_info['match_type'],
+                            'registry_confidence': match_info['confidence'],
+                            'original_input': candidate,
+                            'matched_as': repo_name
+                        },
+                        confidence=match_info['confidence']
+                    )
+                    
+                    references.append(ref)
+                    logger.info(
+                        f"   ✅ Registry match: '{candidate}' (tried as '{repo_name}') → {match_info['full_path']} "
+                        f"(confidence: {match_info['confidence']:.2f}, type: {match_info['match_type']})"
+                    )
+                    # Stop trying other variations once we find a match
+                    break
+            
+            # If no variations matched, create UNKNOWN reference (only once per candidate)
+            if not any(ref.metadata.get('original_input') == candidate for ref in references):
                 ref = Reference(
                     type=ReferenceType.GITHUB_URL,
-                    raw_text=match.group(0).strip(),
-                    normalized_value=f"UNKNOWN/{repo_name}",
+                    raw_text=f"{keyword_match.group(0)} {candidate}",
+                    normalized_value=f"UNKNOWN/{candidate}",
                     metadata={
                         'owner': 'UNKNOWN',
-                        'repo': repo_name,
+                        'repo': candidate,
                         'pattern_matched': 'bare_repo_name',
                         'needs_owner': True,
-                        'warning': f'Repository "{repo_name}" not found in registry. Please specify as "owner/{repo_name}"'
+                        'warning': f'Repository "{candidate}" not found in registry. Please specify as "owner/{candidate}"'
                     },
                     confidence=0.3
                 )
                 
                 references.append(ref)
                 logger.warning(
-                    f"   ⚠️  Bare repo name '{repo_name}' not in registry (missing owner)\n"
-                    f"      Please provide full path like 'owner/{repo_name}' or register it in the repository registry"
+                    f"   ⚠️  Bare repo name '{candidate}' not in registry (missing owner)\n"
+                    f"      Please provide full path like 'owner/{candidate}' or register it in the repository registry"
                 )
         
         return references
@@ -273,9 +299,9 @@ class GitHubExtractor:
             if '/' in repo_name:
                 continue
             
-            # Skip common words
+            # Skip common words (but not 'data' as it's often part of repo names like 'market-data')
             if repo_name.lower() in self.invalid_owners or repo_name.lower() in {
-                'repo', 'repository', 'project', 'code', 'data', 'the', 'this', 'that'
+                'repo', 'repository', 'project', 'code', 'the', 'this', 'that'
             }:
                 continue
             
