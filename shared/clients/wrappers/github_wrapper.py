@@ -132,7 +132,7 @@ class GitHubWrapper:
     
     async def create_branch(self, repo_name: str, branch_name: str, base_branch: str = "main") -> bool:
         """Create a new branch (only available for Replit connector)"""
-        if self._replit_client:
+        if self._replit_client and hasattr(self._replit_client, 'create_branch'):
             return await self._replit_client.create_branch(repo_name, branch_name, base_branch)
         else:
             logger.warning("create_branch only available with Replit connector")
@@ -147,9 +147,9 @@ class GitHubWrapper:
         branch_name: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """Commit documentation to repository (primarily for Replit connector)"""
-        if self._replit_client:
+        if self._replit_client and hasattr(self._replit_client, 'commit_documentation'):
             return await self._replit_client.commit_documentation(
-                repo_name, file_path, content, commit_message, branch_name
+                repo_name, file_path, content, commit_message, branch_name or "main"
             )
         elif self._env_client:
             logger.warning("commit_documentation not fully supported for ENV client, using create_or_update_file")

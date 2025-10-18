@@ -4,7 +4,8 @@
 This project is an intelligent, autonomous development agent designed to automate and streamline the software development lifecycle. It analyzes bugs, diagnoses issues, generates fixes, and manages documentation across platforms by integrating with services like GitHub, Jira, Grafana, and Confluence. Leveraging AI for analysis, code generation, and documentation, the agent provides an end-to-end solution for automated bug resolution and documentation publishing through REST API, webhooks, a Microsoft Teams bot, and a React-based frontend with voice interaction. The project aims to significantly enhance developer productivity and system reliability.
 
 ## User Preferences
-None specified yet - will be updated as preferences are communicated.
+- **Configuration Method**: ENV variables preferred over Replit connectors
+- **LLM Provider**: Together AI as primary provider with automatic fallback to Azure OpenAI
 
 ## System Architecture
 The project employs a clean architecture with a modular design for scalability and maintainability.
