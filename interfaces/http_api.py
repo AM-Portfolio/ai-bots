@@ -134,9 +134,9 @@ async def api_root():
         }
     }
 
-@app.get("/", response_class=FileResponse)
+@app.get("/")
 async def serve_frontend():
-    """Serve the React frontend"""
+    """Serve the React frontend or API info"""
     frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
     index_file = frontend_dist / "index.html"
     
@@ -147,7 +147,13 @@ async def serve_frontend():
             "service": "AI Dev Agent",
             "version": "1.0.0",
             "status": "running",
-            "note": "Frontend not built. Run 'cd frontend && npm run build' to build the frontend."
+            "note": "Frontend not built. Run 'cd frontend && npm run build' to build the frontend.",
+            "endpoints": {
+                "health": "/health",
+                "analyze": "/api/analyze",
+                "webhook": "/api/webhook",
+                "docs": "/docs"
+            }
         }
 
 
