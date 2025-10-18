@@ -19,6 +19,7 @@ from shared.vector_db.services.vector_query_service import VectorQueryService
 from orchestration.github_llm.query_orchestrator import GitHubLLMOrchestrator
 from orchestration.github_llm.models import QueryRequest, QueryType
 from orchestration.summary_layer.beautifier import ResponseBeautifier
+from shared.clients.wrappers.github_wrapper import GitHubWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -59,32 +60,54 @@ vector_db = None
 embedding_service = None
 query_service = None
 github_llm_orchestrator = None
+github_client = None
 
 
 async def initialize_vector_db():
     """Initialize vector database components"""
-    global vector_db, embedding_service, query_service, github_llm_orchestrator
+    global vector_db, embedding_service, query_service, github_llm_orchestrator, github_client
     
     try:
         logger.info("🔧 Initializing Vector DB system...")
         
         # Create vector DB provider (in-memory for now)
+        logger.info("   Creating InMemory vector DB provider...")
         vector_db = VectorDBFactory.create(provider_type="in-memory")
-        await vector_db.initialize()
+        if not vector_db:
+            raise Exception("Failed to create vector DB provider")
+        
+        logger.info("   Initializing vector DB...")
+        init_success = await vector_db.initialize()
+        if not init_success:
+            raise Exception("Vector DB initialization returned False")
         
         # Create embedding service
+        logger.info("   Creating embedding service...")
         embedding_service = EmbeddingService(provider="together")
         
         # Create collection
-        await vector_db.create_collection(
+        logger.info("   Creating github_repos collection...")
+        collection_created = await vector_db.create_collection(
             name="github_repos",
             dimension=embedding_service.get_dimension()
         )
+        if not collection_created:
+            logger.warning("   Collection 'github_repos' may already exist, continuing...")
         
         # Create query service
+        logger.info("   Creating query service...")
         query_service = VectorQueryService(vector_db, embedding_service)
         
+        # Create GitHub client
+        logger.info("   Creating GitHub client...")
+        github_client = GitHubWrapper()
+        if github_client.is_configured:
+            logger.info(f"   ✅ GitHub client ready (provider: {github_client.provider})")
+        else:
+            logger.warning("   ⚠️  GitHub client not configured - repository indexing will be limited")
+        
         # Create GitHub-LLM orchestrator
+        logger.info("   Creating GitHub-LLM orchestrator...")
         beautifier = ResponseBeautifier(llm_provider="together")
         github_llm_orchestrator = GitHubLLMOrchestrator(
             vector_query_service=query_service,
@@ -92,10 +115,20 @@ async def initialize_vector_db():
         )
         
         logger.info("✅ Vector DB system initialized successfully")
+        logger.info(f"   • Provider: in-memory")
+        logger.info(f"   • Collection: github_repos ({embedding_service.get_dimension()} dimensions)")
+        logger.info(f"   • Query service: ready")
+        logger.info(f"   • Orchestrator: ready")
+        logger.info(f"   • GitHub client: {'configured' if github_client.is_configured else 'not configured'}")
         return True
         
     except Exception as e:
-        logger.error(f"❌ Failed to initialize Vector DB system: {e}")
+        logger.error(f"❌ Failed to initialize Vector DB system: {e}", exc_info=True)
+        # Reset globals on failure
+        vector_db = None
+        embedding_service = None
+        query_service = None
+        github_llm_orchestrator = None
         return False
 
 
@@ -133,9 +166,11 @@ async def index_repository(request: IndexRepositoryRequest):
         if not vector_db or not embedding_service:
             raise HTTPException(status_code=503, detail="Vector DB not initialized")
         
+        # Create indexer with GitHub client
         indexer = RepositoryIndexer(
             vector_db=vector_db,
-            embedding_service=embedding_service
+            embedding_service=embedding_service,
+            github_client=github_client
         )
         
         result = await indexer.index_repository(

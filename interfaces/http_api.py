@@ -45,11 +45,17 @@ app = FastAPI(
 
 # Startup event to initialize Vector DB
 @app.on_event("startup")
-async def startup_event():
+async def startup_vector_db():
     """Initialize Vector DB system on startup"""
-    logger.info("🚀 Application startup - initializing Vector DB...")
-    await initialize_vector_db()
-    logger.info("✅ Vector DB initialization complete")
+    try:
+        logger.info("🚀 Application startup - initializing Vector DB...")
+        success = await initialize_vector_db()
+        if success:
+            logger.info("✅ Vector DB initialization complete")
+        else:
+            logger.error("❌ Vector DB initialization failed")
+    except Exception as e:
+        logger.error(f"❌ Vector DB startup error: {e}", exc_info=True)
 
 app.add_middleware(
     CORSMiddleware,
