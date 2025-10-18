@@ -1,0 +1,21 @@
+ry Filter: ai-bots
+2025-10-18 20:09:56,013 - orchestration.github_llm.query_orchestrator - INFO - 🔍 Vector Search: True, GitHub Direct: True
+2025-10-18 20:09:56,013 - orchestration.github_llm.query_orchestrator - INFO - ================================================================================
+2025-10-18 20:09:56,013 - orchestration.github_llm.query_orchestrator - INFO - 📋 STEP 1: Query Planning (0.00ms)
+2025-10-18 20:09:56,014 - orchestration.github_llm.query_orchestrator - INFO -    Sources to query: ['vector_db']
+2025-10-18 20:09:56,014 - shared.vector_db.services.vector_query_service - INFO - ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+2025-10-18 20:09:56,014 - shared.vector_db.services.vector_query_service - INFO - 🔍 VECTOR DB SEMANTIC SEARCH START
+2025-10-18 20:09:56,014 - shared.vector_db.services.vector_query_service - INFO - 📝 Query: 'repo ai-bots explain apoi details 
+...'
+2025-10-18 20:09:56,014 - shared.vector_db.services.vector_query_service - INFO - 📦 Collection: github_repos
+2025-10-18 20:09:56,014 - shared.vector_db.services.vector_query_service - INFO - 🎯 Top K: 5
+2025-10-18 20:09:56,014 - shared.vector_db.services.vector_query_service - INFO - 🔧 Filters: {'repo_name': 'ai-bots'}
+2025-10-18 20:09:56,014 - shared.vector_db.services.vector_query_service - INFO - ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+2025-10-18 20:09:56,014 - shared.vector_db.services.vector_query_service - INFO - 🧮 Generating query embedding...
+2025-10-18 20:09:56,014 - shared.vector_db.services.vector_query_service - INFO - ✅ Embedding generated (0.10ms)
+2025-10-18 20:09:56,014 - shared.vector_db.services.vector_query_service - INFO -    Embedding dimension: 768
+2025-10-18 20:09:56,014 - shared.vector_db.services.vector_query_service - INFO - 🔎 Searching vector database...
+2025-10-18 20:09:56,014 - shared.vector_db.providers.in_memory_provider - WARNING - ⚠️  No documents in collection 'github_repos'
+2025-10-18 20:09:56,014 - shared.vector_db.services.vector_query_service - INFO - ✅ Search completed (0.06ms)
+2025-10-18 20:09:56,014 - shared.vector_db.services.vector_query_service - INFO - 📊 Results: 0 documents found
+2025-10-18 20:09:56,014 - shared.vector_db.services.vector_query_service - INFO - ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
