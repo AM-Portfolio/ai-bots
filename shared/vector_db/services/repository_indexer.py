@@ -125,17 +125,27 @@ class RepositoryIndexer:
     ) -> Optional[List[Dict[str, Any]]]:
         """Get repository file tree"""
         try:
-            # Use GitHub API to get tree
-            # This is a simplified version - in production, use proper GitHub API
-            tree = []
+            if not self.github_client:
+                logger.error("❌ GitHub client not configured")
+                return None
             
-            # TODO: Implement actual GitHub tree API call
-            # For now, return empty to avoid errors
-            logger.warning("⚠️  GitHub tree fetching not fully implemented yet")
+            # Get repository tree using GitHub API
+            repo_name = f"{owner}/{repo}"
+            tree = await self.github_client.get_repository_tree(
+                repo_name=repo_name,
+                branch=branch,
+                recursive=True
+            )
+            
+            if tree:
+                logger.info(f"📂 Successfully retrieved {len(tree)} items from {repo_name}")
+            else:
+                logger.warning(f"⚠️  No tree returned for {repo_name}")
+            
             return tree
             
         except Exception as e:
-            logger.error(f"❌ Failed to get repository tree: {e}")
+            logger.error(f"❌ Failed to get repository tree: {e}", exc_info=True)
             return None
     
     def _filter_indexable_files(self, tree: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -167,10 +177,27 @@ class RepositoryIndexer:
         """Process a single file for indexing"""
         try:
             file_path = file_info.get('path', '')
+            repo_name = f"{owner}/{repo}"
             
-            # TODO: Fetch actual file content from GitHub
-            # For now, use placeholder
-            content = f"Content of {file_path} from {owner}/{repo}"
+            # Fetch actual file content from GitHub
+            if not self.github_client:
+                logger.error("❌ GitHub client not configured")
+                return None, None
+            
+            content = await self.github_client.get_file_content(
+                repo_name=repo_name,
+                file_path=file_path,
+                branch=branch
+            )
+            
+            if not content:
+                logger.warning(f"⚠️  Could not fetch content for {file_path}")
+                return None, None
+            
+            # Skip very large files (>500KB)
+            if len(content) > 500_000:
+                logger.info(f"⏭️  Skipping large file {file_path} ({len(content)} bytes)")
+                return None, None
             
             # Create unique document ID
             doc_id = hashlib.sha256(
@@ -184,7 +211,7 @@ class RepositoryIndexer:
             metadata = DocumentMetadata(
                 doc_id=doc_id,
                 source='github',
-                repo_name=f"{owner}/{repo}",
+                repo_name=repo_name,
                 file_path=file_path,
                 commit_sha=file_info.get('sha'),
                 content_type='code' if language else 'text',
@@ -193,6 +220,7 @@ class RepositoryIndexer:
                 updated_at=datetime.now()
             )
             
+            logger.debug(f"✅ Processed {file_path} ({len(content)} bytes)")
             return content, metadata
             
         except Exception as e:

@@ -159,12 +159,73 @@ async def get_status() -> VectorDBStatus:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/examples")
+async def get_repository_examples():
+    """Get example repositories for indexing"""
+    return {
+        "examples": [
+            {
+                "owner": "facebook",
+                "repo": "react",
+                "branch": "main",
+                "description": "React - A JavaScript library for building user interfaces",
+                "size": "medium"
+            },
+            {
+                "owner": "microsoft",
+                "repo": "vscode",
+                "branch": "main",
+                "description": "Visual Studio Code - Code editing. Redefined.",
+                "size": "large"
+            },
+            {
+                "owner": "psf",
+                "repo": "requests",
+                "branch": "main",
+                "description": "Python HTTP library",
+                "size": "small"
+            },
+            {
+                "owner": "vercel",
+                "repo": "next.js",
+                "branch": "canary",
+                "description": "The React Framework",
+                "size": "large"
+            }
+        ],
+        "tips": [
+            "Start with small repositories (< 1000 files) for faster indexing",
+            "Indexing large repositories may take several minutes",
+            "Use specific branches for consistent results",
+            "The system indexes code files (.py, .js, .ts, etc.) and documentation (.md, .rst)"
+        ]
+    }
+
+
 @router.post("/index-repository")
 async def index_repository(request: IndexRepositoryRequest):
-    """Index a GitHub repository into vector database"""
+    """Index a GitHub repository into vector database
+    
+    Example request:
+    ```json
+    {
+        "owner": "facebook",
+        "repo": "react",
+        "branch": "main",
+        "collection": "github_repos"
+    }
+    ```
+    """
     try:
         if not vector_db or not embedding_service:
             raise HTTPException(status_code=503, detail="Vector DB not initialized")
+        
+        # Validate input
+        if not request.owner or not request.repo:
+            raise HTTPException(
+                status_code=400,
+                detail="Both 'owner' and 'repo' fields are required. Example: owner='facebook', repo='react'"
+            )
         
         # Create indexer with GitHub client
         indexer = RepositoryIndexer(

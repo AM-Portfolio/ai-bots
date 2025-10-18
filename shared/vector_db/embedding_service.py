@@ -26,7 +26,13 @@ class EmbeddingService:
     
     async def generate_embedding(self, text: str) -> List[float]:
         """
-        Generate embedding for a single text
+        Generate embedding for a single text using hash-based approach
+        
+        NOTE: This is a simplified implementation using deterministic hashing.
+        For production, integrate proper embedding models:
+        - OpenAI Embeddings API (text-embedding-ada-002)
+        - sentence-transformers
+        - Together AI embedding models
         
         Args:
             text: Text to embed
@@ -35,27 +41,15 @@ class EmbeddingService:
             Embedding vector
         """
         try:
-            # For now, use a simple approach with Together AI
-            # In production, we'd use dedicated embedding models
-            provider = LLMFactory.create(self.provider_name)
-            
-            # Use LLM to generate a semantic representation
-            # This is a simplified version - in production use proper embedding models
-            response = await provider.generate(
-                prompt=f"Generate a semantic embedding for: {text[:500]}",
-                temperature=0.0
-            )
-            
-            # For now, return a placeholder embedding
-            # TODO: Integrate proper embedding API (e.g., OpenAI embeddings, sentence-transformers)
             import hashlib
             import struct
             
             # Create deterministic embedding from text hash
+            # This ensures same text always gets same embedding
             hash_obj = hashlib.sha256(text.encode())
             hash_bytes = hash_obj.digest()
             
-            # Convert to 768-dimensional vector
+            # Convert hash bytes to 768-dimensional vector
             embedding = []
             for i in range(0, len(hash_bytes), 4):
                 chunk = hash_bytes[i:i+4]
