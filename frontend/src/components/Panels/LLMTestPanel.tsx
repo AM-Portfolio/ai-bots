@@ -4,6 +4,7 @@ import { apiClient } from '../../services/api';
 import type { Provider, ThinkingProcessData } from '../../types/api';
 import ThinkingProcess from '../Shared/ThinkingProcess';
 import BackendActivityStream from '../Shared/BackendActivityStream';
+import { logger } from '../../utils/logger';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -54,7 +55,7 @@ const LLMTestPanel = () => {
   }, []);
 
   const loadConversation = async (conversationId: number) => {
-    try {
+    await logger.chat.track('Load conversation', async () => {
       const response = await fetch(`/api/chat/conversations/${conversationId}/messages`);
       const msgs = await response.json();
       
@@ -65,16 +66,17 @@ const LLMTestPanel = () => {
       })));
       setCurrentConversationId(conversationId);
       
+      logger.chat.info(`Loaded conversation ${conversationId} with ${msgs.length} messages`);
+      
       // Get conversation to set provider
       const convResponse = await fetch('/api/chat/conversations');
       const conversations = await convResponse.json();
       const conv = conversations.find((c: any) => c.id === conversationId);
       if (conv) {
         setProvider(conv.provider as Provider);
+        logger.chat.debug(`Provider set to ${conv.provider}`);
       }
-    } catch (error) {
-      console.error('Failed to load conversation:', error);
-    }
+    });
   };
 
   const saveConversation = async () => {
@@ -135,9 +137,11 @@ const LLMTestPanel = () => {
 
   const toggleVoiceInput = () => {
     if (isListening) {
+      logger.voice.info('Stopping voice recognition');
       recognitionRef.current?.stop();
       setIsListening(false);
     } else {
+      logger.voice.info('Starting voice recognition');
       recognitionRef.current?.start();
       setIsListening(true);
     }
@@ -179,8 +183,15 @@ const LLMTestPanel = () => {
     setIsLoading(true);
     setThinkingData(null);
 
+    logger.chat.info(`Sending message to ${provider}`, { 
+      messageLength: messageText.length, 
+      streaming: useStreaming,
+      backendDetails: showBackendDetails
+    });
+
     // Use streaming if enabled - set message to trigger BackendActivityStream
     if (useStreaming) {
+      logger.chat.debug('Using streaming mode');
       setStreamingMessage(messageText);
       // Don't return - let the component handle the stream
     }
@@ -193,11 +204,21 @@ const LLMTestPanel = () => {
 
     try {
       const startTime = performance.now();
+      logger.llm.info(`Calling ${provider} provider`);
+      
       const result = await apiClient.testLLM(messageText, provider, showBackendDetails);
       const duration = (performance.now() - startTime) / 1000;
       
+      logger.llm.success(`Response received from ${provider}`, { 
+        duration: `${duration.toFixed(2)}s`,
+        responseLength: result.response?.length || 0
+      });
+      
       if (result.thinking) {
         setThinkingData(result.thinking);
+        logger.chat.debug('Backend thinking data received', { 
+          steps: result.thinking.steps?.length || 0 
+        });
       }
 
       if (result.success && result.response) {
@@ -209,12 +230,15 @@ const LLMTestPanel = () => {
         };
         setMessages((prev) => [...prev, assistantMessage]);
         
+        logger.chat.success(`Message completed in ${duration.toFixed(2)}s`);
         setTimeout(() => saveConversation(), 500);
         
         if (voiceEnabled) {
+          logger.voice.info('Playing voice response');
           playVoiceResponse(result.response);
         }
       } else {
+        logger.chat.error('LLM returned error', { error: result.error });
         const errorMessage: Message = {
           role: 'assistant',
           content: `Error: ${result.error || 'Unknown error occurred'}`,
@@ -222,6 +246,9 @@ const LLMTestPanel = () => {
         setMessages((prev) => [...prev, errorMessage]);
       }
     } catch (error) {
+      logger.chat.error('Failed to send message', { 
+        error: error instanceof Error ? error.message : String(error) 
+      });
       const errorMessage: Message = {
         role: 'assistant',
         content: `Error: ${error instanceof Error ? error.message : 'Failed to connect to API'}`,
