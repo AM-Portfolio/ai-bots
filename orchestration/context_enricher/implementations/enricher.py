@@ -10,7 +10,8 @@ from orchestration.shared.models import (
     EnrichedContext,
     ContextData,
     ContextSourceType,
-    ReferenceType
+    ReferenceType,
+    Reference
 )
 from shared.services.manager import ServiceManager
 
@@ -69,7 +70,7 @@ class ContextEnricher(IContextEnricher):
     
     async def _enrich_github_reference(
         self,
-        reference: 'Reference',
+        reference: Reference,
         use_cache: bool
     ) -> List[ContextData]:
         """Enrich GitHub reference with repository/issue/PR data"""
@@ -142,7 +143,7 @@ class ContextEnricher(IContextEnricher):
     
     async def _enrich_jira_reference(
         self,
-        reference: 'Reference',
+        reference: Reference,
         use_cache: bool
     ) -> List[ContextData]:
         """Enrich Jira reference with ticket data"""
@@ -190,7 +191,7 @@ class ContextEnricher(IContextEnricher):
     
     async def _enrich_confluence_reference(
         self,
-        reference: 'Reference',
+        reference: Reference,
         use_cache: bool
     ) -> List[ContextData]:
         """Enrich Confluence reference with page data"""
