@@ -176,7 +176,7 @@ async def health_check():
 
 
 @app.post("/api/test/llm")
-async def test_llm(prompt: str, provider: str = "together", show_thinking: bool = False):
+async def test_llm(prompt: str, provider: str = "together", model: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo", show_thinking: bool = False):
     """Test LLM provider - uses GitHub-LLM orchestration for GitHub-related queries"""
     from shared.llm import llm_client
     from shared.thinking_process import create_llm_thinking_process
@@ -185,7 +185,7 @@ async def test_llm(prompt: str, provider: str = "together", show_thinking: bool 
     from orchestration.github_llm.models import QueryRequest, QueryType
     import uuid
     
-    logger.info(f"🧪 Testing LLM with provider: {provider}, prompt: {prompt[:50]}...")
+    logger.info(f"🧪 Testing LLM with provider: {provider}, model: {model}, prompt: {prompt[:50]}...")
     
     # STEP 1: Detect if this is a GitHub-related query
     is_github = is_github_query(prompt)
@@ -350,7 +350,8 @@ async def test_llm(prompt: str, provider: str = "together", show_thinking: bool 
                     response_text, metadata = await orchestrator.chat_completion_with_fallback(
                         messages=[{"role": "user", "content": prompt}],
                         temperature=0.7,
-                        preferred_provider=provider
+                        preferred_provider=provider,
+                        model=model
                     )
                     
                     fallback_duration = (datetime.now() - fallback_start).total_seconds() * 1000

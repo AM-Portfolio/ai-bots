@@ -17,6 +17,7 @@ const LLMTestPanel = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [provider, setProvider] = useState<Provider>('together');
+  const [model, setModel] = useState('meta-llama/Llama-3.3-70B-Instruct-Turbo');
   const [isLoading, setIsLoading] = useState(false);
   const [showBackendDetails, setShowBackendDetails] = useState(false);
   const [thinkingData, setThinkingData] = useState<ThinkingProcessData | null>(null);
@@ -204,9 +205,9 @@ const LLMTestPanel = () => {
 
     try {
       const startTime = performance.now();
-      logger.llm.info(`Calling ${provider} provider`);
+      logger.llm.info(`Calling ${provider} provider with model ${model}`);
       
-      const result = await apiClient.testLLM(messageText, provider, showBackendDetails);
+      const result = await apiClient.testLLM(messageText, provider, showBackendDetails, model);
       const duration = (performance.now() - startTime) / 1000;
       
       logger.llm.success(`Response received from ${provider}`, { 
@@ -410,12 +411,22 @@ const LLMTestPanel = () => {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <select
-                value={provider}
-                onChange={(e) => setProvider(e.target.value as Provider)}
+                value={provider === 'together' ? model : provider}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === 'azure') {
+                    setProvider('azure');
+                  } else {
+                    setProvider('together');
+                    setModel(value);
+                  }
+                }}
                 className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
               >
-                <option value="together">Llama-3.3-70B</option>
-                <option value="azure">GPT-4</option>
+                <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">Llama-3.3-70B</option>
+                <option value="deepseek-ai/DeepSeek-R1">DeepSeek-R1</option>
+                <option value="Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8">Qwen3-Coder</option>
+                <option value="azure">GPT-4 (Azure)</option>
               </select>
             </div>
 

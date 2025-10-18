@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLogStore, LogEntry, LogLevel } from '../../utils/logger';
+import { useLogStore, LogLevel } from '../../utils/logger';
 import { Terminal, X, Filter, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 
 const LogViewer: React.FC = () => {

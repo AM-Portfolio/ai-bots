@@ -54,7 +54,8 @@ class ResilientLLMOrchestrator:
         messages: List[Dict[str, str]],
         temperature: float = 0.7,
         max_retries: int = 2,
-        preferred_provider: Optional[str] = None
+        preferred_provider: Optional[str] = None,
+        model: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
     ) -> Tuple[str, Dict[str, Any]]:
         """
         Execute chat completion with automatic fallback
@@ -64,6 +65,7 @@ class ResilientLLMOrchestrator:
             temperature: Sampling temperature
             max_retries: Max retries per provider
             preferred_provider: Preferred provider to try first
+            model: Model to use for Together AI provider
             
         Returns:
             Tuple of (response_text, metadata)
@@ -96,7 +98,8 @@ class ResilientLLMOrchestrator:
                     response, metadata = await self._try_provider(
                         provider_name,
                         messages,
-                        temperature
+                        temperature,
+                        model
                     )
                     
                     # Success! Reset failure count and return
@@ -162,7 +165,8 @@ class ResilientLLMOrchestrator:
         self,
         provider_name: str,
         messages: List[Dict[str, str]],
-        temperature: float
+        temperature: float,
+        model: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
     ) -> Tuple[str, Dict[str, Any]]:
         """
         Try a specific provider with timeout
@@ -171,6 +175,7 @@ class ResilientLLMOrchestrator:
             provider_name: Provider to use
             messages: Chat messages
             temperature: Sampling temperature
+            model: Model to use for Together AI provider
             
         Returns:
             Tuple of (response, metadata)
@@ -179,7 +184,7 @@ class ResilientLLMOrchestrator:
         
         # Create provider
         factory = LLMFactory()
-        provider = factory.create_provider(provider_name)
+        provider = factory.create_provider(provider_name, together_model=model)
         
         # Execute with timeout
         response = await asyncio.wait_for(
