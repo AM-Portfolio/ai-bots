@@ -9,6 +9,7 @@ from typing import List, Dict, Any
 from urllib.parse import urlparse
 from orchestration.shared.interfaces import IMessageParser
 from orchestration.shared.models import ParsedMessage, Reference, ReferenceType
+from orchestration.message_parser.extractors.github_extractor import GitHubExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +18,10 @@ class MessageParser(IMessageParser):
     """Extracts structured references from raw user messages"""
     
     def __init__(self):
+        # Initialize enhanced GitHub extractor
+        self.github_extractor = GitHubExtractor()
+        
         self.patterns = {
-            ReferenceType.GITHUB_URL: re.compile(
-                r'https?://github\.com/([^/]+)/([^/]+)(?:/issues/(\d+)|/pull/(\d+)|/blob/([^/]+)/(.+)|/?)?'
-            ),
             ReferenceType.GITHUB_ISSUE: re.compile(
                 r'(?:^|\s)#(\d+)(?:\s|$)'
             ),
@@ -56,7 +57,8 @@ class MessageParser(IMessageParser):
         references: List[Reference] = []
         clean_message = message
         
-        references.extend(self._extract_github_urls(message))
+        # Use enhanced GitHub extractor
+        references.extend(self.github_extractor.extract(message))
         references.extend(self._extract_github_issues(message))
         references.extend(self._extract_jira_urls(message))
         references.extend(self._extract_jira_tickets(message))
@@ -86,40 +88,6 @@ class MessageParser(IMessageParser):
             clean_message=clean_message.strip(),
             metadata={'total_references': len(references)}
         )
-    
-    def _extract_github_urls(self, message: str) -> List[Reference]:
-        """Extract GitHub URLs"""
-        references = []
-        for match in self.patterns[ReferenceType.GITHUB_URL].finditer(message):
-            owner, repo, issue_num, pr_num, branch, file_path = match.groups()
-            
-            metadata: Dict[str, Any] = {
-                'owner': owner,
-                'repo': repo
-            }
-            
-            if issue_num:
-                metadata['issue_number'] = issue_num
-                ref_type = ReferenceType.GITHUB_ISSUE
-            elif pr_num:
-                metadata['pr_number'] = pr_num
-                ref_type = ReferenceType.GITHUB_PR
-            else:
-                ref_type = ReferenceType.GITHUB_URL
-            
-            if branch and file_path:
-                metadata['branch'] = branch
-                metadata['file_path'] = file_path
-            
-            references.append(Reference(
-                type=ref_type,
-                raw_text=match.group(0),
-                normalized_value=f"{owner}/{repo}",
-                metadata=metadata,
-                confidence=1.0
-            ))
-        
-        return references
     
     def _extract_github_issues(self, message: str) -> List[Reference]:
         """Extract GitHub issue references like #123"""
