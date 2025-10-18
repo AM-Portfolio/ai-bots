@@ -187,69 +187,286 @@ async def test_llm(prompt: str, provider: str = "together", show_thinking: bool 
             
             logger.info("📋 Orchestration facade initialized with integrations, processing message...")
             
-            # Process message through full pipeline: parser → enricher → prompt builder → agent
-            result = await orchestration.process_message(
-                message=prompt,
-                template_name="default",
-                execute_tasks=True
-            )
+            # Try primary orchestration pipeline with resilient fallback
+            orchestration_error = None
+            try:
+                # Process message through full pipeline: parser → enricher → prompt builder → agent
+                result = await orchestration.process_message(
+                    message=prompt,
+                    template_name="default",
+                    execute_tasks=True
+                )
+                
+                logger.info(f"✅ Orchestration completed successfully. Result keys: {list(result.keys())}")
+            except Exception as e:
+                orchestration_error = e
+                logger.warning(f"⚠️  Orchestration pipeline error: {str(e)[:200]}")
+                logger.info(f"🔄 Attempting resilient fallback with direct LLM providers...")
+                
+                # Build error thinking data
+                error_thinking = {
+                    "steps": [{
+                        "id": "orchestration_pipeline",
+                        "title": "🚀 Orchestration Pipeline",
+                        "description": "Primary pipeline failed, trying fallback providers",
+                        "status": "failed",
+                        "start_time": datetime.now().isoformat(),
+                        "end_time": datetime.now().isoformat(),
+                        "duration_ms": 0,
+                        "error": str(e)[:200],
+                        "metadata": {"error_type": type(e).__name__}
+                    }],
+                    "workflow_id": str(uuid.uuid4()),
+                    "workflow_type": "resilient_fallback",
+                    "start_time": datetime.now().isoformat(),
+                    "end_time": None,
+                    "total_duration_ms": None,
+                    "status": "in_progress"
+                }
+                
+                # Try resilient fallback with multiple providers
+                from shared.llm_providers.resilient_orchestrator import get_resilient_orchestrator
+                
+                orchestrator = get_resilient_orchestrator()
+                
+                try:
+                    fallback_start = datetime.now()
+                    response_text, metadata = await orchestrator.chat_completion_with_fallback(
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.7,
+                        preferred_provider=provider
+                    )
+                    
+                    fallback_duration = (datetime.now() - fallback_start).total_seconds() * 1000
+                    
+                    logger.info(f"✅ Resilient fallback succeeded with {metadata.get('provider_used')}")
+                    
+                    # Add successful fallback step
+                    error_thinking["steps"].append({
+                        "id": "resilient_fallback",
+                        "title": f"🔄 Resilient Fallback → {metadata.get('provider_used', 'unknown').upper()}",
+                        "description": f"Successfully got response from {metadata.get('provider_used')} provider (attempt {metadata.get('attempt_number', 1)})",
+                        "status": "completed",
+                        "start_time": fallback_start.isoformat(),
+                        "end_time": datetime.now().isoformat(),
+                        "duration_ms": fallback_duration,
+                        "error": None,
+                        "metadata": metadata
+                    })
+                    error_thinking["status"] = "completed"
+                    error_thinking["end_time"] = datetime.now().isoformat()
+                    
+                    return {
+                        "success": True,
+                        "provider": metadata.get('provider_used', provider),
+                        "response": response_text,
+                        "fallback_used": True,
+                        "fallback_metadata": metadata,
+                        "thinking": error_thinking if show_thinking else None
+                    }
+                except Exception as fallback_error:
+                    logger.error(f"❌ All fallback attempts failed: {fallback_error}")
+                    
+                    # Add failed fallback step
+                    error_thinking["steps"].append({
+                        "id": "resilient_fallback",
+                        "title": "🔄 Resilient Fallback",
+                        "description": "All fallback providers failed",
+                        "status": "failed",
+                        "start_time": datetime.now().isoformat(),
+                        "end_time": datetime.now().isoformat(),
+                        "duration_ms": 0,
+                        "error": str(fallback_error)[:200],
+                        "metadata": {"error_type": type(fallback_error).__name__}
+                    })
+                    error_thinking["status"] = "failed"
+                    error_thinking["end_time"] = datetime.now().isoformat()
+                    
+                    return {
+                        "success": False,
+                        "error": f"All providers failed. Pipeline: {str(orchestration_error)[:100]}. Fallback: {str(fallback_error)[:100]}",
+                        "thinking": error_thinking if show_thinking else None
+                    }
             
-            logger.info(f"✅ Orchestration completed successfully. Result keys: {list(result.keys())}")
+            # If we got here, orchestration succeeded
             
-            # Convert orchestration result to LLM test format
+            # Convert orchestration result to LLM test format with timeline
+            workflow_start = datetime.now()
+            
+            # Step 1: Create task plan showing what we WILL do
+            task_plan = []
+            
+            # Always plan these steps
+            task_plan.append({
+                "id": "parse_message",
+                "title": "📝 Parse Message",
+                "description": "Analyzing user message to extract references and context",
+                "status": "pending"
+            })
+            
+            task_plan.append({
+                "id": "enrich_context",
+                "title": "🔍 Enrich Context",
+                "description": "Gathering additional information from integrations",
+                "status": "pending"
+            })
+            
+            task_plan.append({
+                "id": "build_prompt",
+                "title": "🏗️  Build Prompt",
+                "description": "Creating optimized prompt for AI model",
+                "status": "pending"
+            })
+            
+            task_plan.append({
+                "id": "execute_tasks",
+                "title": "⚡ Execute Tasks",
+                "description": "Running AI analysis and generating response",
+                "status": "pending"
+            })
+            
+            # Step 2: Build thinking data showing execution progress
             thinking_data = {
                 "steps": [],
                 "workflow_id": str(uuid.uuid4()),
-                "start_time": datetime.now().isoformat(),
-                "end_time": datetime.now().isoformat()
+                "workflow_type": "orchestration",
+                "start_time": workflow_start.isoformat(),
+                "end_time": None,
+                "total_duration_ms": None,
+                "status": "in_progress"
             }
             
-            # Add orchestration steps to thinking data
+            # Step 3: Execute and update each step
+            step_start = datetime.now()
+            
+            # Parse Message
             if result.get("parsed_message"):
+                refs = result["parsed_message"].references
+                github_refs = [r.normalized_value for r in refs if r.type.value.startswith('github')]
+                jira_refs = [r.normalized_value for r in refs if r.type.value.startswith('jira')]
+                confluence_refs = [r.normalized_value for r in refs if r.type.value.startswith('confluence')]
+                
+                description = f"Found {len(refs)} reference{'s' if len(refs) != 1 else ''}"
+                if github_refs:
+                    description += f" • {len(github_refs)} GitHub"
+                if jira_refs:
+                    description += f" • {len(jira_refs)} Jira"
+                if confluence_refs:
+                    description += f" • {len(confluence_refs)} Confluence"
+                
+                step_end = datetime.now()
                 thinking_data["steps"].append({
                     "id": "parse_message",
-                    "name": "Parse Message",
+                    "title": "📝 Parse Message",
+                    "description": description,
                     "status": "completed",
+                    "start_time": step_start.isoformat(),
+                    "end_time": step_end.isoformat(),
+                    "duration_ms": int((step_end - step_start).total_seconds() * 1000),
+                    "error": None,
                     "metadata": {
-                        "references_found": len(result["parsed_message"].references),
-                        "github_refs": [r.normalized_value for r in result["parsed_message"].references if r.type.value.startswith('github')],
-                        "jira_refs": [r.normalized_value for r in result["parsed_message"].references if r.type.value.startswith('jira')],
-                        "confluence_refs": [r.normalized_value for r in result["parsed_message"].references if r.type.value.startswith('confluence')]
+                        "references_found": len(refs),
+                        "github_refs": github_refs,
+                        "jira_refs": jira_refs,
+                        "confluence_refs": confluence_refs
                     }
                 })
             
+            # Enrich Context
+            step_start = datetime.now()
             if result.get("enriched_context"):
+                ctx = result["enriched_context"]
+                cache_hits = len([item for item in ctx.context_items if item.cache_hit])
+                
+                description = f"Gathered {len(ctx.context_items)} context item{'s' if len(ctx.context_items) != 1 else ''}"
+                if cache_hits > 0:
+                    description += f" • {cache_hits} from cache ⚡"
+                
+                step_end = datetime.now()
                 thinking_data["steps"].append({
                     "id": "enrich_context",
-                    "name": "Enrich Context",
+                    "title": "🔍 Enrich Context",
+                    "description": description,
                     "status": "completed",
+                    "start_time": step_start.isoformat(),
+                    "end_time": step_end.isoformat(),
+                    "duration_ms": int((step_end - step_start).total_seconds() * 1000),
+                    "error": None,
                     "metadata": {
-                        "context_items": len(result["enriched_context"].context_items),
-                        "cache_hits": len([item for item in result["enriched_context"].context_items if item.cache_hit])
+                        "context_items": len(ctx.context_items),
+                        "cache_hits": cache_hits
                     }
                 })
             
+            # Build Prompt
+            step_start = datetime.now()
             if result.get("formatted_prompt"):
+                prompt_len = len(result["formatted_prompt"].system_prompt) + len(result["formatted_prompt"].user_prompt)
+                description = f"Created {prompt_len:,} character prompt for AI model"
+                
+                step_end = datetime.now()
                 thinking_data["steps"].append({
                     "id": "build_prompt",
-                    "name": "Build Prompt",
+                    "title": "🏗️  Build Prompt",
+                    "description": description,
                     "status": "completed",
+                    "start_time": step_start.isoformat(),
+                    "end_time": step_end.isoformat(),
+                    "duration_ms": int((step_end - step_start).total_seconds() * 1000),
+                    "error": None,
                     "metadata": {
-                        "prompt_length": len(result["formatted_prompt"].system_prompt) + len(result["formatted_prompt"].user_prompt)
+                        "prompt_length": prompt_len,
+                        "system_prompt_length": len(result["formatted_prompt"].system_prompt),
+                        "user_prompt_length": len(result["formatted_prompt"].user_prompt)
                     }
                 })
             
+            # Execute Tasks
+            step_start = datetime.now()
             if result.get("task_results"):
-                successful = len([t for t in result["task_results"] if t.status == "completed"])
+                tasks = result["task_results"]
+                successful = len([t for t in tasks if t.status == "completed"])
+                
+                description = f"Executed {len(tasks)} task{'s' if len(tasks) != 1 else ''} • {successful} successful"
+                
+                step_end = datetime.now()
                 thinking_data["steps"].append({
                     "id": "execute_tasks",
-                    "name": "Execute Tasks",
+                    "title": "⚡ Execute Tasks",
+                    "description": description,
                     "status": "completed",
+                    "start_time": step_start.isoformat(),
+                    "end_time": step_end.isoformat(),
+                    "duration_ms": int((step_end - step_start).total_seconds() * 1000),
+                    "error": None,
                     "metadata": {
-                        "tasks_executed": len(result["task_results"]),
-                        "tasks_successful": successful
+                        "tasks_executed": len(tasks),
+                        "tasks_successful": successful,
+                        "task_types": [t.task_type for t in tasks]
                     }
                 })
+            
+            # Mark any remaining planned steps as skipped
+            completed_ids = [step["id"] for step in thinking_data["steps"]]
+            for planned_step in task_plan:
+                if planned_step["id"] not in completed_ids:
+                    thinking_data["steps"].append({
+                        "id": planned_step["id"],
+                        "title": planned_step["title"],
+                        "description": "Step was skipped",
+                        "status": "skipped",
+                        "start_time": None,
+                        "end_time": None,
+                        "duration_ms": None,
+                        "error": None,
+                        "metadata": {}
+                    })
+            
+            # Finalize workflow
+            workflow_end = datetime.now()
+            thinking_data["end_time"] = workflow_end.isoformat()
+            thinking_data["total_duration_ms"] = int((workflow_end - workflow_start).total_seconds() * 1000)
+            thinking_data["status"] = "completed"
             
             # Extract the LLM response from task results
             response = "Pipeline executed successfully."

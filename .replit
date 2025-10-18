@@ -1,4 +1,4 @@
-modules = ["python-3.11", "nodejs-20"]
+modules = ["python-3.11", "nodejs-20", "postgresql-16"]
 [agent]
 expertMode = true
 integrations = ["github:1.0.0", "confluence:1.0.0"]
@@ -42,6 +42,10 @@ externalPort = 3001
 [[ports]]
 localPort = 8000
 externalPort = 8000
+
+[[ports]]
+localPort = 45537
+externalPort = 3000
 
 [deployment]
 deploymentTarget = "autoscale"

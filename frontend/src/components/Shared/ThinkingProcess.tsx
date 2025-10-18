@@ -56,6 +56,8 @@ const ThinkingProcess = ({ data, title = "Backend Processing Steps" }: ThinkingP
         return <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />;
       case 'skipped':
         return <div className="w-5 h-5 text-gray-400">⊘</div>;
+      case 'pending':
+        return <Clock className="w-5 h-5 text-gray-400" />;
       default:
         return <div className="w-5 h-5 border-2 border-gray-300 rounded-full" />;
     }
@@ -64,15 +66,34 @@ const ThinkingProcess = ({ data, title = "Backend Processing Steps" }: ThinkingP
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'bg-green-50 border-green-200';
+        return 'bg-green-50 border-green-200 hover:bg-green-100';
       case 'failed':
-        return 'bg-red-50 border-red-200';
+        return 'bg-red-50 border-red-200 hover:bg-red-100';
       case 'in_progress':
-        return 'bg-blue-50 border-blue-200';
+        return 'bg-blue-50 border-blue-200 animate-pulse';
       case 'skipped':
         return 'bg-gray-50 border-gray-200';
+      case 'pending':
+        return 'bg-white border-gray-300 opacity-60';
       default:
         return 'bg-gray-50 border-gray-200';
+    }
+  };
+  
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <span className="px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full">✓ Done</span>;
+      case 'failed':
+        return <span className="px-2 py-0.5 text-xs font-medium text-red-700 bg-red-100 rounded-full">✗ Failed</span>;
+      case 'in_progress':
+        return <span className="px-2 py-0.5 text-xs font-medium text-blue-700 bg-blue-100 rounded-full animate-pulse">⟳ Running...</span>;
+      case 'skipped':
+        return <span className="px-2 py-0.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-full">⊘ Skipped</span>;
+      case 'pending':
+        return <span className="px-2 py-0.5 text-xs font-medium text-gray-500 bg-gray-100 rounded-full">⏳ Waiting</span>;
+      default:
+        return null;
     }
   };
 
@@ -125,13 +146,16 @@ const ThinkingProcess = ({ data, title = "Backend Processing Steps" }: ThinkingP
                     {getStatusIcon(step.status)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
                       <p className="font-medium text-gray-900">{step.title}</p>
-                      {step.duration_ms !== null && (
-                        <span className="text-xs text-gray-500 ml-2">
-                          {formatDuration(step.duration_ms)}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(step.status)}
+                        {step.duration_ms !== null && step.duration_ms !== undefined && (
+                          <span className="text-xs text-gray-500">
+                            {formatDuration(step.duration_ms)}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <p className="text-sm text-gray-600 mt-1">{step.description}</p>
 

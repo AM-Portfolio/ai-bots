@@ -50,3 +50,4 @@ together
 streamlit
 motor>=3.6.0
 pymongo>=4.10.1
+requests
