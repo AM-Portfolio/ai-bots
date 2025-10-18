@@ -159,14 +159,113 @@ async def health_check():
 
 @app.post("/api/test/llm")
 async def test_llm(prompt: str, provider: str = "together", show_thinking: bool = False):
-    """Test LLM provider with a simple prompt"""
+    """Test LLM provider - uses orchestration pipeline when show_thinking=True"""
     from shared.llm import llm_client
     from shared.thinking_process import create_llm_thinking_process
     import uuid
     
-    logger.info(f"Testing LLM with provider: {provider}, prompt: {prompt[:50]}...")
+    logger.info(f"Testing LLM with provider: {provider}, prompt: {prompt[:50]}..., orchestration: {show_thinking}")
     
-    # Create thinking process
+    # Use full orchestration pipeline when show_thinking is enabled
+    if show_thinking:
+        from orchestration.facade import OrchestrationFacade
+        from shared.services.manager import ServiceManager
+        
+        try:
+            service_manager = ServiceManager()
+            orchestration = OrchestrationFacade(service_manager)
+            
+            # Process message through full pipeline: parser → enricher → prompt builder → agent
+            result = await orchestration.process_message(
+                message=prompt,
+                template_name="default",
+                execute_tasks=True
+            )
+            
+            # Convert orchestration result to LLM test format
+            thinking_data = {
+                "steps": [],
+                "workflow_id": str(uuid.uuid4()),
+                "start_time": datetime.now().isoformat(),
+                "end_time": datetime.now().isoformat()
+            }
+            
+            # Add orchestration steps to thinking data
+            if result.get("parsed_message"):
+                thinking_data["steps"].append({
+                    "id": "parse_message",
+                    "name": "Parse Message",
+                    "status": "completed",
+                    "metadata": {
+                        "references_found": result["parsed_message"].get("references_count", 0),
+                        "github_refs": result["parsed_message"].get("github_refs", []),
+                        "jira_refs": result["parsed_message"].get("jira_refs", []),
+                        "confluence_refs": result["parsed_message"].get("confluence_refs", [])
+                    }
+                })
+            
+            if result.get("enriched_context"):
+                thinking_data["steps"].append({
+                    "id": "enrich_context",
+                    "name": "Enrich Context",
+                    "status": "completed",
+                    "metadata": {
+                        "context_items": result["enriched_context"].get("context_items", 0),
+                        "cache_hits": result["enriched_context"].get("cache_hits", 0)
+                    }
+                })
+            
+            if result.get("built_prompt"):
+                thinking_data["steps"].append({
+                    "id": "build_prompt",
+                    "name": "Build Prompt",
+                    "status": "completed",
+                    "metadata": {
+                        "template": result["built_prompt"].get("template", "default")
+                    }
+                })
+            
+            if result.get("tasks"):
+                thinking_data["steps"].append({
+                    "id": "execute_tasks",
+                    "name": "Execute Tasks",
+                    "status": "completed",
+                    "metadata": {
+                        "tasks_executed": result["tasks"].get("executed", 0),
+                        "tasks_successful": result["tasks"].get("successful", 0)
+                    }
+                })
+            
+            # Extract the LLM response from task results
+            response = "Pipeline executed successfully."
+            if result.get("tasks") and result["tasks"].get("results"):
+                # Get the last task result as the response
+                task_results = result["tasks"]["results"]
+                if task_results and len(task_results) > 0:
+                    last_result = task_results[-1]
+                    if isinstance(last_result, dict) and "output" in last_result:
+                        response = last_result["output"]
+                    elif isinstance(last_result, str):
+                        response = last_result
+            
+            return {
+                "success": True,
+                "provider": provider,
+                "response": response,
+                "github_context": result.get("enriched_context", {}).get("github_data"),
+                "thinking": thinking_data,
+                "orchestration_result": result
+            }
+            
+        except Exception as e:
+            logger.error(f"Orchestration pipeline failed: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": f"Orchestration failed: {str(e)}",
+                "thinking": None
+            }
+    
+    # Simple mode without orchestration (backward compatibility)
     workflow_id = str(uuid.uuid4())
     thinking = create_llm_thinking_process(workflow_id)
     
