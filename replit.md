@@ -29,6 +29,7 @@ The project employs a clean architecture with a modular design for scalability a
 -   **Integrations Hub:** Unified, extensible system for managing integrations with a modern UI, live status bar, real-time updates, connection history, category-based organization, service cards, and a feature-rich configuration modal supporting various authentication types.
 -   **Doc Orchestrator UI:** User-friendly interface for selective publishing to GitHub, Confluence, and Jira.
 -   **API Client:** Axios-based HTTP client with strong TypeScript typing.
+-   **Activity Logger:** Reactive logging system using Zustand for tracking user actions, API calls, and system events with a floating LogViewer component featuring filtering, expandable details, and performance tracking across all major flows (Chat, Voice, Integrations, LLM, API, Orchestrator, UI).
 
 ### Deployment
 -   Configured for Autoscale deployment on Replit, with the FastAPI backend serving both API endpoints and the pre-built React frontend.
