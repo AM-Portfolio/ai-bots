@@ -3,6 +3,7 @@ import { Send, Loader2, Mic, MicOff, Volume2, Sparkles } from 'lucide-react';
 import { apiClient } from '../../services/api';
 import type { Provider, ThinkingProcessData } from '../../types/api';
 import ThinkingProcess from '../Shared/ThinkingProcess';
+import BackendActivityStream from '../Shared/BackendActivityStream';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -19,6 +20,8 @@ const LLMTestPanel = () => {
   const [showBackendDetails, setShowBackendDetails] = useState(false);
   const [thinkingData, setThinkingData] = useState<ThinkingProcessData | null>(null);
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
+  const [streamingMessage, setStreamingMessage] = useState<string | null>(null);
+  const [useStreaming, setUseStreaming] = useState(false);
   
   // Voice features
   const [isListening, setIsListening] = useState(false);
@@ -176,6 +179,12 @@ const LLMTestPanel = () => {
     setIsLoading(true);
     setThinkingData(null);
 
+    // Use streaming if backend details are enabled
+    if (showBackendDetails && useStreaming) {
+      setStreamingMessage(messageText);
+      return;
+    }
+
     try {
       const startTime = performance.now();
       const result = await apiClient.testLLM(messageText, provider, showBackendDetails);
@@ -215,6 +224,32 @@ const LLMTestPanel = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleStreamComplete = (result: any) => {
+    setIsLoading(false);
+    setStreamingMessage(null);
+    
+    // Create a summary response based on the pipeline result
+    const assistantMessage: Message = {
+      role: 'assistant',
+      content: `Pipeline completed successfully!\n\n✓ Found ${result.parsed_message?.references_count || 0} references\n✓ Fetched ${result.enriched_context?.context_items || 0} context items\n✓ Executed ${result.tasks?.executed || 0} tasks (${result.tasks?.successful || 0} successful)`,
+      provider: provider,
+      duration: 0
+    };
+    setMessages((prev) => [...prev, assistantMessage]);
+    setTimeout(() => saveConversation(), 500);
+  };
+
+  const handleStreamError = (error: string) => {
+    setIsLoading(false);
+    setStreamingMessage(null);
+    
+    const errorMessage: Message = {
+      role: 'assistant',
+      content: `Error: ${error}`,
+    };
+    setMessages((prev) => [...prev, errorMessage]);
   };
 
   return (
@@ -260,11 +295,23 @@ const LLMTestPanel = () => {
             </div>
           ))}
 
-          {showBackendDetails && thinkingData && (
+          {/* Streaming backend activity */}
+          {streamingMessage && showBackendDetails && useStreaming && (
+            <BackendActivityStream
+              message={streamingMessage}
+              templateName="default"
+              executeTasks={true}
+              onComplete={handleStreamComplete}
+              onError={handleStreamError}
+            />
+          )}
+
+          {/* Traditional thinking process display */}
+          {showBackendDetails && !useStreaming && thinkingData && (
             <ThinkingProcess data={thinkingData} title="Backend Processing Steps" />
           )}
 
-          {isLoading && (
+          {isLoading && !streamingMessage && (
             <div className="flex justify-start">
               <div className="message-bubble message-assistant">
                 <div className="flex items-center space-x-2">
@@ -360,6 +407,19 @@ const LLMTestPanel = () => {
               <Sparkles className="w-4 h-4 text-gray-600" />
               <span className="text-sm text-gray-700">Details</span>
             </label>
+
+            {showBackendDetails && (
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useStreaming}
+                  onChange={(e) => setUseStreaming(e.target.checked)}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                />
+                <Loader2 className="w-4 h-4 text-gray-600" />
+                <span className="text-sm text-gray-700">Stream</span>
+              </label>
+            )}
           </div>
 
           <div className="text-xs text-gray-500">

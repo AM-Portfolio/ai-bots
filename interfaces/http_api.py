@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import Dict, Any, Optional, List
 import os
@@ -237,6 +237,42 @@ async def test_llm(prompt: str, provider: str = "together", show_thinking: bool 
             if current_step:
                 thinking.fail_step(current_step[0].id, str(e))
         return {"success": False, "error": str(e), "thinking": thinking.to_dict() if show_thinking else None}
+
+
+class StreamOrchestrationRequest(BaseModel):
+    message: str
+    template_name: str = "default"
+    execute_tasks: bool = True
+
+
+@app.post("/api/orchestration/stream")
+async def stream_orchestration(request: StreamOrchestrationRequest):
+    """
+    Stream orchestration pipeline activity in real-time
+    
+    Returns Server-Sent Events showing backend processing steps
+    """
+    from orchestration.streaming_wrapper import StreamingOrchestrationWrapper
+    from shared.services.manager import ServiceManager
+    
+    logger.info(f"Starting streaming orchestration for message: {request.message[:50]}...")
+    
+    service_manager = ServiceManager()
+    wrapper = StreamingOrchestrationWrapper(service_manager)
+    
+    return StreamingResponse(
+        wrapper.stream_process_message(
+            message=request.message,
+            template_name=request.template_name,
+            execute_tasks=request.execute_tasks
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 
 @app.post("/api/test/github")
