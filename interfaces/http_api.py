@@ -164,10 +164,10 @@ async def test_llm(prompt: str, provider: str = "together", show_thinking: bool 
     from shared.thinking_process import create_llm_thinking_process
     import uuid
     
-    logger.info(f"Testing LLM with provider: {provider}, prompt: {prompt[:50]}..., orchestration: {show_thinking}")
+    logger.info(f"Testing LLM with provider: {provider}, prompt: {prompt[:50]}...")
     
-    # Use full orchestration pipeline when show_thinking is enabled
-    if show_thinking:
+    # ALWAYS use full orchestration pipeline
+    if True:  # Always use orchestration
         from orchestration.facade import OrchestrationFacade
         from shared.services.manager import ServiceManager
         
@@ -259,12 +259,12 @@ async def test_llm(prompt: str, provider: str = "together", show_thinking: bool 
                 "provider": provider,
                 "response": response,
                 "github_context": result.get("enriched_context", {}).get("github_data"),
-                "thinking": thinking_data,
+                "thinking": thinking_data if show_thinking else None,
                 "orchestration_result": result
             }
             
         except Exception as e:
-            logger.error(f"Orchestration pipeline failed: {e}", exc_info=True)
+            logger.error(f"❌ Orchestration pipeline failed: {e}", exc_info=True)
             return {
                 "success": False,
                 "error": f"Orchestration failed: {str(e)}",
