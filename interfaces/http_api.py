@@ -284,41 +284,79 @@ async def test_llm(prompt: str, provider: str = "together", show_thinking: bool 
             
             # If we got here, orchestration succeeded
             
-            # Convert orchestration result to LLM test format
-            start_time = datetime.now()
+            # Convert orchestration result to LLM test format with timeline
+            workflow_start = datetime.now()
+            
+            # Step 1: Create task plan showing what we WILL do
+            task_plan = []
+            
+            # Always plan these steps
+            task_plan.append({
+                "id": "parse_message",
+                "title": "📝 Parse Message",
+                "description": "Analyzing user message to extract references and context",
+                "status": "pending"
+            })
+            
+            task_plan.append({
+                "id": "enrich_context",
+                "title": "🔍 Enrich Context",
+                "description": "Gathering additional information from integrations",
+                "status": "pending"
+            })
+            
+            task_plan.append({
+                "id": "build_prompt",
+                "title": "🏗️  Build Prompt",
+                "description": "Creating optimized prompt for AI model",
+                "status": "pending"
+            })
+            
+            task_plan.append({
+                "id": "execute_tasks",
+                "title": "⚡ Execute Tasks",
+                "description": "Running AI analysis and generating response",
+                "status": "pending"
+            })
+            
+            # Step 2: Build thinking data showing execution progress
             thinking_data = {
                 "steps": [],
                 "workflow_id": str(uuid.uuid4()),
                 "workflow_type": "orchestration",
-                "start_time": start_time.isoformat(),
-                "end_time": datetime.now().isoformat(),
-                "total_duration_ms": 0,
-                "status": "completed"
+                "start_time": workflow_start.isoformat(),
+                "end_time": None,
+                "total_duration_ms": None,
+                "status": "in_progress"
             }
             
-            # Add orchestration steps to thinking data with proper field names
+            # Step 3: Execute and update each step
+            step_start = datetime.now()
+            
+            # Parse Message
             if result.get("parsed_message"):
                 refs = result["parsed_message"].references
                 github_refs = [r.normalized_value for r in refs if r.type.value.startswith('github')]
                 jira_refs = [r.normalized_value for r in refs if r.type.value.startswith('jira')]
                 confluence_refs = [r.normalized_value for r in refs if r.type.value.startswith('confluence')]
                 
-                description = f"Found {len(refs)} references"
+                description = f"Found {len(refs)} reference{'s' if len(refs) != 1 else ''}"
                 if github_refs:
-                    description += f" ({len(github_refs)} GitHub)"
+                    description += f" • {len(github_refs)} GitHub"
                 if jira_refs:
-                    description += f" ({len(jira_refs)} Jira)"
+                    description += f" • {len(jira_refs)} Jira"
                 if confluence_refs:
-                    description += f" ({len(confluence_refs)} Confluence)"
+                    description += f" • {len(confluence_refs)} Confluence"
                 
+                step_end = datetime.now()
                 thinking_data["steps"].append({
                     "id": "parse_message",
                     "title": "📝 Parse Message",
                     "description": description,
                     "status": "completed",
-                    "start_time": start_time.isoformat(),
-                    "end_time": datetime.now().isoformat(),
-                    "duration_ms": 10,
+                    "start_time": step_start.isoformat(),
+                    "end_time": step_end.isoformat(),
+                    "duration_ms": int((step_end - step_start).total_seconds() * 1000),
                     "error": None,
                     "metadata": {
                         "references_found": len(refs),
@@ -328,22 +366,25 @@ async def test_llm(prompt: str, provider: str = "together", show_thinking: bool 
                     }
                 })
             
+            # Enrich Context
+            step_start = datetime.now()
             if result.get("enriched_context"):
                 ctx = result["enriched_context"]
                 cache_hits = len([item for item in ctx.context_items if item.cache_hit])
                 
-                description = f"Gathered {len(ctx.context_items)} context items"
+                description = f"Gathered {len(ctx.context_items)} context item{'s' if len(ctx.context_items) != 1 else ''}"
                 if cache_hits > 0:
-                    description += f" ({cache_hits} from cache)"
+                    description += f" • {cache_hits} from cache ⚡"
                 
+                step_end = datetime.now()
                 thinking_data["steps"].append({
                     "id": "enrich_context",
                     "title": "🔍 Enrich Context",
                     "description": description,
                     "status": "completed",
-                    "start_time": start_time.isoformat(),
-                    "end_time": datetime.now().isoformat(),
-                    "duration_ms": 15,
+                    "start_time": step_start.isoformat(),
+                    "end_time": step_end.isoformat(),
+                    "duration_ms": int((step_end - step_start).total_seconds() * 1000),
                     "error": None,
                     "metadata": {
                         "context_items": len(ctx.context_items),
@@ -351,18 +392,21 @@ async def test_llm(prompt: str, provider: str = "together", show_thinking: bool 
                     }
                 })
             
+            # Build Prompt
+            step_start = datetime.now()
             if result.get("formatted_prompt"):
                 prompt_len = len(result["formatted_prompt"].system_prompt) + len(result["formatted_prompt"].user_prompt)
-                description = f"Generated {prompt_len} character prompt for LLM"
+                description = f"Created {prompt_len:,} character prompt for AI model"
                 
+                step_end = datetime.now()
                 thinking_data["steps"].append({
                     "id": "build_prompt",
                     "title": "🏗️  Build Prompt",
                     "description": description,
                     "status": "completed",
-                    "start_time": start_time.isoformat(),
-                    "end_time": datetime.now().isoformat(),
-                    "duration_ms": 5,
+                    "start_time": step_start.isoformat(),
+                    "end_time": step_end.isoformat(),
+                    "duration_ms": int((step_end - step_start).total_seconds() * 1000),
                     "error": None,
                     "metadata": {
                         "prompt_length": prompt_len,
@@ -371,20 +415,23 @@ async def test_llm(prompt: str, provider: str = "together", show_thinking: bool 
                     }
                 })
             
+            # Execute Tasks
+            step_start = datetime.now()
             if result.get("task_results"):
                 tasks = result["task_results"]
                 successful = len([t for t in tasks if t.status == "completed"])
                 
-                description = f"Executed {len(tasks)} tasks ({successful} successful)"
+                description = f"Executed {len(tasks)} task{'s' if len(tasks) != 1 else ''} • {successful} successful"
                 
+                step_end = datetime.now()
                 thinking_data["steps"].append({
                     "id": "execute_tasks",
                     "title": "⚡ Execute Tasks",
                     "description": description,
                     "status": "completed",
-                    "start_time": start_time.isoformat(),
-                    "end_time": datetime.now().isoformat(),
-                    "duration_ms": 100,
+                    "start_time": step_start.isoformat(),
+                    "end_time": step_end.isoformat(),
+                    "duration_ms": int((step_end - step_start).total_seconds() * 1000),
                     "error": None,
                     "metadata": {
                         "tasks_executed": len(tasks),
@@ -392,6 +439,28 @@ async def test_llm(prompt: str, provider: str = "together", show_thinking: bool 
                         "task_types": [t.task_type for t in tasks]
                     }
                 })
+            
+            # Mark any remaining planned steps as skipped
+            completed_ids = [step["id"] for step in thinking_data["steps"]]
+            for planned_step in task_plan:
+                if planned_step["id"] not in completed_ids:
+                    thinking_data["steps"].append({
+                        "id": planned_step["id"],
+                        "title": planned_step["title"],
+                        "description": "Step was skipped",
+                        "status": "skipped",
+                        "start_time": None,
+                        "end_time": None,
+                        "duration_ms": None,
+                        "error": None,
+                        "metadata": {}
+                    })
+            
+            # Finalize workflow
+            workflow_end = datetime.now()
+            thinking_data["end_time"] = workflow_end.isoformat()
+            thinking_data["total_duration_ms"] = int((workflow_end - workflow_start).total_seconds() * 1000)
+            thinking_data["status"] = "completed"
             
             # Extract the LLM response from task results
             response = "Pipeline executed successfully."
