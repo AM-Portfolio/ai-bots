@@ -3,6 +3,7 @@ Context Enricher Implementation
 
 Fetches data from GitHub, Jira, Confluence based on parsed references
 """
+import logging
 from typing import Dict, List, Optional, Any
 from orchestration.shared.interfaces import IContextEnricher
 from orchestration.shared.models import (
@@ -14,6 +15,8 @@ from orchestration.shared.models import (
     Reference
 )
 from shared.services.manager import ServiceManager
+
+logger = logging.getLogger(__name__)
 
 
 class ContextEnricher(IContextEnricher):
@@ -48,9 +51,23 @@ class ContextEnricher(IContextEnricher):
         use_cache = options.get('use_cache', True)
         max_depth = options.get('max_depth', 2)
         
+        logger.info(
+            "Starting context enrichment",
+            extra={
+                "reference_count": len(parsed_message.references),
+                "use_cache": use_cache,
+                "max_depth": max_depth
+            }
+        )
+        
         context_items: List[ContextData] = []
         
         for ref in parsed_message.references:
+            logger.debug(
+                "Processing reference",
+                extra={"type": ref.type.value, "value": ref.normalized_value}
+            )
+            
             if ref.type in [ReferenceType.GITHUB_URL, ReferenceType.GITHUB_ISSUE, ReferenceType.GITHUB_PR]:
                 items = await self._enrich_github_reference(ref, use_cache)
                 context_items.extend(items)
@@ -62,6 +79,14 @@ class ContextEnricher(IContextEnricher):
             elif ref.type == ReferenceType.CONFLUENCE_URL:
                 items = await self._enrich_confluence_reference(ref, use_cache)
                 context_items.extend(items)
+        
+        logger.info(
+            "Context enrichment completed",
+            extra={
+                "items_fetched": len(context_items),
+                "cache_hits": len([item for item in context_items if item.cache_hit])
+            }
+        )
         
         return EnrichedContext(
             parsed_message=parsed_message,

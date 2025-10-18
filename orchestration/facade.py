@@ -4,6 +4,7 @@ Orchestration Facade
 Unified interface for the entire orchestration pipeline:
 Message Parser → Context Enricher → Prompt Builder → LangGraph Agent
 """
+import logging
 from typing import Dict, List, Optional, Any
 from orchestration.message_parser import MessageParser
 from orchestration.context_enricher import ContextEnricher
@@ -17,6 +18,8 @@ from orchestration.shared.models import (
 )
 from shared.services.manager import ServiceManager
 from shared.llm.factory import LLMFactory
+
+logger = logging.getLogger(__name__)
 
 
 class OrchestrationFacade:
@@ -67,6 +70,15 @@ class OrchestrationFacade:
         Returns:
             Complete processing result with all pipeline outputs
         """
+        logger.info(
+            "Starting orchestration pipeline",
+            extra={
+                "message_length": len(message),
+                "template_name": template_name,
+                "execute_tasks": execute_tasks
+            }
+        )
+        
         parsed_message = await self.parser.parse(message)
         
         enriched_context = await self.enricher.enrich(
@@ -90,6 +102,17 @@ class OrchestrationFacade:
             for task in tasks:
                 completed_task = await self.agent.execute(task)
                 results.append(completed_task)
+        
+        logger.info(
+            "Orchestration pipeline completed",
+            extra={
+                "references_found": len(parsed_message.references),
+                "context_items": len(enriched_context.context_items),
+                "tasks_planned": len(tasks),
+                "tasks_executed": len(results),
+                "successful_tasks": len([r for r in results if r.status == "completed"])
+            }
+        )
         
         return {
             'parsed_message': parsed_message,

@@ -3,6 +3,7 @@ Prompt Builder Implementation
 
 Formats enriched context into structured prompts for LLM consumption
 """
+import logging
 from typing import Dict, Any
 from orchestration.shared.interfaces import IPromptBuilder
 from orchestration.shared.models import (
@@ -10,6 +11,8 @@ from orchestration.shared.models import (
     FormattedPrompt,
     ContextSourceType
 )
+
+logger = logging.getLogger(__name__)
 
 
 class PromptBuilder(IPromptBuilder):
@@ -80,6 +83,15 @@ Provide detailed code review feedback."""
         Returns:
             FormattedPrompt ready for LLM
         """
+        logger.info(
+            "Starting prompt building",
+            extra={
+                "template_name": template_name,
+                "context_items": len(enriched_context.context_items),
+                "references": len(enriched_context.parsed_message.references)
+            }
+        )
+        
         template = self.templates.get(template_name, self.templates['default'])
         
         system_prompt = template['system']
@@ -98,6 +110,15 @@ Provide detailed code review feedback."""
         )
         
         context_summary = self._build_context_summary(enriched_context)
+        
+        logger.info(
+            "Prompt building completed",
+            extra={
+                "system_prompt_length": len(system_prompt),
+                "user_prompt_length": len(user_prompt),
+                "context_summary_length": len(context_summary)
+            }
+        )
         
         return FormattedPrompt(
             system_prompt=system_prompt,

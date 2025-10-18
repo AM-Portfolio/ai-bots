@@ -3,6 +3,7 @@ LangGraph Agent Implementation
 
 Coordinates task execution using LLM-powered workflow
 """
+import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import uuid
@@ -14,6 +15,8 @@ from orchestration.shared.models import (
 )
 from shared.services.manager import ServiceManager
 from shared.llm.factory import LLMFactory
+
+logger = logging.getLogger(__name__)
 
 
 class LangGraphAgent(ILangGraphAgent):
@@ -50,6 +53,15 @@ class LangGraphAgent(ILangGraphAgent):
         Returns:
             Completed task with results
         """
+        logger.info(
+            "Starting task execution",
+            extra={
+                "task_id": task.task_id,
+                "task_type": task.task_type,
+                "description": task.description
+            }
+        )
+        
         task.status = "running"
         self.task_registry[task.task_id] = task
         
@@ -68,11 +80,30 @@ class LangGraphAgent(ILangGraphAgent):
             task.status = "completed"
             task.result = result
             task.completed_at = datetime.utcnow()
+            
+            logger.info(
+                "Task execution completed",
+                extra={
+                    "task_id": task.task_id,
+                    "task_type": task.task_type,
+                    "status": task.status
+                }
+            )
         
         except Exception as e:
             task.status = "failed"
             task.error = str(e)
             task.completed_at = datetime.utcnow()
+            
+            logger.error(
+                "Task execution failed",
+                extra={
+                    "task_id": task.task_id,
+                    "task_type": task.task_type,
+                    "error": str(e)
+                },
+                exc_info=True
+            )
         
         return task
     
@@ -91,6 +122,14 @@ class LangGraphAgent(ILangGraphAgent):
         Returns:
             List of planned tasks
         """
+        logger.info(
+            "Starting task planning",
+            extra={
+                "user_intent": user_intent,
+                "context_items": len(enriched_context.context_items)
+            }
+        )
+        
         tasks = []
         
         has_github = any(

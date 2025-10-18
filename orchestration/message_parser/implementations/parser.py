@@ -4,10 +4,13 @@ Message Parser Implementation
 Extracts references (URLs, tickets, issue IDs) from user messages
 """
 import re
+import logging
 from typing import List, Dict, Any
 from urllib.parse import urlparse
 from orchestration.shared.interfaces import IMessageParser
 from orchestration.shared.models import ParsedMessage, Reference, ReferenceType
+
+logger = logging.getLogger(__name__)
 
 
 class MessageParser(IMessageParser):
@@ -45,6 +48,11 @@ class MessageParser(IMessageParser):
         Returns:
             ParsedMessage with extracted references
         """
+        logger.info(
+            "Starting message parsing",
+            extra={"message_length": len(message)}
+        )
+        
         references: List[Reference] = []
         clean_message = message
         
@@ -54,8 +62,23 @@ class MessageParser(IMessageParser):
         references.extend(self._extract_jira_tickets(message))
         references.extend(self._extract_confluence_urls(message))
         
+        logger.debug(
+            "Extracted references by type",
+            extra={
+                "github_urls": len([r for r in references if r.type == ReferenceType.GITHUB_URL]),
+                "github_issues": len([r for r in references if r.type == ReferenceType.GITHUB_ISSUE]),
+                "jira_tickets": len([r for r in references if r.type in [ReferenceType.JIRA_URL, ReferenceType.JIRA_TICKET]]),
+                "confluence_urls": len([r for r in references if r.type == ReferenceType.CONFLUENCE_URL])
+            }
+        )
+        
         for ref in references:
             clean_message = clean_message.replace(ref.raw_text, f"[{ref.type.value}]")
+        
+        logger.info(
+            "Message parsing completed",
+            extra={"total_references": len(references)}
+        )
         
         return ParsedMessage(
             original_message=message,
