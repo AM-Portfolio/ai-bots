@@ -25,9 +25,13 @@ class TogetherAIProvider(BaseLLMProvider):
             return
         
         try:
-            # Together AI SDK reads from TOGETHER_API_KEY environment variable automatically
-            # No need to pass api_key parameter
-            self.client = Together()
+            # Set the environment variable if it's not already set but we have the key
+            if self.api_key and not os.environ.get("TOGETHER_API_KEY"):
+                os.environ["TOGETHER_API_KEY"] = self.api_key
+                logger.debug("Set TOGETHER_API_KEY environment variable from config")
+            
+            # Initialize Together AI client with explicit api_key
+            self.client = Together(api_key=self.api_key)
             logger.info(
                 "Together AI client initialized successfully",
                 provider="together",
