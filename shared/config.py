@@ -41,7 +41,8 @@ class Settings(BaseSettings):
     
     database_url: str = "sqlite:///./ai_dev_agent.db"
     
-    vector_db_provider: str = "qdrant"
+    # Vector DB: Use "in-memory" for Replit, "qdrant" for Docker environments
+    vector_db_provider: str = "in-memory"
     qdrant_host: str = "localhost"
     qdrant_port: int = 6333
     
