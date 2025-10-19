@@ -1405,10 +1405,23 @@ async def execute_commit_operation(operation_type: str, template_data: Dict[str,
     """
     Execute approved commit/publish operation
     Returns result with links for next actions
+    Uses centralized GitHub client from wrapper
     """
     logger.info(f"⚡ Executing operation: {operation_type}")
     
-    github_ops = GitHubOperations()
+    # Get GitHub client from centralized wrapper
+    from shared.clients.wrappers.github_wrapper import GitHubWrapper
+    github_wrapper = GitHubWrapper()
+    
+    # Extract PyGithub client from wrapper
+    github_client = None
+    if github_wrapper._env_client and hasattr(github_wrapper._env_client, 'client'):
+        github_client = github_wrapper._env_client.client
+        logger.info("✅ Using centralized GitHub client from ENV wrapper")
+    elif github_wrapper._replit_client:
+        logger.warning("⚠️ Replit connector detected, but PyGithub operations require ENV-based client")
+    
+    github_ops = GitHubOperations(github_client)
     
     if operation_type == "github_commit":
         result = await github_ops.commit_files(

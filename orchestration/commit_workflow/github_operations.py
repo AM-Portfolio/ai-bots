@@ -1,10 +1,10 @@
 """
 GitHub Operations using PyGithub
 Handles commits, pull requests, and repository management
+Uses centralized GitHub wrapper for authentication
 """
 
 import logging
-import os
 from typing import Dict, Any, Optional, List
 from github import Github, GithubException
 
@@ -15,22 +15,21 @@ class GitHubOperations:
     """
     GitHub operations using PyGithub library
     Provides methods for commits, PRs, and repository management
+    Uses centralized GitHub client from GitHubWrapper
     """
     
-    def __init__(self, token: Optional[str] = None):
+    def __init__(self, github_client: Optional[Github] = None):
         """
-        Initialize GitHub client
+        Initialize GitHub operations with existing client
         
         Args:
-            token: GitHub personal access token (defaults to env var)
+            github_client: Existing PyGithub client instance from GitHubWrapper
         """
-        self.token = token or os.getenv("GITHUB_TOKEN")
-        if not self.token:
-            logger.warning("No GitHub token found - operations will be limited")
-            self.client = None
+        self.client = github_client
+        if not self.client:
+            logger.warning("⚠️ No GitHub client provided - operations will be limited")
         else:
-            self.client = Github(self.token)
-            logger.info("✅ GitHub client initialized with PyGithub")
+            logger.info("✅ GitHub operations initialized with centralized client")
     
     async def commit_files(
         self,
