@@ -1272,6 +1272,231 @@ async def process_github_issue(issue_number: int, repository: str):
         logger.error(f"Failed to process issue: {e}")
 
 
+# ==================== COMMIT WORKFLOW API ====================
+
+from orchestration.commit_workflow import CommitWorkflowRouter, GitHubOperations
+from orchestration.commit_workflow.approval_system import get_approval_manager
+
+class CommitWorkflowRequest(BaseModel):
+    """Request to initiate commit/publish workflow"""
+    message: str
+    repository: Optional[str] = None
+    branch: Optional[str] = None
+    files: Optional[Dict[str, str]] = None
+    context: Optional[Dict[str, Any]] = None
+
+
+@app.post("/api/commit/parse-intent")
+async def parse_commit_intent(request: CommitWorkflowRequest):
+    """
+    Parse user message to detect commit/publish intent
+    Returns approval template for user confirmation
+    """
+    from shared.llm_providers.resilient_orchestrator import get_llm_orchestrator
+    
+    logger.info(f"🧠 Parsing commit intent: {request.message[:100]}...")
+    
+    try:
+        llm_orchestrator = get_llm_orchestrator()
+        router = CommitWorkflowRouter(llm_orchestrator)
+        
+        intent = await router.parse_user_intent(request.message, request.context)
+        
+        workflow_result = await router.route_to_workflow(
+            intent,
+            {
+                "repository": request.repository,
+                "branch": request.branch or "main",
+                "files": request.files or {},
+                "context": request.context or {}
+            }
+        )
+        
+        approval_manager = get_approval_manager()
+        approval_request = approval_manager.create_approval_request(
+            operation_type=workflow_result["workflow"],
+            title=workflow_result["template"].title,
+            description=workflow_result["template"].description,
+            template_data=workflow_result["template"].fields
+        )
+        
+        return {
+            "success": True,
+            "intent": {
+                "platform": intent.platform,
+                "action": intent.action,
+                "confidence": intent.confidence
+            },
+            "workflow": workflow_result["workflow"],
+            "template": workflow_result["template"].fields,
+            "approval_request": approval_request.to_dict(),
+            "requires_approval": workflow_result.get("requires_approval", True)
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to parse commit intent: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class ApprovalResponse(BaseModel):
+    """User's response to approval request"""
+    approval_id: str
+    approved: bool
+    updated_template: Optional[Dict[str, Any]] = None
+    rejection_reason: Optional[str] = None
+
+
+@app.post("/api/commit/approve")
+async def approve_commit(response: ApprovalResponse):
+    """
+    User approves/rejects commit operation
+    If approved, executes the operation
+    """
+    approval_manager = get_approval_manager()
+    
+    logger.info(f"📋 Processing approval: {response.approval_id}, approved={response.approved}")
+    
+    try:
+        if not response.approved:
+            approval_manager.reject_request(response.approval_id, response.rejection_reason)
+            return {
+                "success": True,
+                "status": "rejected",
+                "message": "Operation cancelled by user"
+            }
+        
+        approval_request = approval_manager.approve_request(
+            response.approval_id,
+            response.updated_template
+        )
+        
+        if not approval_request:
+            raise HTTPException(status_code=404, detail="Approval request not found or expired")
+        
+        result = await execute_commit_operation(
+            operation_type=approval_request.operation_type,
+            template_data=approval_request.template_data
+        )
+        
+        return {
+            "success": True,
+            "status": "approved",
+            "operation_result": result
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to process approval: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def execute_commit_operation(operation_type: str, template_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Execute approved commit/publish operation
+    Returns result with links for next actions
+    """
+    logger.info(f"⚡ Executing operation: {operation_type}")
+    
+    github_ops = GitHubOperations()
+    
+    if operation_type == "github_commit":
+        result = await github_ops.commit_files(
+            repository=template_data["repository"],
+            branch=template_data["branch"],
+            files=template_data.get("files", {}),
+            commit_message=template_data["commit_message"],
+            commit_description=template_data.get("commit_description")
+        )
+        
+        if result["success"]:
+            return {
+                **result,
+                "next_actions": [
+                    {
+                        "action": "view_commit",
+                        "label": "View Commit",
+                        "url": result["commit_url"]
+                    },
+                    {
+                        "action": "create_pr",
+                        "label": "Create Pull Request",
+                        "prompt": "Would you like to create a pull request for this commit?"
+                    }
+                ]
+            }
+        return result
+    
+    elif operation_type == "github_pr":
+        result = await github_ops.create_pull_request(
+            repository=template_data["repository"],
+            source_branch=template_data.get("source_branch", "main"),
+            target_branch=template_data.get("target_branch", "main"),
+            title=template_data.get("pr_title", ""),
+            description=template_data.get("pr_description"),
+            reviewers=template_data.get("reviewers"),
+            assignees=template_data.get("assignees"),
+            labels=template_data.get("labels"),
+            draft=template_data.get("draft", False)
+        )
+        
+        if result["success"]:
+            return {
+                **result,
+                "next_actions": [
+                    {
+                        "action": "view_pr",
+                        "label": "View Pull Request",
+                        "url": result["pr_url"]
+                    }
+                ]
+            }
+        return result
+    
+    elif operation_type == "github_commit_and_pr":
+        result = await github_ops.commit_and_create_pr(
+            repository=template_data["repository"],
+            branch=template_data.get("branch", "main"),
+            files=template_data.get("files", {}),
+            commit_message=template_data["commit_message"],
+            pr_title=template_data.get("pr_title", template_data["commit_message"]),
+            pr_description=template_data.get("pr_description", ""),
+            target_branch=template_data.get("target_branch", "main")
+        )
+        
+        if result["success"]:
+            return {
+                **result,
+                "next_actions": [
+                    {
+                        "action": "view_commit",
+                        "label": "View Commit",
+                        "url": result["commit_url"]
+                    },
+                    {
+                        "action": "view_pr",
+                        "label": "View Pull Request",
+                        "url": result["pr_url"]
+                    }
+                ]
+            }
+        return result
+    
+    else:
+        logger.warning(f"Unknown operation type: {operation_type}")
+        return {"success": False, "error": "Unknown operation type"}
+
+
+@app.get("/api/commit/pending-approvals")
+async def list_pending_approvals():
+    """List all pending approval requests"""
+    approval_manager = get_approval_manager()
+    pending = approval_manager.list_pending_requests()
+    
+    return {
+        "pending_approvals": [req.to_dict() for req in pending],
+        "count": len(pending)
+    }
+
+
 @app.get("/{full_path:path}", response_class=FileResponse)
 async def serve_spa_routes(full_path: str):
     """Catch-all route to serve React SPA for client-side routing"""
