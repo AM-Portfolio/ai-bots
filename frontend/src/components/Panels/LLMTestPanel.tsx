@@ -1,10 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, Mic, MicOff, Volume2, Sparkles } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
 import { apiClient } from '../../services/api';
 import type { Provider, ThinkingProcessData } from '../../types/api';
 import ThinkingProcess from '../Shared/ThinkingProcess';
 import BackendActivityStream from '../Shared/BackendActivityStream';
 import { logger } from '../../utils/logger';
+import 'highlight.js/styles/github-dark.css';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -295,44 +299,71 @@ const LLMTestPanel = () => {
   };
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex-1 card overflow-y-auto mb-4 p-6">
+    <div className="h-full flex flex-col bg-gradient-to-br from-gray-50 to-blue-50/30">
+      <div className="flex-1 overflow-y-auto mb-4 p-6">
         {messages.length === 0 && (
           <div className="text-center py-20">
-            <div className="w-16 h-16 bg-primary-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-              <Send className="w-8 h-8 text-primary-600" />
+            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg">
+              <Sparkles className="w-10 h-10 text-white" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Ready to chat!
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-3">
+              AI Development Assistant
             </h3>
-            <p className="text-gray-600">
-              Send a message to start testing the LLM
+            <p className="text-gray-600 text-lg">
+              Ask me anything about your codebase
             </p>
           </div>
         )}
 
-        <div className="space-y-4">
+        <div className="space-y-6 max-w-5xl mx-auto">
           {messages.map((message, index) => (
             <div
               key={index}
               className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`message-bubble ${
-                  message.role === 'user' ? 'message-user' : 'message-assistant'
-                }`}
+                className={`max-w-[85%] ${
+                  message.role === 'user' 
+                    ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-2xl rounded-tr-sm shadow-md' 
+                    : 'bg-white border border-gray-200 rounded-2xl rounded-tl-sm shadow-sm'
+                } p-5 transition-all hover:shadow-lg`}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold text-sm">
-                    {message.role === 'user' ? 'You' : `🤖 AI Assistant${message.provider ? ` (${message.provider})` : ''}`}
-                  </span>
-                  {message.duration && (
-                    <span className="text-xs text-gray-500 ml-4">
-                      {message.duration.toFixed(2)}s
+                {message.role === 'assistant' && (
+                  <div className="flex items-center gap-2 mb-3 pb-3 border-b border-gray-100">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                      <Sparkles className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="font-semibold text-gray-700">
+                      AI Assistant
                     </span>
+                    {message.provider && (
+                      <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                        {message.provider}
+                      </span>
+                    )}
+                    {message.duration && (
+                      <span className="text-xs text-gray-400 ml-auto">
+                        {message.duration.toFixed(2)}s
+                      </span>
+                    )}
+                  </div>
+                )}
+                <div className={`prose prose-sm max-w-none ${
+                  message.role === 'user' 
+                    ? 'prose-invert' 
+                    : 'prose-headings:text-gray-900 prose-p:text-gray-700 prose-strong:text-gray-900 prose-code:text-blue-600 prose-code:bg-blue-50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-gray-900 prose-pre:text-gray-100'
+                }`}>
+                  {message.role === 'assistant' ? (
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeHighlight]}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  ) : (
+                    <div className="whitespace-pre-wrap">{message.content}</div>
                   )}
                 </div>
-                <div className="whitespace-pre-wrap">{message.content}</div>
               </div>
             </div>
           ))}
@@ -366,9 +397,9 @@ const LLMTestPanel = () => {
         </div>
       </div>
 
-      {/* Compact Input Area with Settings */}
-      <div className="card p-4">
-        <div className="flex space-x-3 mb-3">
+      {/* Modern Input Area */}
+      <div className="bg-white border-t border-gray-200 shadow-lg p-4">
+        <div className="flex space-x-3 mb-3 max-w-5xl mx-auto">
           <div className="flex-1 relative">
             <textarea
               value={input}
@@ -379,17 +410,21 @@ const LLMTestPanel = () => {
                   handleSend();
                 }
               }}
-              placeholder={isListening ? "Listening..." : "Message AI Assistant..."}
-              className={`w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none ${isListening ? 'ring-2 ring-red-500' : ''}`}
+              placeholder={isListening ? "🎤 Listening..." : "Ask me anything about your code..."}
+              className={`w-full px-4 py-3 pr-12 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all ${
+                isListening 
+                  ? 'border-red-400 ring-2 ring-red-400/20 bg-red-50' 
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
               rows={2}
               disabled={isListening}
             />
             <button
               onClick={toggleVoiceInput}
               disabled={isLoading}
-              className={`absolute right-2 top-2 p-2 rounded-lg transition-colors ${
+              className={`absolute right-2 top-2 p-2 rounded-lg transition-all ${
                 isListening 
-                  ? 'bg-red-500 text-white hover:bg-red-600' 
+                  ? 'bg-red-500 text-white hover:bg-red-600 shadow-md' 
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
               title={isListening ? "Stop listening" : "Start voice input"}
@@ -404,7 +439,7 @@ const LLMTestPanel = () => {
           <button
             onClick={handleSend}
             disabled={isLoading || !input.trim()}
-            className="btn-primary px-6 flex items-center space-x-2 self-end"
+            className="bg-gradient-to-br from-blue-600 to-purple-600 text-white px-8 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 self-end shadow-md hover:shadow-lg transition-all"
           >
             {isLoading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -414,8 +449,8 @@ const LLMTestPanel = () => {
           </button>
         </div>
 
-        {/* Compact Settings Bar */}
-        <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+        {/* Modern Settings Bar */}
+        <div className="flex items-center justify-between pt-3 border-t border-gray-100 max-w-5xl mx-auto">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <select
@@ -429,12 +464,12 @@ const LLMTestPanel = () => {
                     setModel(value);
                   }
                 }}
-                className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                className="text-sm border-2 border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white hover:border-gray-300 transition-colors"
               >
-                <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">Llama-3.3-70B</option>
-                <option value="deepseek-ai/DeepSeek-R1">DeepSeek-R1</option>
-                <option value="Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8">Qwen3-Coder</option>
-                <option value="azure">GPT-4 (Azure)</option>
+                <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">🦙 Llama-3.3-70B</option>
+                <option value="deepseek-ai/DeepSeek-R1">🧠 DeepSeek-R1</option>
+                <option value="Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8">💻 Qwen3-Coder</option>
+                <option value="azure">☁️ GPT-4 (Azure)</option>
               </select>
             </div>
 
