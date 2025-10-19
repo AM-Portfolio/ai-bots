@@ -62,16 +62,17 @@ embedding_service = None
 query_service = None
 github_llm_orchestrator = None
 github_client = None
+active_provider_type = None  # Track which provider is actually being used
 
 
 async def initialize_vector_db():
-    """Initialize vector database components"""
-    global vector_db, embedding_service, query_service, github_llm_orchestrator, github_client
+    """Initialize vector database components with automatic fallback"""
+    global vector_db, embedding_service, query_service, github_llm_orchestrator, github_client, active_provider_type
     
     try:
         logger.info("🔧 Initializing Vector DB system...")
         
-        # Create vector DB provider from settings
+        # Try primary provider
         provider_type = settings.vector_db_provider
         logger.info(f"   Creating {provider_type.capitalize()} vector DB provider...")
         
@@ -89,6 +90,17 @@ async def initialize_vector_db():
         
         logger.info("   Initializing vector DB...")
         init_success = await vector_db.initialize()
+        
+        # If initialization fails and fallback is enabled, try in-memory
+        if not init_success and settings.vector_db_fallback_enabled and provider_type != "in-memory":
+            logger.warning(f"   ⚠️  {provider_type.capitalize()} initialization failed, falling back to in-memory...")
+            provider_type = "in-memory"
+            logger.info(f"   Creating In-Memory vector DB provider...")
+            vector_db = VectorDBFactory.create(provider_type="in-memory")
+            if not vector_db:
+                raise Exception("Failed to create fallback in-memory provider")
+            init_success = await vector_db.initialize()
+        
         if not init_success:
             raise Exception("Vector DB initialization returned False")
         
@@ -125,8 +137,13 @@ async def initialize_vector_db():
             beautifier=beautifier
         )
         
+        # Store the active provider type
+        active_provider_type = provider_type
+        
         logger.info("✅ Vector DB system initialized successfully")
         logger.info(f"   • Provider: {provider_type}")
+        if provider_type == "in-memory" and settings.vector_db_provider != "in-memory":
+            logger.info(f"   • Note: Fell back from {settings.vector_db_provider} to in-memory")
         logger.info(f"   • Collection: github_repos ({embedding_service.get_dimension()} dimensions)")
         logger.info(f"   • Query service: ready")
         logger.info(f"   • Orchestrator: ready")
@@ -160,7 +177,7 @@ async def get_status() -> VectorDBStatus:
         stats = await vector_db.get_collection_stats("github_repos")
         
         return VectorDBStatus(
-            provider="in-memory",
+            provider=active_provider_type or "unknown",
             initialized=is_healthy,
             collections=[stats] if stats else []
         )
