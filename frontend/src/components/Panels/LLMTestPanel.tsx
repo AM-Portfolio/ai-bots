@@ -23,7 +23,7 @@ const LLMTestPanel = () => {
   const [provider, setProvider] = useState<Provider>('together');
   const [model, setModel] = useState('meta-llama/Llama-3.3-70B-Instruct-Turbo');
   const [isLoading, setIsLoading] = useState(false);
-  const [showBackendDetails, setShowBackendDetails] = useState(true);
+  const [showBackendDetails, setShowBackendDetails] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
   
   // Voice features
@@ -178,114 +178,51 @@ const LLMTestPanel = () => {
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
-    const userMessage: Message = { role: 'user', content: input, isExpanded: true };
+    const userMessage: Message = { role: 'user', content: input.trim(), isExpanded: true };
     setMessages((prev) => [...prev, userMessage]);
-    const messageText = input;
     setInput('');
     setIsLoading(true);
 
-    try {
-      const startTime = performance.now();
-      
-      const conversationHistory = messages.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }));
-      
-      const result = await apiClient.testLLM(messageText, provider, showBackendDetails, model, conversationHistory);
-      const duration = (performance.now() - startTime) / 1000;
-
-      if (result.success && result.response) {
-        const assistantMessage: Message = {
-          role: 'assistant',
-          content: result.response,
-          provider: result.provider_used || provider,
-          duration,
-          thinking: result.thinking,
-          isExpanded: false // Start collapsed to show overview
-        };
-        setMessages((prev) => [...prev, assistantMessage]);
+    await logger.llm.track('LLM query', async () => {
+      try {
+        const result = await apiClient.testLLM(input.trim(), provider, showBackendDetails, model);
         
-        setTimeout(() => saveConversation(), 500);
-        
-        if (voiceEnabled) {
-          playVoiceResponse(result.response);
+        if (result.success && result.response) {
+          const assistantMessage: Message = {
+            role: 'assistant',
+            content: result.response,
+            provider: result.provider_used,
+            thinking: result.thinking,
+            isExpanded: false
+          };
+          setMessages((prev) => [...prev, assistantMessage]);
+          await saveConversation();
+          await playVoiceResponse(result.response);
+        } else {
+          const errorMessage: Message = {
+            role: 'assistant',
+            content: `Error: ${result.error || 'Unknown error occurred'}`,
+            isExpanded: true
+          };
+          setMessages((prev) => [...prev, errorMessage]);
         }
-      } else {
+      } catch (error) {
         const errorMessage: Message = {
           role: 'assistant',
-          content: `Error: ${result.error || 'Unknown error occurred'}`,
+          content: `Error: ${error instanceof Error ? error.message : 'Failed to connect to API'}`,
           isExpanded: true
         };
         setMessages((prev) => [...prev, errorMessage]);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      const errorMessage: Message = {
-        role: 'assistant',
-        content: `Error: ${error instanceof Error ? error.message : 'Failed to connect to API'}`,
-        isExpanded: true
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
+    });
   };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 to-blue-50/20">
-      {/* Top Bar with Settings */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200 px-6 py-3 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-4">
-          <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-blue-600" />
-            AI Assistant
-          </h2>
-          
-          <select
-            value={provider === 'together' ? model : provider}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (value === 'azure') {
-                setProvider('azure');
-              } else {
-                setProvider('together');
-                setModel(value);
-              }
-            }}
-            className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:border-gray-400 transition-colors"
-          >
-            <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">🦙 Llama 3.3 70B</option>
-            <option value="deepseek-ai/DeepSeek-R1">🧠 DeepSeek-R1</option>
-            <option value="Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8">💻 Qwen3 Coder</option>
-            <option value="azure">☁️ GPT-4</option>
-          </select>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={showBackendDetails}
-              onChange={(e) => setShowBackendDetails(e.target.checked)}
-              className="w-4 h-4 rounded"
-            />
-            Show Thinking
-          </label>
-          
-          <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={voiceEnabled}
-              onChange={(e) => setVoiceEnabled(e.target.checked)}
-              className="w-4 h-4 rounded"
-            />
-            Voice
-          </label>
-        </div>
-      </div>
-
+    <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
+      <div className="flex-1 overflow-y-auto px-6 py-6">
         {messages.length === 0 && (
           <div className="text-center py-20">
             <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg">
@@ -361,44 +298,12 @@ const LLMTestPanel = () => {
                       )}
                     </div>
                   </div>
-
-                  {/* Backend Thinking Process */}
-                  {showBackendDetails && message.thinking && message.thinking.steps && message.thinking.steps.length > 0 && (
-                    <div className="border-t border-gray-100 bg-gray-50/50">
-                      <div className="px-4 py-3">
-                        <div className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-2">
-                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                          Backend Processing Steps
-                        </div>
-                        <div className="space-y-2">
-                          {message.thinking.steps.map((step, idx) => (
-                            <div key={idx} className="flex items-start gap-2 text-xs">
-                              <span className={`mt-0.5 ${
-                                step.status === 'completed' ? 'text-green-600' :
-                                step.status === 'failed' ? 'text-red-600' :
-                                step.status === 'in_progress' ? 'text-blue-600' :
-                                'text-gray-400'
-                              }`}>
-                                {step.status === 'completed' ? '✓' : step.status === 'failed' ? '✗' : '◌'}
-                              </span>
-                              <div>
-                                <div className="text-gray-700 font-medium">{step.title}</div>
-                                {step.description && (
-                                  <div className="text-gray-500 text-[11px] mt-0.5">{step.description}</div>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
           ))}
 
-          {/* Loading indicator with animated steps */}
+          {/* Loading indicator */}
           {isLoading && (
             <div className="flex justify-start">
               <div className="bg-white rounded-2xl rounded-tl-md shadow-sm border border-gray-100 px-4 py-3 min-w-[200px]">
@@ -418,47 +323,97 @@ const LLMTestPanel = () => {
         </div>
       </div>
 
-      {/* Input Area - Fixed at bottom */}
+      {/* Compact Input Area with Inline Settings */}
       <div className="bg-white border-t border-gray-200 shadow-lg px-6 py-4">
-        <div className="max-w-4xl mx-auto flex gap-3">
-          <div className="flex-1 relative">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
+        <div className="max-w-4xl mx-auto space-y-3">
+          {/* Settings Row */}
+          <div className="flex items-center gap-4 px-1">
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Sparkles className="w-4 h-4 text-blue-600" />
+              <span className="font-medium">Model:</span>
+            </div>
+            
+            <select
+              value={provider === 'together' ? model : provider}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === 'azure') {
+                  setProvider('azure');
+                } else {
+                  setProvider('together');
+                  setModel(value);
                 }
               }}
-              placeholder={isListening ? "🎤 Listening..." : "Ask me anything..."}
-              className={`w-full px-4 py-3 pr-12 border-2 rounded-xl resize-none transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                isListening 
-                  ? 'border-red-400 bg-red-50' 
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-              rows={2}
-              disabled={isListening}
-            />
-            <button
-              onClick={toggleVoiceInput}
-              disabled={isLoading}
-              className={`absolute right-2 top-2 p-2 rounded-lg transition-all ${
-                isListening 
-                  ? 'bg-red-500 text-white' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              className="text-xs px-2 py-1 border border-gray-300 rounded-md bg-white hover:border-gray-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              <option value="meta-llama/Llama-3.3-70B-Instruct-Turbo">🦙 Llama 3.3 70B</option>
+              <option value="deepseek-ai/DeepSeek-R1">🧠 DeepSeek-R1</option>
+              <option value="Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8">💻 Qwen3 Coder</option>
+              <option value="azure">☁️ GPT-4</option>
+            </select>
+
+            <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-700">
+              <input
+                type="checkbox"
+                checked={showBackendDetails}
+                onChange={(e) => setShowBackendDetails(e.target.checked)}
+                className="w-3.5 h-3.5 rounded"
+              />
+              Show Thinking
+            </label>
+
+            <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-700">
+              <input
+                type="checkbox"
+                checked={voiceEnabled}
+                onChange={(e) => setVoiceEnabled(e.target.checked)}
+                className="w-3.5 h-3.5 rounded"
+              />
+              Voice
+            </label>
+          </div>
+
+          {/* Input Row */}
+          <div className="flex gap-3">
+            <div className="flex-1 relative">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder={isListening ? "🎤 Listening..." : "Ask me anything..."}
+                className={`w-full px-4 py-3 pr-12 border-2 rounded-xl resize-none transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                  isListening 
+                    ? 'border-red-400 bg-red-50' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+                rows={2}
+                disabled={isListening}
+              />
+              <button
+                onClick={toggleVoiceInput}
+                disabled={isLoading}
+                className={`absolute right-2 top-2 p-2 rounded-lg transition-all ${
+                  isListening 
+                    ? 'bg-red-500 text-white' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
+            </div>
+            <button
+              onClick={handleSend}
+              disabled={isLoading || !input.trim()}
+              className="bg-gradient-to-br from-blue-600 to-purple-600 text-white px-8 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+            >
+              {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
             </button>
           </div>
-          <button
-            onClick={handleSend}
-            disabled={isLoading || !input.trim()}
-            className="bg-gradient-to-br from-blue-600 to-purple-600 text-white px-8 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg transition-all flex items-center gap-2"
-          >
-            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-          </button>
         </div>
       </div>
     </div>
