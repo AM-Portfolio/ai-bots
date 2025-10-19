@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     
     database_url: str = "sqlite:///./ai_dev_agent.db"
     
+    vector_db_provider: str = "qdrant"
+    qdrant_host: str = "localhost"
+    qdrant_port: int = 6333
+    
     microsoft_app_id: Optional[str] = None
     microsoft_app_password: Optional[str] = None
     

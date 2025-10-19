@@ -20,6 +20,7 @@ from orchestration.github_llm.query_orchestrator import GitHubLLMOrchestrator
 from orchestration.github_llm.models import QueryRequest, QueryType
 from orchestration.summary_layer.beautifier import ResponseBeautifier
 from shared.clients.wrappers.github_wrapper import GitHubWrapper
+from shared.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -70,9 +71,19 @@ async def initialize_vector_db():
     try:
         logger.info("🔧 Initializing Vector DB system...")
         
-        # Create vector DB provider (in-memory for now)
-        logger.info("   Creating InMemory vector DB provider...")
-        vector_db = VectorDBFactory.create(provider_type="in-memory")
+        # Create vector DB provider from settings
+        provider_type = settings.vector_db_provider
+        logger.info(f"   Creating {provider_type.capitalize()} vector DB provider...")
+        
+        # Pass provider-specific config
+        provider_kwargs = {}
+        if provider_type == "qdrant":
+            provider_kwargs = {
+                "host": settings.qdrant_host,
+                "port": settings.qdrant_port
+            }
+        
+        vector_db = VectorDBFactory.create(provider_type=provider_type, **provider_kwargs)
         if not vector_db:
             raise Exception("Failed to create vector DB provider")
         
@@ -115,7 +126,7 @@ async def initialize_vector_db():
         )
         
         logger.info("✅ Vector DB system initialized successfully")
-        logger.info(f"   • Provider: in-memory")
+        logger.info(f"   • Provider: {provider_type}")
         logger.info(f"   • Collection: github_repos ({embedding_service.get_dimension()} dimensions)")
         logger.info(f"   • Query service: ready")
         logger.info(f"   • Orchestrator: ready")
