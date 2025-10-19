@@ -1294,7 +1294,7 @@ async def parse_commit_intent(request: CommitWorkflowRequest):
     
     IMPORTANT: Requires repo_content in context to prevent commits without GitHub data
     """
-    from shared.llm_providers.resilient_orchestrator import get_llm_orchestrator
+    from shared.llm_providers.resilient_orchestrator import get_resilient_orchestrator
     
     logger.info(f"🧠 Parsing commit intent: {request.message[:100]}...")
     
@@ -1309,7 +1309,7 @@ async def parse_commit_intent(request: CommitWorkflowRequest):
         
         logger.info(f"✅ GitHub content validated (length: {len(request.files.get('repo_content', ''))} chars)")
         
-        llm_orchestrator = get_llm_orchestrator()
+        llm_orchestrator = get_resilient_orchestrator()
         router = CommitWorkflowRouter(llm_orchestrator)
         
         intent = await router.parse_user_intent(request.message, request.context)
