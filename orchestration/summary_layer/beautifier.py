@@ -9,6 +9,7 @@ import time
 from typing import List, Dict, Any
 from orchestration.github_llm.models import SourceResult, QueryType
 from shared.llm_providers.factory import LLMFactory
+from orchestration.summary_layer.response_cleaner import response_cleaner
 
 logger = logging.getLogger(__name__)
 
@@ -91,12 +92,21 @@ class ResponseBeautifier:
             logger.info(f"✅ LLM beautification completed ({llm_time:.2f}ms)")
             logger.info(f"   Response length: {len(beautified)} characters")
             logger.info(f"   Response preview: {beautified[:200]}...")
+            
+            # Clean the beautified response
+            clean_start = time.time()
+            logger.info("🧹 Cleaning beautified response...")
+            cleaned, clean_metadata = response_cleaner.clean_with_metadata(beautified)
+            clean_time = (time.time() - clean_start) * 1000
+            logger.info(f"✅ Response cleaned ({clean_time:.2f}ms)")
+            logger.info(f"   {clean_metadata}")
+            
             logger.info("-" * 60)
             logger.info(f"✅ RESPONSE BEAUTIFIER COMPLETE")
-            logger.info(f"⏱️  Total Time: {context_time + prompt_time + llm_time:.2f}ms")
+            logger.info(f"⏱️  Total Time: {context_time + prompt_time + llm_time + clean_time:.2f}ms")
             logger.info("-" * 60)
             
-            return beautified
+            return cleaned
             
         except Exception as e:
             logger.error(f"❌ Beautification failed: {e}", exc_info=True)
@@ -104,6 +114,9 @@ class ResponseBeautifier:
             # Fallback to basic formatting
             fallback = self._fallback_formatting(query, summary, sources)
             logger.info(f"✅ Fallback formatting complete ({len(fallback)} characters)")
+            # Clean the fallback response too
+            fallback = response_cleaner.clean(fallback)
+            logger.info(f"🧹 Fallback cleaned ({len(fallback)} characters)")
             logger.info("-" * 60)
             return fallback
     
