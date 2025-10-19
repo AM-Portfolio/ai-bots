@@ -99,7 +99,7 @@ class ApiClient {
       message,
       repository,
       branch,
-      files,
+      files: files || {},
       context: {}
     });
     return data;

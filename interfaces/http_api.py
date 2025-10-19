@@ -1291,12 +1291,24 @@ async def parse_commit_intent(request: CommitWorkflowRequest):
     """
     Parse user message to detect commit/publish intent
     Returns approval template for user confirmation
+    
+    IMPORTANT: Requires repo_content in context to prevent commits without GitHub data
     """
     from shared.llm_providers.resilient_orchestrator import get_llm_orchestrator
     
     logger.info(f"🧠 Parsing commit intent: {request.message[:100]}...")
     
     try:
+        # Validate that GitHub content was fetched
+        if not request.files or 'repo_content' not in request.files:
+            logger.error("❌ GitHub content not provided - commit workflow requires repository content")
+            raise HTTPException(
+                status_code=400,
+                detail="GitHub content must be fetched before creating commit. Please ensure repository content is loaded first."
+            )
+        
+        logger.info(f"✅ GitHub content validated (length: {len(request.files.get('repo_content', ''))} chars)")
+        
         llm_orchestrator = get_llm_orchestrator()
         router = CommitWorkflowRouter(llm_orchestrator)
         

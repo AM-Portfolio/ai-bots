@@ -7,6 +7,7 @@ import { apiClient } from '../../services/api';
 import type { Provider, ThinkingProcessData } from '../../types/api';
 import { logger } from '../../utils/logger';
 import ThinkingProcess from '../Shared/ThinkingProcess';
+import ApprovalDialog from '../Shared/ApprovalDialog';
 import 'highlight.js/styles/github-dark.css';
 
 interface Message {
@@ -16,6 +17,10 @@ interface Message {
   duration?: number;
   thinking?: ThinkingProcessData;
   isExpanded?: boolean;
+  approvalRequest?: any;
+  workflow?: string;
+  intent?: any;
+  repoContent?: string;
 }
 
 const LLMTestPanel = () => {
@@ -26,6 +31,7 @@ const LLMTestPanel = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showBackendDetails, setShowBackendDetails] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
+  const [isApprovingCommit, setIsApprovingCommit] = useState(false);
   
   // Voice features
   const [isListening, setIsListening] = useState(false);
@@ -195,121 +201,119 @@ const LLMTestPanel = () => {
     return undefined;
   };
 
-  const extractApprovalId = (messages: Message[]): string | null => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const match = messages[i].content.match(/\*\*Approval ID\*\*:\s*`([a-f0-9-]+)`/);
-      if (match) return match[1];
-    }
-    return null;
-  };
+  const handleApprove = async (messageIndex: number) => {
+    const message = messages[messageIndex];
+    if (!message.approvalRequest) return;
 
-  const handleApprovalResponse = async (userMessage: string, approvalId: string) => {
-    const lowerMessage = userMessage.toLowerCase();
-    const isApprove = lowerMessage.includes('approve') || lowerMessage.includes('yes');
-    const isCancel = lowerMessage.includes('cancel') || lowerMessage.includes('no') || lowerMessage.includes('reject');
-
-    if (isApprove) {
-      try {
-        const result = await apiClient.approveCommit(approvalId, true);
+    setIsApprovingCommit(true);
+    try {
+      const result = await apiClient.approveCommit(message.approvalRequest.id, true);
+      
+      if (result.success && result.operation_result) {
+        const opResult = result.operation_result;
+        let responseMessage = `## ✅ Operation Completed Successfully!\n\n`;
         
-        if (result.success && result.operation_result) {
-          const opResult = result.operation_result;
-          let responseMessage = `## ✅ Operation Completed Successfully!\n\n`;
-          
-          if (opResult.commit_url) {
-            responseMessage += `🔗 **Commit**: [View Commit](${opResult.commit_url})\n`;
-          }
-          if (opResult.pr_url) {
-            responseMessage += `🔗 **Pull Request**: [View PR](${opResult.pr_url})\n`;
-          }
-          
-          if (opResult.next_actions && opResult.next_actions.length > 0) {
-            responseMessage += `\n### 🎯 Next Actions:\n`;
-            opResult.next_actions.forEach((action: any, index: number) => {
-              if (action.url) {
-                responseMessage += `${index + 1}. [${action.label}](${action.url})\n`;
-              } else if (action.prompt) {
-                responseMessage += `${index + 1}. ${action.prompt}\n`;
-              }
-            });
-          }
-          
-          const assistantMessage: Message = {
-            role: 'assistant',
-            content: responseMessage,
-            isExpanded: true
-          };
-          setMessages((prev) => [...prev, assistantMessage]);
-        } else {
-          throw new Error(result.operation_result?.error || 'Operation failed');
+        if (opResult.commit_url) {
+          responseMessage += `🔗 **Commit**: [View Commit](${opResult.commit_url})\n`;
         }
-      } catch (error) {
-        const errorMessage: Message = {
-          role: 'assistant',
-          content: `❌ Operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          isExpanded: true
-        };
-        setMessages((prev) => [...prev, errorMessage]);
-      }
-    } else if (isCancel) {
-      try {
-        await apiClient.approveCommit(approvalId, false, undefined, 'User cancelled');
+        if (opResult.pr_url) {
+          responseMessage += `🔗 **Pull Request**: [View PR](${opResult.pr_url})\n`;
+        }
+        
+        if (opResult.next_actions && opResult.next_actions.length > 0) {
+          responseMessage += `\n### 🎯 Next Actions:\n`;
+          opResult.next_actions.forEach((action: any, index: number) => {
+            if (action.url) {
+              responseMessage += `${index + 1}. [${action.label}](${action.url})\n`;
+            } else if (action.prompt) {
+              responseMessage += `${index + 1}. ${action.prompt}\n`;
+            }
+          });
+        }
+        
         const assistantMessage: Message = {
           role: 'assistant',
-          content: '❌ Operation cancelled by user.',
+          content: responseMessage,
           isExpanded: true
         };
         setMessages((prev) => [...prev, assistantMessage]);
-      } catch (error) {
-        const errorMessage: Message = {
-          role: 'assistant',
-          content: `Error cancelling operation: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          isExpanded: true
-        };
-        setMessages((prev) => [...prev, errorMessage]);
+      } else {
+        throw new Error(result.operation_result?.error || 'Operation failed');
       }
+    } catch (error) {
+      const errorMessage: Message = {
+        role: 'assistant',
+        content: `❌ Operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        isExpanded: true
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsApprovingCommit(false);
+    }
+  };
+
+  const handleReject = async (messageIndex: number) => {
+    const message = messages[messageIndex];
+    if (!message.approvalRequest) return;
+
+    setIsApprovingCommit(true);
+    try {
+      await apiClient.approveCommit(message.approvalRequest.id, false, undefined, 'User rejected');
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: '❌ Operation rejected by user.',
+        isExpanded: true
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      const errorMessage: Message = {
+        role: 'assistant',
+        content: `Error rejecting operation: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        isExpanded: true
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsApprovingCommit(false);
     }
   };
 
   const handleCommitWorkflow = async (userMessage: string) => {
     try {
       const repository = extractRepository(userMessage);
-      const result = await apiClient.parseCommitIntent(userMessage, repository);
+      
+      // Step 1: Fetch GitHub content first using orchestrator
+      const fetchMessage: Message = {
+        role: 'assistant',
+        content: '🔍 Fetching repository content...',
+        isExpanded: true
+      };
+      setMessages((prev) => [...prev, fetchMessage]);
+      
+      const repoQuery = repository 
+        ? `Get content from repository ${repository}` 
+        : userMessage;
+      const contentResult = await apiClient.testLLM(repoQuery, provider, false, model);
+      
+      if (!contentResult.success || !contentResult.response) {
+        throw new Error('Failed to fetch repository content');
+      }
+      
+      // Step 2: Parse commit intent with fetched content
+      const result = await apiClient.parseCommitIntent(
+        userMessage, 
+        repository, 
+        undefined, 
+        { repo_content: contentResult.response }
+      );
       
       if (result.success && result.approval_request) {
-        const approvalMessage = `
-## 🔒 Approval Required
-
-**Operation**: ${result.approval_request.title}
-**Description**: ${result.approval_request.description}
-
-**Template Details**:
-\`\`\`json
-${JSON.stringify(result.approval_request.template_data, null, 2)}
-\`\`\`
-
-**Workflow**: \`${result.workflow}\`
-**Platform**: \`${result.intent.platform}\`
-**Action**: \`${result.intent.action}\`
-**Confidence**: ${(result.intent.confidence * 100).toFixed(0)}%
-
-⏰ **Expires**: ${new Date(result.approval_request.expires_at).toLocaleString()}
-
----
-
-To proceed, you need to approve this operation. Would you like to:
-1. ✅ **Approve** and execute
-2. ✏️ **Modify** template and execute
-3. ❌ **Cancel** operation
-
-*Reply with "approve" to proceed, or "cancel" to abort.*
-
-**Approval ID**: \`${result.approval_request.id}\`
-        `;
-        
         const assistantMessage: Message = {
           role: 'assistant',
-          content: approvalMessage,
+          content: '',
+          approvalRequest: result.approval_request,
+          workflow: result.workflow,
+          intent: result.intent,
+          repoContent: contentResult.response,
           isExpanded: true
         };
         setMessages((prev) => [...prev, assistantMessage]);
@@ -337,14 +341,6 @@ To proceed, you need to approve this operation. Would you like to:
 
     await logger.llm.track('LLM query', async () => {
       try {
-        // Check if this is an approval response
-        const approvalId = extractApprovalId(messages);
-        if (approvalId && (currentInput.toLowerCase().includes('approve') || currentInput.toLowerCase().includes('cancel'))) {
-          await handleApprovalResponse(currentInput, approvalId);
-          setIsLoading(false);
-          return;
-        }
-
         // Check if this is a commit/PR intent
         if (detectCommitIntent(currentInput)) {
           await handleCommitWorkflow(currentInput);
@@ -449,22 +445,33 @@ To proceed, you need to approve this operation. Would you like to:
 
                   {/* Response Content */}
                   <div className="px-4 py-4">
-                    <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-strong:text-gray-900 prose-code:text-blue-600 prose-code:bg-blue-50 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-a:text-blue-600">
-                      <ReactMarkdown 
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeHighlight as any]}
-                      >
-                        {message.isExpanded ? message.content : extractOverview(message.content)}
-                      </ReactMarkdown>
-                      {!message.isExpanded && (
-                        <button
-                          onClick={() => toggleMessageExpansion(index)}
-                          className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    {message.approvalRequest ? (
+                      <ApprovalDialog
+                        approvalRequest={message.approvalRequest}
+                        workflow={message.workflow || 'unknown'}
+                        intent={message.intent || {}}
+                        onApprove={() => handleApprove(index)}
+                        onReject={() => handleReject(index)}
+                        isLoading={isApprovingCommit}
+                      />
+                    ) : (
+                      <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-strong:text-gray-900 prose-code:text-blue-600 prose-code:bg-blue-50 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-a:text-blue-600">
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          rehypePlugins={[rehypeHighlight as any]}
                         >
-                          Read full response →
-                        </button>
-                      )}
-                    </div>
+                          {message.isExpanded ? message.content : extractOverview(message.content)}
+                        </ReactMarkdown>
+                        {!message.isExpanded && message.content && (
+                          <button
+                            onClick={() => toggleMessageExpansion(index)}
+                            className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                          >
+                            Read full response →
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Backend Execution Steps / Thinking Process */}
