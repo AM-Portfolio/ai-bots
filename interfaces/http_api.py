@@ -177,15 +177,22 @@ async def health_check():
 
 class LLMTestRequest(BaseModel):
     """Request model for LLM testing with conversation context"""
-    prompt: str
-    provider: str = "together"
-    model: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
-    show_thinking: bool = False
+    prompt: Optional[str] = None
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    show_thinking: Optional[bool] = None
     conversation_history: Optional[List[Dict[str, Any]]] = None
 
 
 @app.post("/api/test/llm")
-async def test_llm(request: LLMTestRequest):
+async def test_llm(
+    # Support both query params (old frontend) and body (new frontend)
+    request: LLMTestRequest = Body(LLMTestRequest()),
+    prompt: Optional[str] = None,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    show_thinking: Optional[bool] = None
+):
     """Test LLM provider - uses GitHub-LLM orchestration for GitHub-related queries with conversation context"""
     from shared.llm import llm_client
     from shared.thinking_process import create_llm_thinking_process
@@ -195,12 +202,15 @@ async def test_llm(request: LLMTestRequest):
     from orchestration.context_manager import ConversationContextManager
     import uuid
     
-    # Extract parameters from request model
-    prompt = request.prompt
-    provider = request.provider
-    model = request.model
-    show_thinking = request.show_thinking
+    # Extract parameters - prefer body, fall back to query params for backwards compatibility
+    prompt = request.prompt or prompt
+    provider = request.provider or provider or "together"
+    model = request.model or model or "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+    show_thinking = request.show_thinking if request.show_thinking is not None else (show_thinking or False)
     conversation_history = request.conversation_history
+    
+    if not prompt:
+        raise HTTPException(status_code=400, detail="Prompt is required")
     
     logger.info(f"🧪 Testing LLM with provider: {provider}, model: {model}, prompt: {prompt[:50]}...")
     
