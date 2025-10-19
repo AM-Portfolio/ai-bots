@@ -115,6 +115,7 @@ class CommitWorkflowRouter:
         context_str = json.dumps(context, indent=2) if context else "{}"
         
         return f"""Analyze this user message and extract the commit/publish intent.
+Generate a meaningful commit message and branch name from the user's intent.
 
 User Message: "{message}"
 
@@ -123,8 +124,14 @@ Context: {context_str}
 Detect:
 1. Platform: github, confluence, or jira
 2. Action: commit, create_pr, commit_and_pr, publish, or create_ticket
-3. Parameters: Extract repository, branch, space_key, project_key, etc.
+3. Parameters: Extract repository, commit_message, branch_name, etc.
 4. Confidence: 0.0 to 1.0
+
+IMPORTANT:
+- ALWAYS generate a meaningful commit_message based on what the user wants to commit
+- ALWAYS generate a branch_name (NEVER use "main" - create a feature/fix/docs branch)
+- Branch names should follow pattern: feature/description or fix/description or docs/description
+- Commit messages should be clear, concise, and descriptive
 
 Return JSON only:
 {{
@@ -133,17 +140,16 @@ Return JSON only:
   "confidence": 0.95,
   "parameters": {{
     "repository": "owner/repo",
-    "branch": "main",
-    "commit_message": "..."
+    "commit_message": "Add authentication service",
+    "branch_name": "feature/add-authentication-service",
+    "branch_prefix": "feature"
   }}
 }}
 
 Examples:
-- "commit this to GitHub" → {{"platform": "github", "action": "commit", "confidence": 0.9}}
-- "commit and create PR" → {{"platform": "github", "action": "commit_and_pr", "confidence": 0.95}}
+- "commit authentication docs to repo ai-bots" → {{"platform": "github", "action": "commit", "parameters": {{"repository": "ai-bots", "commit_message": "Add authentication documentation", "branch_name": "docs/add-authentication-docs", "branch_prefix": "docs"}}, "confidence": 0.95}}
+- "commit and create PR for bug fix" → {{"platform": "github", "action": "commit_and_pr", "parameters": {{"commit_message": "Fix critical bug", "branch_name": "fix/critical-bug", "branch_prefix": "fix"}}, "confidence": 0.95}}
 - "publish to Confluence" → {{"platform": "confluence", "action": "publish", "confidence": 0.9}}
-- "create Jira ticket" → {{"platform": "jira", "action": "create_ticket", "confidence": 0.9}}
-- "commit to repo ai-bots branch feature/api" → {{"platform": "github", "action": "commit", "parameters": {{"repository": "ai-bots", "branch": "feature/api"}}, "confidence": 0.95}}
 
 Return JSON now:"""
     
@@ -233,30 +239,37 @@ Return JSON now:"""
         logger.info(f"🔀 Routing to workflow: {intent.platform.value} / {intent.action.value}")
         
         if intent.platform == TemplatePlatform.GITHUB:
+            from orchestration.commit_workflow.github_operations import generate_branch_name
+            
+            commit_msg = params.get("commit_message", "Update files")
+            branch_prefix = params.get("branch_prefix", "feature")
+            branch_name = params.get("branch_name") or generate_branch_name(commit_msg, branch_prefix)
+            
             if intent.action == WorkflowAction.COMMIT:
                 template = CommitTemplateFactory.create_github_commit_template(
                     repository=params.get("repository"),
-                    branch=params.get("branch", "main"),
+                    branch=branch_name,
                     files=params.get("files", {}),
-                    commit_message=params.get("commit_message", "")
+                    commit_message=commit_msg
                 )
                 workflow = "github_commit"
             
             elif intent.action == WorkflowAction.CREATE_PR:
                 template = CommitTemplateFactory.create_github_pr_template(
                     repository=params.get("repository"),
-                    source_branch=params.get("source_branch", "main"),
+                    source_branch=branch_name,
                     target_branch=params.get("target_branch", "main"),
-                    pr_title=params.get("pr_title", "")
+                    pr_title=params.get("pr_title") or commit_msg
                 )
                 workflow = "github_pr"
             
             elif intent.action == WorkflowAction.COMMIT_AND_PR:
                 template = CommitTemplateFactory.create_github_commit_and_pr_template(
                     repository=params.get("repository"),
-                    branch=params.get("branch", "main"),
+                    branch=branch_name,
                     target_branch=params.get("target_branch", "main"),
-                    commit_message=params.get("commit_message", "")
+                    commit_message=commit_msg,
+                    pr_title=params.get("pr_title") or commit_msg
                 )
                 workflow = "github_commit_and_pr"
             

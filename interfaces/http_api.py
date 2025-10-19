@@ -1433,6 +1433,8 @@ async def execute_commit_operation(operation_type: str, template_data: Dict[str,
         )
         
         if result["success"]:
+            pr_url = f"https://github.com/{template_data['repository']}/compare/{result.get('base_branch', 'main')}...{result['branch']}?expand=1"
+            
             return {
                 **result,
                 "next_actions": [
@@ -1442,9 +1444,17 @@ async def execute_commit_operation(operation_type: str, template_data: Dict[str,
                         "url": result["commit_url"]
                     },
                     {
+                        "action": "view_branch",
+                        "label": "View Branch",
+                        "url": result.get("branch_url", result["commit_url"])
+                    },
+                    {
                         "action": "create_pr",
                         "label": "Create Pull Request",
-                        "prompt": "Would you like to create a pull request for this commit?"
+                        "url": pr_url,
+                        "repository": template_data["repository"],
+                        "source_branch": result["branch"],
+                        "target_branch": result.get("base_branch", "main")
                     }
                 ]
             }

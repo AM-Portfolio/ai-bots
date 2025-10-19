@@ -5,10 +5,37 @@ Uses centralized GitHub wrapper for authentication
 """
 
 import logging
+import re
+from datetime import datetime
 from typing import Dict, Any, Optional, List
 from github import Github, GithubException
 
 logger = logging.getLogger(__name__)
+
+
+def generate_branch_name(commit_message: str, prefix: str = "feature") -> str:
+    """
+    Generate meaningful branch name from commit message
+    
+    Args:
+        commit_message: Commit message to extract branch name from
+        prefix: Branch prefix (feature, fix, docs, etc.)
+    
+    Returns:
+        Sanitized branch name
+    
+    Example:
+        "Add authentication service" -> "feature/add-authentication-service"
+        "Fix login bug" -> "fix/login-bug"
+    """
+    clean_message = commit_message.lower()
+    clean_message = re.sub(r'[^a-z0-9\s-]', '', clean_message)
+    clean_message = re.sub(r'\s+', '-', clean_message.strip())
+    clean_message = clean_message[:50]
+    
+    timestamp = datetime.now().strftime("%Y%m%d")
+    
+    return f"{prefix}/{clean_message}-{timestamp}"
 
 
 class GitHubOperations:
@@ -31,23 +58,59 @@ class GitHubOperations:
         else:
             logger.info("✅ GitHub operations initialized with centralized client")
     
+    def _create_branch(
+        self,
+        repo,
+        branch_name: str,
+        base_branch: str = "main"
+    ) -> bool:
+        """
+        Create a new branch from base branch
+        
+        Args:
+            repo: PyGithub repository object
+            branch_name: Name for new branch
+            base_branch: Base branch to branch from (default: main)
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            base_ref = repo.get_branch(base_branch)
+            repo.create_git_ref(
+                ref=f"refs/heads/{branch_name}",
+                sha=base_ref.commit.sha
+            )
+            logger.info(f"✅ Created branch: {branch_name} from {base_branch}")
+            return True
+        except GithubException as e:
+            if e.status == 422:
+                logger.info(f"ℹ️ Branch {branch_name} already exists")
+                return True
+            logger.error(f"Failed to create branch: {e}")
+            return False
+    
     async def commit_files(
         self,
         repository: str,
         branch: str,
         files: Dict[str, str],
         commit_message: str,
-        commit_description: Optional[str] = None
+        commit_description: Optional[str] = None,
+        create_branch: bool = True,
+        base_branch: str = "main"
     ) -> Dict[str, Any]:
         """
         Commit files to GitHub repository
         
         Args:
             repository: Repository name (owner/repo)
-            branch: Branch name
+            branch: Branch name (will be created if create_branch=True)
             files: Dictionary of {file_path: content}
             commit_message: Commit message
             commit_description: Optional extended description
+            create_branch: Whether to create the branch first (default: True)
+            base_branch: Base branch to create from (default: main)
         
         Returns:
             Result dictionary with success status and commit info
@@ -59,6 +122,10 @@ class GitHubOperations:
         
         try:
             repo = self.client.get_repo(repository)
+            
+            if create_branch and branch != base_branch:
+                if not self._create_branch(repo, branch, base_branch):
+                    return {"success": False, "error": f"Failed to create branch {branch}"}
             
             full_message = commit_message
             if commit_description:
@@ -90,16 +157,20 @@ class GitHubOperations:
             
             latest_commit = repo.get_branch(branch).commit
             commit_url = latest_commit.html_url
+            branch_url = f"https://github.com/{repository}/tree/{branch}"
             
             logger.info(f"✅ Commit successful: {commit_url}")
+            logger.info(f"📌 Branch URL: {branch_url}")
             
             return {
                 "success": True,
                 "commit_sha": latest_commit.sha,
                 "commit_url": commit_url,
+                "branch_url": branch_url,
                 "files_committed": list(files.keys()),
                 "repository": repository,
-                "branch": branch
+                "branch": branch,
+                "base_branch": base_branch
             }
             
         except Exception as e:

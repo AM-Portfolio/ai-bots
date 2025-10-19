@@ -1,4 +1,4 @@
-import { CheckCircle, XCircle, FileText, AlertCircle } from 'lucide-react';
+import { CheckCircle, XCircle, GitBranch, FileCode } from 'lucide-react';
 
 interface ApprovalDialogProps {
   approvalRequest: {
@@ -27,94 +27,96 @@ const ApprovalDialog = ({
   onReject,
   isLoading = false,
 }: ApprovalDialogProps) => {
+  const { template_data } = approvalRequest;
+  
   return (
-    <div className="bg-white rounded-xl shadow-lg border-2 border-blue-200 overflow-hidden">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-4">
-        <div className="flex items-center gap-3">
-          <AlertCircle className="w-6 h-6" />
-          <div>
-            <h3 className="text-lg font-bold">Approval Required</h3>
-            <p className="text-sm text-blue-100">{approvalRequest.title}</p>
+    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-300 p-4 shadow-md">
+      <div className="flex items-start justify-between gap-4 mb-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <GitBranch className="w-4 h-4 text-blue-600" />
+            <h4 className="font-bold text-gray-900">{approvalRequest.title}</h4>
           </div>
+          <p className="text-sm text-gray-600">{approvalRequest.description}</p>
+        </div>
+        
+        <div className="flex gap-2">
+          <button
+            onClick={onReject}
+            disabled={isLoading}
+            className="px-3 py-1.5 bg-white border border-red-300 text-red-600 text-sm font-medium rounded hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+          >
+            <XCircle className="w-4 h-4" />
+            Reject
+          </button>
+          <button
+            onClick={onApprove}
+            disabled={isLoading}
+            className="px-4 py-1.5 bg-gradient-to-r from-green-500 to-green-600 text-white text-sm font-semibold rounded hover:from-green-600 hover:to-green-700 transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
+          >
+            <CheckCircle className="w-4 h-4" />
+            {isLoading ? 'Executing...' : 'Approve & Execute'}
+          </button>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="p-6 space-y-4">
-        {/* Description */}
-        <div>
-          <label className="text-sm font-semibold text-gray-700 block mb-1">Description</label>
-          <p className="text-gray-600">{approvalRequest.description}</p>
-        </div>
-
-        {/* Metadata */}
-        <div className="grid grid-cols-2 gap-4">
+      <div className="bg-white rounded border border-blue-200 p-3 space-y-2">
+        <div className="grid grid-cols-3 gap-2 text-xs">
           <div>
-            <label className="text-sm font-semibold text-gray-700 block mb-1">Platform</label>
-            <span className="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-medium">
-              {intent.platform}
-            </span>
+            <span className="text-gray-500">Platform:</span>
+            <span className="ml-1 font-medium text-blue-700">{intent.platform}</span>
           </div>
           <div>
-            <label className="text-sm font-semibold text-gray-700 block mb-1">Action</label>
-            <span className="inline-flex items-center px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm font-medium">
-              {intent.action}
-            </span>
+            <span className="text-gray-500">Action:</span>
+            <span className="ml-1 font-medium text-green-700">{intent.action}</span>
           </div>
           <div>
-            <label className="text-sm font-semibold text-gray-700 block mb-1">Workflow</label>
-            <span className="inline-flex items-center px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-sm font-medium">
-              {workflow}
-            </span>
-          </div>
-          <div>
-            <label className="text-sm font-semibold text-gray-700 block mb-1">Confidence</label>
-            <span className="inline-flex items-center px-3 py-1 bg-yellow-50 text-yellow-700 rounded-full text-sm font-medium">
-              {(intent.confidence * 100).toFixed(0)}%
-            </span>
+            <span className="text-gray-500">Confidence:</span>
+            <span className="ml-1 font-medium text-purple-700">{(intent.confidence * 100).toFixed(0)}%</span>
           </div>
         </div>
 
-        {/* Template Data */}
-        <div>
-          <label className="text-sm font-semibold text-gray-700 block mb-2 flex items-center gap-2">
-            <FileText className="w-4 h-4" />
-            Template Details
-          </label>
-          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-            <pre className="text-xs text-gray-700 overflow-x-auto">
-              {JSON.stringify(approvalRequest.template_data, null, 2)}
-            </pre>
+        {template_data && (
+          <div className="border-t border-gray-200 pt-2">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <FileCode className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-xs font-semibold text-gray-700">Operation Details</span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+              {template_data.repository && (
+                <div>
+                  <span className="text-gray-500">Repository:</span>
+                  <span className="ml-1 font-mono text-gray-900">{template_data.repository}</span>
+                </div>
+              )}
+              {template_data.branch && (
+                <div>
+                  <span className="text-gray-500">Branch:</span>
+                  <span className="ml-1 font-mono text-indigo-700">{template_data.branch}</span>
+                </div>
+              )}
+              {template_data.commit_message && (
+                <div className="col-span-2">
+                  <span className="text-gray-500">Commit:</span>
+                  <span className="ml-1 text-gray-900">{template_data.commit_message}</span>
+                </div>
+              )}
+              {template_data.files && Object.keys(template_data.files).length > 0 && (
+                <div className="col-span-2">
+                  <span className="text-gray-500">Files:</span>
+                  <span className="ml-1 text-gray-900">
+                    {Object.keys(template_data.files).slice(0, 3).join(', ')}
+                    {Object.keys(template_data.files).length > 3 && ` +${Object.keys(template_data.files).length - 3} more`}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-
-        {/* Expiration Notice */}
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-          <p className="text-sm text-amber-800">
-            ⏰ <strong>Expires:</strong> {new Date(approvalRequest.expires_at).toLocaleString()}
-          </p>
-        </div>
+        )}
       </div>
 
-      {/* Action Buttons */}
-      <div className="bg-gray-50 px-6 py-4 flex gap-3 justify-end border-t border-gray-200">
-        <button
-          onClick={onReject}
-          disabled={isLoading}
-          className="px-6 py-2.5 bg-white border-2 border-red-300 text-red-700 font-semibold rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          <XCircle className="w-5 h-5" />
-          Reject
-        </button>
-        <button
-          onClick={onApprove}
-          disabled={isLoading}
-          className="px-6 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold rounded-lg hover:from-green-600 hover:to-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
-        >
-          <CheckCircle className="w-5 h-5" />
-          {isLoading ? 'Processing...' : 'Approve & Execute'}
-        </button>
+      <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+        ⏰ Expires: {new Date(approvalRequest.expires_at).toLocaleTimeString()}
       </div>
     </div>
   );

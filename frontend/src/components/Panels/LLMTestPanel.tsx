@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Mic, MicOff, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { Send, Loader2, Mic, MicOff, ChevronDown, ChevronUp, Sparkles, ExternalLink, GitBranch, GitPullRequest } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -21,6 +21,14 @@ interface Message {
   workflow?: string;
   intent?: any;
   repoContent?: string;
+  nextActions?: Array<{
+    action: string;
+    label: string;
+    url?: string;
+    repository?: string;
+    source_branch?: string;
+    target_branch?: string;
+  }>;
 }
 
 const LLMTestPanel = () => {
@@ -213,28 +221,21 @@ const LLMTestPanel = () => {
         const opResult = result.operation_result;
         let responseMessage = `## ✅ Operation Completed Successfully!\n\n`;
         
-        if (opResult.commit_url) {
-          responseMessage += `🔗 **Commit**: [View Commit](${opResult.commit_url})\n`;
+        if (opResult.repository) {
+          responseMessage += `**Repository**: \`${opResult.repository}\`\n`;
         }
-        if (opResult.pr_url) {
-          responseMessage += `🔗 **Pull Request**: [View PR](${opResult.pr_url})\n`;
+        if (opResult.branch) {
+          responseMessage += `**Branch**: \`${opResult.branch}\`\n`;
         }
-        
-        if (opResult.next_actions && opResult.next_actions.length > 0) {
-          responseMessage += `\n### 🎯 Next Actions:\n`;
-          opResult.next_actions.forEach((action: any, index: number) => {
-            if (action.url) {
-              responseMessage += `${index + 1}. [${action.label}](${action.url})\n`;
-            } else if (action.prompt) {
-              responseMessage += `${index + 1}. ${action.prompt}\n`;
-            }
-          });
+        if (opResult.commit_sha) {
+          responseMessage += `**Commit**: \`${opResult.commit_sha.substring(0, 7)}\`\n`;
         }
         
         const assistantMessage: Message = {
           role: 'assistant',
           content: responseMessage,
-          isExpanded: true
+          isExpanded: true,
+          nextActions: opResult.next_actions || []
         };
         setMessages((prev) => [...prev, assistantMessage]);
       } else {
@@ -469,6 +470,30 @@ const LLMTestPanel = () => {
                           >
                             Read full response →
                           </button>
+                        )}
+                        
+                        {/* Next Actions Buttons */}
+                        {message.nextActions && message.nextActions.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <p className="text-sm font-semibold text-gray-700 mb-2">🎯 Next Actions:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {message.nextActions.map((action, idx) => {
+                                const Icon = action.action === 'view_commit' ? ExternalLink : action.action === 'view_branch' ? GitBranch : GitPullRequest;
+                                return (
+                                  <a
+                                    key={idx}
+                                    href={action.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-medium rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-sm hover:shadow-md"
+                                  >
+                                    <Icon className="w-4 h-4" />
+                                    {action.label}
+                                  </a>
+                                );
+                              })}
+                            </div>
+                          </div>
                         )}
                       </div>
                     )}
