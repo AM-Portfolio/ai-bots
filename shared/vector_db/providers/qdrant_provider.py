@@ -251,6 +251,36 @@ class QdrantProvider(VectorDBProvider):
             logger.error(f"❌ Failed to delete documents from '{collection}': {e}")
             return False
     
+    async def clear_collection(self, collection: str) -> bool:
+        """Clear all documents from a collection"""
+        try:
+            if not self.client:
+                logger.error("❌ Qdrant client not initialized")
+                return False
+            
+            # Get collection stats first to see how many documents will be deleted
+            stats = await self.get_collection_stats(collection)
+            doc_count = stats.get('count', 0)
+            
+            if doc_count == 0:
+                logger.info(f"📭 Collection '{collection}' is already empty")
+                return True
+            
+            logger.info(f"🧹 Clearing {doc_count} documents from collection '{collection}'...")
+            
+            # Delete all points by not providing any filter (deletes all)
+            self.client.delete(
+                collection_name=collection,
+                points_selector=Filter(must=[])  # Empty filter matches all
+            )
+            
+            logger.info(f"✅ Successfully cleared all {doc_count} documents from '{collection}'")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to clear collection '{collection}': {e}")
+            return False
+    
     async def get_collection_stats(self, collection: str) -> Dict[str, Any]:
         """Get collection statistics from Qdrant"""
         try:
