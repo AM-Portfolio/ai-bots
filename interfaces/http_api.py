@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, Depends
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, Depends, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
@@ -181,7 +181,7 @@ async def test_llm(
     provider: str = "together", 
     model: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo", 
     show_thinking: bool = False,
-    conversation_history: Optional[List[Dict[str, Any]]] = None
+    conversation_history: Optional[List[Dict[str, Any]]] = Body(None)
 ):
     """Test LLM provider - uses GitHub-LLM orchestration for GitHub-related queries with conversation context"""
     from shared.llm import llm_client
