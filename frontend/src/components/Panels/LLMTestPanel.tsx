@@ -207,7 +207,15 @@ const LLMTestPanel = () => {
       const startTime = performance.now();
       logger.llm.info(`Calling ${provider} provider with model ${model}`);
       
-      const result = await apiClient.testLLM(messageText, provider, showBackendDetails, model);
+      // Build conversation history from previous messages (excluding the current user message)
+      const conversationHistory = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+      
+      logger.chat.debug(`Sending ${conversationHistory.length} previous messages as context`);
+      
+      const result = await apiClient.testLLM(messageText, provider, showBackendDetails, model, conversationHistory);
       const duration = (performance.now() - startTime) / 1000;
       
       logger.llm.success(`Response received from ${provider}`, { 

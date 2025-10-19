@@ -176,16 +176,38 @@ async def health_check():
 
 
 @app.post("/api/test/llm")
-async def test_llm(prompt: str, provider: str = "together", model: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo", show_thinking: bool = False):
-    """Test LLM provider - uses GitHub-LLM orchestration for GitHub-related queries"""
+async def test_llm(
+    prompt: str, 
+    provider: str = "together", 
+    model: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo", 
+    show_thinking: bool = False,
+    conversation_history: Optional[List[Dict[str, Any]]] = None
+):
+    """Test LLM provider - uses GitHub-LLM orchestration for GitHub-related queries with conversation context"""
     from shared.llm import llm_client
     from shared.thinking_process import create_llm_thinking_process
     from shared.utils.github_query_detector import is_github_query, get_github_context
     from interfaces.vector_db_api import github_llm_orchestrator
     from orchestration.github_llm.models import QueryRequest, QueryType
+    from orchestration.context_manager import ConversationContextManager
     import uuid
     
     logger.info(f"🧪 Testing LLM with provider: {provider}, model: {model}, prompt: {prompt[:50]}...")
+    
+    # STEP 0: Apply conversation context if history provided
+    original_prompt = prompt
+    conversation_context = None
+    
+    if conversation_history and len(conversation_history) > 0:
+        logger.info(f"🧠 Applying conversation context from {len(conversation_history)} previous messages")
+        context_manager = ConversationContextManager()
+        prompt, conversation_context = context_manager.augment_query_with_context(
+            query=prompt,
+            conversation_history=conversation_history
+        )
+        
+        if prompt != original_prompt:
+            logger.info(f"✨ Query augmented: '{original_prompt}' → '{prompt}'")
     
     # STEP 1: Detect if this is a GitHub-related query
     is_github = is_github_query(prompt)
