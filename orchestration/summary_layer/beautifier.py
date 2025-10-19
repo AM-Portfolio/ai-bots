@@ -139,9 +139,9 @@ class ResponseBeautifier:
         context: str,
         query_type: QueryType
     ) -> str:
-        """Create prompt for LLM beautification"""
-        prompt = f"""You are a technical documentation expert. Your task is to create a clear, 
-well-structured response to a developer's question.
+        """Create prompt for LLM beautification with rich formatting"""
+        prompt = f"""You are a technical documentation expert. Your task is to create a visually stunning, 
+modern response with rich formatting, icons, and clear structure.
 
 User Query: {query}
 Query Type: {query_type.value}
@@ -152,15 +152,65 @@ Raw Summary:
 Source Context:
 {context}
 
-Instructions:
-1. Create a clear, professional response that directly answers the user's query
-2. Use proper formatting (markdown headings, code blocks, lists)
-3. Reference specific files and locations when relevant
-4. Highlight key insights and important details
-5. Keep the response concise but comprehensive
-6. Use technical language appropriate for developers
+CRITICAL FORMATTING REQUIREMENTS:
+Create a beautifully formatted markdown response using these elements:
 
-Please provide a well-formatted, beautiful response:"""
+1. **START WITH AN ICON-RICH HEADER**:
+   - Use emojis/icons (🎯 📊 🔍 💡 ⚡ 🚀 ✨ 📁 🔧 ⚠️ ✅ ❌ 📝 🎨)
+   - Example: "## 🎯 API Implementations Found"
+
+2. **USE COLORED CALLOUTS FOR KEY INFO**:
+   - ✅ Success/Found items with checkmarks
+   - ⚠️ Warnings or important notes
+   - 💡 Key insights or tips
+   - 📊 Statistics or metrics
+   - 🔍 Search results
+   - ❌ Missing items or errors
+
+3. **STRUCTURED SECTIONS WITH ICONS**:
+   - ### 📋 Overview
+   - ### 🔑 Key Findings
+   - ### 📂 File Locations
+   - ### 💻 Code Examples
+   - ### 📊 Summary
+   - ### 🎯 Next Steps
+
+4. **HIGHLIGHT IMPORTANT DETAILS**:
+   - Use **bold** for important terms
+   - Use `inline code` for file names, functions, variables
+   - Use ```language blocks for code snippets
+   - Use > blockquotes for important notes
+   - Use bullet points with icons: 🔸 🔹 ▪️ • 
+
+5. **FILE REFERENCES**:
+   Format as: 📁 `path/to/file.ext` (line X-Y)
+
+6. **METRICS AND STATS**:
+   Format as:
+   📊 **Statistics**:
+   - ✅ Found: X items
+   - 🎯 Relevance: XX%
+   - ⏱️ Response time: Xms
+
+7. **CODE BLOCKS**:
+   Always use proper language tags:
+   ```python
+   def example():
+       pass
+   ```
+
+8. **CLEAR VISUAL HIERARCHY**:
+   - Use headers (##, ###) with icons
+   - Add horizontal separators (---) between major sections
+   - Group related items with consistent formatting
+
+9. **END WITH ACTIONABLE SUMMARY**:
+   ### 🎯 Summary
+   Brief, icon-enhanced bullet points
+
+REMEMBER: Make it visually engaging, modern, and easy to scan. Use icons liberally but tastefully.
+
+Now create your beautifully formatted response:"""
         
         return prompt
     
@@ -170,29 +220,68 @@ Please provide a well-formatted, beautiful response:"""
         summary: str,
         sources: List[SourceResult]
     ) -> str:
-        """Fallback formatting when LLM is unavailable"""
-        formatted = f"""# Query: {query}
+        """Fallback formatting when LLM is unavailable - uses rich formatting"""
+        
+        # Build header
+        formatted = f"""## 🔍 Search Results
 
-## Summary
+### 📋 Query
+> {query}
+
+---
+
+### 📊 Summary
 {summary}
 
-## Details
 """
         
-        for idx, source in enumerate(sources[:3], 1):
-            repo = source.metadata.get('repo', 'Unknown')
-            file_path = source.metadata.get('file_path', 'Unknown')
-            
-            formatted += f"""
-### Result {idx}
-- **Repository**: {repo}
-- **File**: {file_path}
-- **Relevance**: {source.relevance_score:.2f}
-- **Source**: {source.source_type}
+        # Add results if available
+        if sources:
+            formatted += f"""---
 
+### 🎯 Found {len(sources[:3])} Result{'s' if len(sources[:3]) != 1 else ''}
+
+"""
+            
+            for idx, source in enumerate(sources[:3], 1):
+                repo = source.metadata.get('repo', 'Unknown')
+                file_path = source.metadata.get('file_path', 'Unknown')
+                relevance_pct = source.relevance_score * 100
+                
+                # Icon based on relevance
+                relevance_icon = "🟢" if relevance_pct >= 80 else "🟡" if relevance_pct >= 60 else "🟠"
+                
+                formatted += f"""
+#### {relevance_icon} Result {idx} - {relevance_pct:.0f}% Match
+
+📁 **File**: `{file_path}`  
+🏢 **Repository**: {repo}  
+📊 **Relevance**: {source.relevance_score:.2f}  
+🔗 **Source**: {source.source_type}
+
+**Preview:**
 ```
 {source.content[:300]}...
 ```
+
+---
+"""
+        else:
+            formatted += """---
+
+### ⚠️ No Results Found
+
+The search didn't return any matching results. Try:
+- 🔸 Broadening your search terms
+- 🔸 Checking repository names
+- 🔸 Using different keywords
+
+"""
+        
+        # Add footer
+        formatted += """
+### 💡 Tip
+For better results, make sure the repository is indexed in the Vector DB.
 """
         
         return formatted
