@@ -67,7 +67,11 @@ class ConversationContextExtractor:
         """
         logger.info(f"🔍 Extracting context from {len(conversation_history)} messages")
         
-        context = ConversationContext(conversation_depth=len(conversation_history))
+        context = ConversationContext(
+            conversation_depth=len(conversation_history),
+            current_repository=None,
+            last_query_type=None
+        )
         
         # Process each message in chronological order
         for msg in conversation_history:
