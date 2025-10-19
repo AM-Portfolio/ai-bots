@@ -94,6 +94,21 @@ class GitHubWrapper:
             logger.error("No GitHub provider configured")
             return None
     
+    async def get_repository_tree(
+        self,
+        repo_name: str,
+        branch: str = "main",
+        recursive: bool = True
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Get repository file tree"""
+        if self._env_client:
+            return self._env_client.get_repository_tree(repo_name, branch, recursive)
+        elif self._replit_client and hasattr(self._replit_client, 'get_repository_tree'):
+            return await self._replit_client.get_repository_tree(repo_name, branch, recursive)
+        else:
+            logger.error("No GitHub provider configured")
+            return None
+    
     async def get_file_content(
         self,
         repo_name: str,

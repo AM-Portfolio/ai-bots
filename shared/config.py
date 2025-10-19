@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     
     database_url: str = "sqlite:///./ai_dev_agent.db"
     
+    # Vector DB: Defaults to Qdrant with automatic fallback to in-memory
+    vector_db_provider: str = "qdrant"
+    qdrant_host: str = "localhost"
+    qdrant_port: int = 6333
+    vector_db_fallback_enabled: bool = True
+    
     microsoft_app_id: Optional[str] = None
     microsoft_app_password: Optional[str] = None
     

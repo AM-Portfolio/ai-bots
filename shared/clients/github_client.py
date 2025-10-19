@@ -88,6 +88,44 @@ class GitHubClient:
             logger.error(f"Failed to create PR in {repo_name}: {e}")
             return None
     
+    def get_repository_tree(
+        self,
+        repo_name: str,
+        branch: str = "main",
+        recursive: bool = True
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Get repository file tree"""
+        if not self.client:
+            return None
+        
+        try:
+            repo = self.client.get_repo(repo_name)
+            
+            # Get the branch reference
+            branch_ref = repo.get_branch(branch)
+            commit_sha = branch_ref.commit.sha
+            
+            # Get the tree recursively
+            tree = repo.get_git_tree(commit_sha, recursive=recursive)
+            
+            # Convert to list of dicts
+            result = []
+            for item in tree.tree:
+                result.append({
+                    'path': item.path,
+                    'type': item.type,  # 'blob' for files, 'tree' for directories
+                    'sha': item.sha,
+                    'size': item.size,
+                    'url': item.url
+                })
+            
+            logger.info(f"📂 Retrieved {len(result)} items from {repo_name}/{branch}")
+            return result
+            
+        except GithubException as e:
+            logger.error(f"Failed to get repository tree for {repo_name}: {e}")
+            return None
+    
     def get_file_content(
         self,
         repo_name: str,

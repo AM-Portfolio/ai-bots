@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from sqlalchemy import create_engine
 
 from interfaces.http_api import app
+from interfaces.vector_db_api import initialize_vector_db
 from observability.metrics import metrics
 from db.models import Base
 from shared.config import settings
@@ -32,6 +33,11 @@ def init_database():
 async def lifespan(app):
     logger.info("Starting AI Dev Agent...")
     init_database()
+    
+    # Initialize Vector DB system
+    logger.info("Initializing Vector DB...")
+    await initialize_vector_db()
+    
     port = settings.port
     logger.info(f"AI Dev Agent ready on {settings.app_host}:{port}")
     yield

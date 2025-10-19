@@ -570,6 +570,57 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
       errorMessage: 'Failed to connect to API'
     },
     capabilities: ['Custom Endpoints', 'Data Fetching', 'Webhooks']
+  },
+  {
+    id: 'vector_db',
+    name: 'Vector Database',
+    type: 'vector_db',
+    category: 'databases',
+    description: 'Semantic search and repository knowledge base with vector embeddings',
+    icon: 'Brain',
+    authType: 'connection_string',
+    isConfigured: true,
+    isActive: true,
+    status: 'connected',
+    configFields: [
+      {
+        name: 'provider',
+        label: 'Vector DB Provider',
+        type: 'select',
+        required: true,
+        defaultValue: 'in-memory',
+        options: [
+          { value: 'in-memory', label: 'In-Memory (Dev/Test)' },
+          { value: 'chromadb', label: 'ChromaDB (Production)' }
+        ],
+        description: 'Choose vector database provider'
+      },
+      {
+        name: 'collection_name',
+        label: 'Collection Name',
+        type: 'text',
+        required: false,
+        defaultValue: 'github_repos',
+        placeholder: 'github_repos',
+        description: 'Name of the vector collection'
+      },
+      {
+        name: 'embedding_dimension',
+        label: 'Embedding Dimension',
+        type: 'number',
+        required: false,
+        defaultValue: 768,
+        placeholder: '768',
+        description: 'Vector embedding dimension size'
+      }
+    ],
+    testAction: {
+      endpoint: '/api/vector-db/status',
+      method: 'GET',
+      successMessage: 'Vector DB connection successful!',
+      errorMessage: 'Failed to connect to Vector DB'
+    },
+    capabilities: ['Semantic Search', 'Repository Indexing', 'Code Similarity', 'Knowledge Retrieval']
   }
 ];
 

@@ -2,6 +2,12 @@
   "name": "ai-dev-agent-full-stack",
   "version": "1.0.0",
   "description": "AI Development Agent - Full Stack Application",
+  "license": "ISC",
+  "dependencies": {
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1"
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd . && python main.py",
