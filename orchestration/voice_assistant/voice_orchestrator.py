@@ -16,7 +16,7 @@ from typing import Dict, Optional, Tuple
 from pydantic import BaseModel
 
 from shared.config import settings
-from shared.llm_providers.resilient_orchestrator import Resilient_LLMOrchestrator
+from shared.llm_providers.resilient_orchestrator import ResilientLLMOrchestrator
 from orchestration.summary_layer.beautifier import ResponseBeautifier
 from .session_manager import SessionManager
 from .intent_classifier import IntentClassifier
@@ -67,10 +67,7 @@ class VoiceOrchestrator:
         self.llm = ResilientLLMOrchestrator()
         
         # Initialize beautifier for response cleanup
-        self.beautifier = ResponseBeautifier(
-            llm_orchestrator=self.llm,
-            provider=settings.llm_provider
-        )
+        self.beautifier = ResponseBeautifier(llm_provider=settings.llm_provider)
         
         # Initialize intent classifier
         self.intent_classifier = IntentClassifier(self.llm)
@@ -209,16 +206,9 @@ class VoiceOrchestrator:
         if not settings.azure_speech_key:
             raise ValueError("Azure Speech key not configured")
         
-        try:
-            import azure.cognitiveservices.speech as speechsdk
-            
-            # TODO: Implement Azure Speech SDK transcription
-            logger.warning("Azure Speech transcription not yet implemented")
-            return "[Azure Speech STT not yet implemented]"
-            
-        except ImportError:
-            logger.error("❌ Azure Speech SDK not installed")
-            return "[Azure Speech SDK not installed]"
+        # TODO: Implement Azure Speech SDK transcription when needed
+        logger.warning("Azure Speech transcription not yet implemented")
+        return "[Azure Speech STT not yet implemented]"
     
     async def _route_to_orchestration(self, transcript: str, intent, session_id: str) -> Tuple[str, Optional[Dict]]:
         """Route to appropriate orchestration based on intent"""
@@ -260,30 +250,41 @@ class VoiceOrchestrator:
         """Handle general queries"""
         conversation_history = self.session_manager.get_conversation_history(session_id)
         
-        # Build prompt with context
-        prompt = self._build_general_prompt(transcript, conversation_history)
+        # Build messages with context
+        messages = self._build_general_messages(transcript, conversation_history)
         
-        # Generate response
-        result = await self.llm.generate(
-            prompt=prompt,
-            max_tokens=300,
-            temperature=0.7,
-            step_name="general_conversation"
+        # Generate response using resilient LLM
+        response, metadata = await self.llm.chat_completion_with_fallback(
+            messages=messages,
+            temperature=0.7
         )
         
-        return result.get("content", "I'm not sure how to respond to that.")
+        return response
     
-    def _build_general_prompt(self, user_input: str, history: list) -> str:
-        """Build prompt for general conversation"""
-        prompt = "You are a helpful AI development assistant. Respond naturally and conversationally.\n\n"
+    def _build_general_messages(self, user_input: str, history: list) -> list:
+        """Build messages for general conversation"""
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a helpful AI development assistant. Respond naturally and conversationally. Keep responses concise for voice interaction."
+            }
+        ]
         
+        # Add recent conversation history
         if history:
-            prompt += "Conversation history:\n"
             for turn in history[-5:]:
-                prompt += f"{turn['role']}: {turn['content']}\n"
+                messages.append({
+                    "role": turn['role'],
+                    "content": turn['content']
+                })
         
-        prompt += f"\nUser: {user_input}\nAssistant:"
-        return prompt
+        # Add current user input
+        messages.append({
+            "role": "user",
+            "content": user_input
+        })
+        
+        return messages
     
     async def _synthesize_speech(self, text: str) -> Optional[str]:
         """Synthesize speech from text using configured TTS provider"""
@@ -315,7 +316,7 @@ class VoiceOrchestrator:
             # Generate speech
             response = self._tts_client.audio.speech.create(
                 model=settings.openai_tts_model,
-                voice=settings.openai_tts_voice,
+                voice=settings.openai_tts_voice,  # type: ignore
                 input=text
             )
             
@@ -337,13 +338,6 @@ class VoiceOrchestrator:
         if not settings.azure_speech_key:
             raise ValueError("Azure Speech key not configured")
         
-        try:
-            import azure.cognitiveservices.speech as speechsdk
-            
-            # TODO: Implement Azure TTS
-            logger.warning("Azure TTS not yet implemented")
-            return None
-            
-        except ImportError:
-            logger.error("❌ Azure Speech SDK not installed")
-            return None
+        # TODO: Implement Azure TTS when needed
+        logger.warning("Azure TTS not yet implemented")
+        return None

@@ -29,7 +29,7 @@ The project employs a clean architecture with a modular design for scalability a
 -   **Styling:** Tailwind CSS 3 with a modern vertical component architecture and compact, space-efficient layouts.
 -   **UI/UX:** ChatGPT-like interface for LLM interaction with compact inline settings (model selection, show thinking, voice controls integrated with input area), collapsible responses with overview mode, professional panels for integrations, and consistent gradient backgrounds.
 -   **Chat History:** Full conversation management with SQLite/PostgreSQL storage, sidebar navigation, and auto-save.
--   **Voice Features:** Browser-native Web Speech API for speech-to-text and text-to-speech, with inline voice controls and visual feedback.
+-   **Voice Assistant:** Advanced cloud-based voice assistant with OpenAI Whisper STT, intelligent intent classification, and OpenAI TTS. Features MediaRecorder-based audio capture, automatic pause detection (1.5s), session-based conversation context, and smart routing to commit workflow, GitHub-LLM, or general assistant based on user intent. Supports continuous conversation mode with automatic restart after each interaction.
 -   **Navigation:** Streamlined 4-tab interface: Voice Assistant, LLM Testing, Integrations Hub, and Doc Orchestrator.
 -   **LLM Testing Panel:** Compact design with inline controls (model selection, show thinking toggle, voice toggle), collapsible AI responses (overview/detail toggle), ReactMarkdown with syntax highlighting, and backend execution steps panel (visible when "Show Thinking" is enabled).
 -   **Integrations Hub:** Unified, extensible system for managing integrations with a modern UI, live status bar, real-time updates, connection history, category-based organization, service cards, and a feature-rich configuration modal supporting various authentication types.
@@ -54,11 +54,12 @@ The project employs a clean architecture with a modular design for scalability a
 -   **Response Cleaner:** Automated text cleaning module that ensures proper markdown formatting, spacing, alignment, and line breaks in all LLM responses. Normalizes line breaks, fixes header/list/code block spacing, removes excessive whitespace, and optimizes paragraph structure.
 -   **Automatic Query Detection:** Word-boundary pattern matching for GitHub-related queries in LLM Testing UI. Detects high-confidence keywords (git, repo, pr), medium-confidence code terms (api, function, class, method), and automatically routes to GitHub-LLM orchestrator without false positives.
 -   **Intelligent Commit Workflow:** Advanced LangGraph-based system for intelligent GitHub commits, PRs, and documentation publishing. Features: (1) Natural language intent parsing (understands "commit and PR", "publish to Confluence", etc.), (2) Pre-commit templates for GitHub/Confluence/Jira, (3) UI approval system for write operations with 30-minute expiration, (4) Post-commit actions with clickable links and PR creation prompts, (5) PyGithub integration for reliable GitHub operations, (6) Template customization before commit, (7) Smart detection of platform and action from user messages. API endpoints: POST /api/commit/parse-intent, POST /api/commit/approve, GET /api/commit/pending-approvals.
+-   **Voice Assistant Orchestration:** Complete voice interaction system with session management, OpenAI Whisper transcription, LLM-powered intent classification (routes to commit workflow, GitHub query, or general assistant), voice-optimized response formatting (summarized and conversational), and OpenAI TTS for natural speech synthesis. Backend API endpoints: POST /api/voice/session, POST /api/voice/process, GET /api/voice/session/{id}/history. Maintains conversation context across turns with configurable pause detection and response length limits.
 -   **Documentation Orchestrator:** Automated workflow for creating branches, committing documentation to GitHub, publishing to Confluence, and creating Jira tickets, with clickable links to all generated artifacts.
 -   **Observability:** Prometheus metrics, OpenTelemetry tracing, and comprehensive structured logging including request correlation IDs, LLM interaction logging, timing information, and enhanced flow tracking across Vector DB, GitHub-LLM, and Summary/Beautify layers.
 
 ## External Dependencies
--   **AI Providers:** Together AI, Azure OpenAI
+-   **AI Providers:** Together AI, Azure OpenAI, OpenAI (for Whisper STT and TTS)
 -   **Version Control:** GitHub
 -   **Issue Tracking:** Jira
 -   **Documentation:** Confluence
@@ -66,7 +67,7 @@ The project employs a clean architecture with a modular design for scalability a
 -   **Communication:** Microsoft Teams
 -   **Database:** SQLAlchemy (for SQLite and PostgreSQL)
 -   **Frontend Libraries:** React, Vite, Tailwind CSS, Lucide React, Axios
--   **Browser APIs:** Web Speech Recognition API, Web Speech Synthesis API
+-   **Browser APIs:** MediaRecorder API, Web Speech Synthesis API (fallback)
 
 ## Documentation
 -   **Vector DB Usage Guide:** Comprehensive documentation for Vector Database and GitHub-LLM integration available in `VECTOR_DB_USAGE.md`. Includes quick start, API reference, use cases, troubleshooting, and best practices for indexing repositories and performing semantic code search.
