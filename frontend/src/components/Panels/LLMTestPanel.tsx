@@ -356,7 +356,7 @@ const LLMTestPanel = () => {
                   {message.role === 'assistant' ? (
                     <ReactMarkdown 
                       remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeHighlight]}
+                      rehypePlugins={[rehypeHighlight as any]}
                     >
                       {message.content}
                     </ReactMarkdown>
