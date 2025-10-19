@@ -176,17 +176,184 @@ const LLMTestPanel = () => {
     ));
   };
 
+  const detectCommitIntent = (message: string): boolean => {
+    const lowerMessage = message.toLowerCase();
+    const commitKeywords = ['commit', 'push', 'create pr', 'pull request', 'merge', 'branch'];
+    return commitKeywords.some(keyword => lowerMessage.includes(keyword));
+  };
+
+  const extractRepository = (message: string): string | undefined => {
+    const repoPatterns = [
+      /repo(?:sitory)?\s+([a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+)/i,
+      /in\s+([a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+)/i,
+      /to\s+([a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+)/i,
+    ];
+    for (const pattern of repoPatterns) {
+      const match = message.match(pattern);
+      if (match) return match[1];
+    }
+    return undefined;
+  };
+
+  const extractApprovalId = (messages: Message[]): string | null => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const match = messages[i].content.match(/\*\*Approval ID\*\*:\s*`([a-f0-9-]+)`/);
+      if (match) return match[1];
+    }
+    return null;
+  };
+
+  const handleApprovalResponse = async (userMessage: string, approvalId: string) => {
+    const lowerMessage = userMessage.toLowerCase();
+    const isApprove = lowerMessage.includes('approve') || lowerMessage.includes('yes');
+    const isCancel = lowerMessage.includes('cancel') || lowerMessage.includes('no') || lowerMessage.includes('reject');
+
+    if (isApprove) {
+      try {
+        const result = await apiClient.approveCommit(approvalId, true);
+        
+        if (result.success && result.operation_result) {
+          const opResult = result.operation_result;
+          let responseMessage = `## ✅ Operation Completed Successfully!\n\n`;
+          
+          if (opResult.commit_url) {
+            responseMessage += `🔗 **Commit**: [View Commit](${opResult.commit_url})\n`;
+          }
+          if (opResult.pr_url) {
+            responseMessage += `🔗 **Pull Request**: [View PR](${opResult.pr_url})\n`;
+          }
+          
+          if (opResult.next_actions && opResult.next_actions.length > 0) {
+            responseMessage += `\n### 🎯 Next Actions:\n`;
+            opResult.next_actions.forEach((action: any, index: number) => {
+              if (action.url) {
+                responseMessage += `${index + 1}. [${action.label}](${action.url})\n`;
+              } else if (action.prompt) {
+                responseMessage += `${index + 1}. ${action.prompt}\n`;
+              }
+            });
+          }
+          
+          const assistantMessage: Message = {
+            role: 'assistant',
+            content: responseMessage,
+            isExpanded: true
+          };
+          setMessages((prev) => [...prev, assistantMessage]);
+        } else {
+          throw new Error(result.operation_result?.error || 'Operation failed');
+        }
+      } catch (error) {
+        const errorMessage: Message = {
+          role: 'assistant',
+          content: `❌ Operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          isExpanded: true
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+      }
+    } else if (isCancel) {
+      try {
+        await apiClient.approveCommit(approvalId, false, undefined, 'User cancelled');
+        const assistantMessage: Message = {
+          role: 'assistant',
+          content: '❌ Operation cancelled by user.',
+          isExpanded: true
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      } catch (error) {
+        const errorMessage: Message = {
+          role: 'assistant',
+          content: `Error cancelling operation: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          isExpanded: true
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+      }
+    }
+  };
+
+  const handleCommitWorkflow = async (userMessage: string) => {
+    try {
+      const repository = extractRepository(userMessage);
+      const result = await apiClient.parseCommitIntent(userMessage, repository);
+      
+      if (result.success && result.approval_request) {
+        const approvalMessage = `
+## 🔒 Approval Required
+
+**Operation**: ${result.approval_request.title}
+**Description**: ${result.approval_request.description}
+
+**Template Details**:
+\`\`\`json
+${JSON.stringify(result.approval_request.template_data, null, 2)}
+\`\`\`
+
+**Workflow**: \`${result.workflow}\`
+**Platform**: \`${result.intent.platform}\`
+**Action**: \`${result.intent.action}\`
+**Confidence**: ${(result.intent.confidence * 100).toFixed(0)}%
+
+⏰ **Expires**: ${new Date(result.approval_request.expires_at).toLocaleString()}
+
+---
+
+To proceed, you need to approve this operation. Would you like to:
+1. ✅ **Approve** and execute
+2. ✏️ **Modify** template and execute
+3. ❌ **Cancel** operation
+
+*Reply with "approve" to proceed, or "cancel" to abort.*
+
+**Approval ID**: \`${result.approval_request.id}\`
+        `;
+        
+        const assistantMessage: Message = {
+          role: 'assistant',
+          content: approvalMessage,
+          isExpanded: true
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      } else {
+        throw new Error('Failed to parse commit intent');
+      }
+    } catch (error) {
+      const errorMessage: Message = {
+        role: 'assistant',
+        content: `Error processing commit request: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        isExpanded: true
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = { role: 'user', content: input.trim(), isExpanded: true };
     setMessages((prev) => [...prev, userMessage]);
+    const currentInput = input.trim();
     setInput('');
     setIsLoading(true);
 
     await logger.llm.track('LLM query', async () => {
       try {
-        const result = await apiClient.testLLM(input.trim(), provider, showBackendDetails, model);
+        // Check if this is an approval response
+        const approvalId = extractApprovalId(messages);
+        if (approvalId && (currentInput.toLowerCase().includes('approve') || currentInput.toLowerCase().includes('cancel'))) {
+          await handleApprovalResponse(currentInput, approvalId);
+          setIsLoading(false);
+          return;
+        }
+
+        // Check if this is a commit/PR intent
+        if (detectCommitIntent(currentInput)) {
+          await handleCommitWorkflow(currentInput);
+          setIsLoading(false);
+          return;
+        }
+
+        // Regular LLM query
+        const result = await apiClient.testLLM(currentInput, provider, showBackendDetails, model);
         
         if (result.success && result.response) {
           const assistantMessage: Message = {

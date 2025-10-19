@@ -93,6 +93,32 @@ class ApiClient {
     );
     return data;
   }
+
+  async parseCommitIntent(message: string, repository?: string, branch?: string, files?: Record<string, string>): Promise<any> {
+    const { data } = await this.client.post('/api/commit/parse-intent', {
+      message,
+      repository,
+      branch,
+      files,
+      context: {}
+    });
+    return data;
+  }
+
+  async approveCommit(approvalId: string, approved: boolean, updatedTemplate?: any, rejectionReason?: string): Promise<any> {
+    const { data } = await this.client.post('/api/commit/approve', {
+      approval_id: approvalId,
+      approved,
+      updated_template: updatedTemplate,
+      rejection_reason: rejectionReason
+    });
+    return data;
+  }
+
+  async getPendingApprovals(): Promise<any> {
+    const { data } = await this.client.get('/api/commit/pending-approvals');
+    return data;
+  }
 }
 
 export const apiClient = new ApiClient();
