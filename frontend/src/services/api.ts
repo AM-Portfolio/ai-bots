@@ -47,8 +47,14 @@ class ApiClient {
     conversationHistory?: Array<{ role: string; content: string }>
   ): Promise<LLMTestResponse> {
     const { data} = await this.client.post<LLMTestResponse>(
-      `/api/test/llm?prompt=${encodeURIComponent(prompt)}&provider=${provider}&show_thinking=${showThinking}&model=${encodeURIComponent(model)}`,
-      conversationHistory ? { conversation_history: conversationHistory } : undefined
+      `/api/test/llm`,
+      {
+        prompt,
+        provider,
+        show_thinking: showThinking,
+        model,
+        conversation_history: conversationHistory || null
+      }
     );
     return data;
   }

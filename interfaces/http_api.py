@@ -175,14 +175,17 @@ async def health_check():
     return {"status": "healthy"}
 
 
+class LLMTestRequest(BaseModel):
+    """Request model for LLM testing with conversation context"""
+    prompt: str
+    provider: str = "together"
+    model: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+    show_thinking: bool = False
+    conversation_history: Optional[List[Dict[str, Any]]] = None
+
+
 @app.post("/api/test/llm")
-async def test_llm(
-    prompt: str, 
-    provider: str = "together", 
-    model: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo", 
-    show_thinking: bool = False,
-    conversation_history: Optional[List[Dict[str, Any]]] = Body(None)
-):
+async def test_llm(request: LLMTestRequest):
     """Test LLM provider - uses GitHub-LLM orchestration for GitHub-related queries with conversation context"""
     from shared.llm import llm_client
     from shared.thinking_process import create_llm_thinking_process
@@ -191,6 +194,13 @@ async def test_llm(
     from orchestration.github_llm.models import QueryRequest, QueryType
     from orchestration.context_manager import ConversationContextManager
     import uuid
+    
+    # Extract parameters from request model
+    prompt = request.prompt
+    provider = request.provider
+    model = request.model
+    show_thinking = request.show_thinking
+    conversation_history = request.conversation_history
     
     logger.info(f"🧪 Testing LLM with provider: {provider}, model: {model}, prompt: {prompt[:50]}...")
     
