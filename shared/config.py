@@ -55,6 +55,24 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     environment: str = "development"
     
+    # Voice Assistant Settings
+    voice_stt_provider: str = "openai"  # openai, azure, google
+    voice_tts_provider: str = "openai"  # openai, azure, google
+    voice_pause_detection_ms: int = 1500
+    voice_max_recording_seconds: int = 60
+    voice_response_max_length: int = 500
+    
+    # OpenAI (for Whisper STT and TTS)
+    openai_api_key: Optional[str] = None
+    openai_whisper_model: str = "whisper-1"
+    openai_tts_model: str = "tts-1"
+    openai_tts_voice: str = "nova"
+    
+    # Azure Speech Services
+    azure_speech_key: Optional[str] = None
+    azure_speech_region: str = "eastus"
+    azure_speech_lang: str = "en-US"
+    
     @property
     def port(self) -> int:
         import os
