@@ -6,6 +6,7 @@ import rehypeHighlight from 'rehype-highlight';
 import { apiClient } from '../../services/api';
 import type { Provider, ThinkingProcessData } from '../../types/api';
 import { logger } from '../../utils/logger';
+import ThinkingProcess from '../Shared/ThinkingProcess';
 import 'highlight.js/styles/github-dark.css';
 
 interface Message {
@@ -298,6 +299,16 @@ const LLMTestPanel = () => {
                       )}
                     </div>
                   </div>
+
+                  {/* Backend Execution Steps / Thinking Process */}
+                  {message.thinking && showBackendDetails && (
+                    <div className="px-4 pb-4">
+                      <ThinkingProcess 
+                        data={message.thinking} 
+                        title="Backend Execution Steps"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>

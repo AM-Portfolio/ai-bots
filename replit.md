@@ -30,7 +30,7 @@ The project employs a clean architecture with a modular design for scalability a
 -   **Chat History:** Full conversation management with SQLite/PostgreSQL storage, sidebar navigation, and auto-save.
 -   **Voice Features:** Browser-native Web Speech API for speech-to-text and text-to-speech, with inline voice controls and visual feedback.
 -   **Navigation:** Streamlined 4-tab interface: Voice Assistant, LLM Testing, Integrations Hub, and Doc Orchestrator.
--   **LLM Testing Panel:** Compact design with inline controls, collapsible AI responses (overview/detail toggle), ReactMarkdown with syntax highlighting, and space-efficient layout removing unnecessary panels.
+-   **LLM Testing Panel:** Compact design with inline controls (model selection, show thinking toggle, voice toggle), collapsible AI responses (overview/detail toggle), ReactMarkdown with syntax highlighting, and backend execution steps panel (visible when "Show Thinking" is enabled).
 -   **Integrations Hub:** Unified, extensible system for managing integrations with a modern UI, live status bar, real-time updates, connection history, category-based organization, service cards, and a feature-rich configuration modal supporting various authentication types.
 -   **Doc Orchestrator UI:** User-friendly interface for selective publishing to GitHub, Confluence, and Jira.
 -   **API Client:** Axios-based HTTP client with strong TypeScript typing.
