@@ -1,264 +1,76 @@
-# AI Development Agent - Replit Project
+# AI Development Agent
 
-## Project Overview
-
-This is an intelligent, autonomous development agent built in Python that:
-- Analyzes bugs from multiple sources (GitHub, Jira, Grafana)
-- Uses Azure OpenAI to diagnose issues and generate fixes
-- Automatically creates pull requests with tests
-- Publishes documentation to Confluence
-- Provides REST API, webhooks, and Teams bot interfaces
-
-## Technology Stack
-
-- **Framework:** FastAPI
-- **Database:** SQLAlchemy (SQLite default, PostgreSQL supported)
-- **AI:** Together AI (default), Azure OpenAI (alternative) - Factory pattern
-- **Integrations:** GitHub, Jira, Confluence, Grafana, Microsoft Teams
-- **Monitoring:** Prometheus metrics, OpenTelemetry tracing
-- **Language:** Python 3.11
-
-## Architecture
-
-The project follows a clean architecture with:
-
-1. **Interfaces Layer** (`interfaces/`): API, webhooks, bot handlers
-2. **Features Layer** (`features/`): Independent business capabilities
-   - Context resolution
-   - Issue analysis
-   - Code generation
-   - Test orchestration
-   - Documentation publishing
-   - Data injection
-3. **Shared Layer** (`shared/`): Common utilities and clients
-4. **Data Layer** (`db/`): Database models and repositories
-5. **Observability** (`observability/`): Metrics and tracing
-
-## Key Features Implemented
-
-### ✅ Multi-Source Integration
-- GitHub API client with issue/PR management
-- Jira API client for ticket management
-- Confluence client for documentation
-- Grafana client for metrics/alerts
-
-### ✅ AI-Powered Analysis
-- Multi-provider LLM support (Together AI default, Azure OpenAI alternative)
-- Factory pattern for easy provider switching
-- Automated bug diagnosis
-- Fix generation with explanations
-- Test code generation
-- Automatic fallback between providers
-
-### ✅ Automated Workflows
-- Context enrichment from multiple sources
-- Root cause analysis
-- Code fix generation
-- Pull request creation
-- Documentation publishing
-
-### ✅ Observability
-- Prometheus metrics export
-- OpenTelemetry tracing support
-- Structured logging
-
-### ✅ Database
-- SQLAlchemy ORM with Issue, Analysis, Fix models
-- Repository pattern for data access
-- Automatic schema creation
-
-## Running the Project
-
-The application is already configured to run automatically in Replit on port 5000.
-
-**Manual start:**
-```bash
-python main.py
-```
-
-**Access the API:**
-- Local: http://0.0.0.0:5000
-- Replit: Use the provided webview URL
-
-## Configuration Required
-
-Before full functionality, configure these services in `.env`:
-
-### Required for Core Features (LLM - Choose One):
-
-**Option 1: Together AI (Recommended - Default)**
-- `TOGETHER_API_KEY` - For AI analysis
-- `TOGETHER_MODEL` - Model selection (optional, defaults to Llama-3.3-70B)
-
-**Option 2: Azure OpenAI (Alternative)**
-- `AZURE_OPENAI_ENDPOINT` - For AI analysis
-- `AZURE_OPENAI_API_KEY` - For AI analysis
-
-**Both (For Automatic Fallback)**
-- Configure both providers for maximum reliability
-
-### Optional Integrations:
-- `GITHUB_TOKEN` - For GitHub integration
-- `JIRA_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` - For Jira
-- `CONFLUENCE_URL`, `CONFLUENCE_EMAIL`, `CONFLUENCE_API_TOKEN` - For docs
-- `GRAFANA_URL`, `GRAFANA_API_KEY` - For metrics
-- `MICROSOFT_APP_ID`, `MICROSOFT_APP_PASSWORD` - For Teams bot
-
-See `.env.example` and `CONFIGURATION.md` for detailed setup.
-
-## Project Structure
-
-```
-ai_dev_agent/
-├── shared/              # Core utilities
-│   ├── config.py        # Settings management
-│   ├── models.py        # Pydantic models
-│   ├── secrets.py       # Azure Key Vault
-│   ├── llm.py          # OpenAI client
-│   └── clients/        # External API clients
-├── features/           # Business logic
-│   ├── context_resolver/
-│   ├── issue_analyzer/
-│   ├── code_generator/
-│   ├── test_orchestrator/
-│   ├── doc_publisher/
-│   └── data_injector/
-├── interfaces/         # External interfaces
-│   ├── http_api.py    # FastAPI app
-│   └── teams_bot.py   # Teams bot
-├── db/                # Database
-│   ├── models.py      # ORM models
-│   └── repo.py        # Repositories
-├── observability/     # Monitoring
-│   ├── metrics.py     # Prometheus
-│   └── tracing.py     # OpenTelemetry
-└── main.py           # Entry point
-```
-
-## API Endpoints
-
-- `GET /` - Service info
-- `GET /health` - Health check
-- `POST /api/analyze` - Analyze issue
-- `POST /api/webhook/{source}` - Receive webhooks
-- `GET /metrics` - Prometheus metrics
-
-See `API_ENDPOINTS.md` for complete documentation.
-
-## Development Notes
-
-### Database
-- Default: SQLite (`ai_dev_agent.db`)
-- Schema auto-created on startup
-- For production: Use PostgreSQL via `DATABASE_URL`
-
-### Hot Reload
-- Enabled in development mode
-- Changes auto-reload the server
-
-### Logging
-- Level: Configurable via `LOG_LEVEL` env var
-- Default: INFO
-- Format: Timestamp, logger name, level, message
-
-## Recent Changes
-
-**2025-10-17 (Latest):**
-- ✅ Created comprehensive Streamlit testing UI in `ui/` package
-- ✅ Added 8 test endpoints for individual feature testing
-- ✅ Implemented dual workflow setup: API (port 5000) + UI (port 8501)
-- ✅ Built UI-API integration layer with automatic URL detection
-- ✅ Added comprehensive UI Testing Guide documentation
-- ✅ All features now testable through intuitive web interface
-
-**2025-10-17 (Earlier):**
-- ✅ Integrated Together AI as default LLM provider
-- ✅ Implemented factory pattern for multi-provider support
-- ✅ Added automatic fallback (Together AI → Azure OpenAI)
-- ✅ Updated all documentation for new provider architecture
-- ✅ Created comprehensive LLM Provider Guide
-
-**2025-10-16:**
-- Complete project implementation
-- All features operational
-- Documentation created
-- Server running successfully
-
-## Known Limitations
-
-1. **No Authentication:** API endpoints are open (implement for production)
-2. **No Rate Limiting:** Should be added for production use
-3. **Webhook Signatures:** Not validated (security concern)
-4. **Error Handling:** Basic implementation, needs enhancement
-5. **Testing:** No unit tests yet (should be added)
-
-## Next Steps
-
-1. Add authentication/authorization
-2. Implement webhook signature validation
-3. Add rate limiting
-4. Write unit tests
-5. Add integration tests
-6. Enhance error handling
-7. Add caching layer (Redis)
-8. Implement async task queue
-9. Add more sophisticated AI prompts
-10. Build admin dashboard
+## Overview
+This project is an intelligent, autonomous development agent designed to automate and streamline the software development lifecycle. It analyzes bugs, diagnoses issues, generates fixes, and manages documentation across platforms by integrating with services like GitHub, Jira, Grafana, and Confluence. Leveraging AI for analysis, code generation, and documentation, the agent provides an end-to-end solution for automated bug resolution and documentation publishing through REST API, webhooks, a Microsoft Teams bot, and a React-based frontend with voice interaction. The project aims to significantly enhance developer productivity and system reliability.
 
 ## User Preferences
+- **Configuration Method**: ENV variables preferred over Replit connectors
+- **LLM Provider**: Together AI as primary provider with automatic fallback to Azure OpenAI
+- **Vector Database**: Qdrant (persistent) preferred over in-memory for production use
+- **UI Design**: Compact, space-efficient layouts with inline controls
 
-None specified yet - will be updated as preferences are communicated.
+## System Architecture
+The project employs a clean architecture with a modular design for scalability and maintainability.
 
-## Useful Commands
+### Backend Architecture
+-   **Framework:** FastAPI (Python 3.11).
+-   **Core Layers:** Orchestration (parser, enricher, prompt builder, agent workflow), Enhanced GitHub Extractor, Interfaces (API, webhooks, bot), Features (business logic), Shared utilities, Data management, and Observability (Prometheus, OpenTelemetry).
+-   **Database:** SQLAlchemy ORM supporting SQLite (default) and PostgreSQL with a repository pattern.
+-   **AI Integration:** Factory pattern for pluggable LLM providers (Together AI, Azure OpenAI) with automatic fallback.
+-   **Vector Database:** Qdrant (persistent, production-ready) with automatic fallback to in-memory when Docker is unavailable. Defaults to Qdrant with seamless degradation for environments without Docker support.
+-   **Service Architecture:** Modular, LLM-powered service layer with `BaseService`, `ServiceManager`, and `ServiceLLMWrapper` for intelligent interactions across integrations like GitHub, Confluence, and MongoDB.
+-   **Integration Wrappers:** Unified wrapper pattern for all external services (GitHub, Jira, Confluence) that uses ENV config by default and automatically falls back to Replit connectors. Makes integrations easily removable and switchable without changing business logic.
+-   **Orchestration Layer:** Modular pipeline for message processing including `Message Parser` (with intelligent GitHub repository detection), `Context Enricher` (with caching), `Prompt Builder` (with templates), and a `LangGraph Agent` for task execution. Provides a unified facade for the pipeline and extensive structured logging.
+-   **Intelligent Repository Matching:** Advanced fuzzy matching system that automatically resolves partial repository names to full paths. Supports compound word matching (e.g., "marketdata", "market data", "market-data" all match "am-market-data"), auto-loads repositories from GitHub organizations, and provides high-confidence matches using normalized similarity scoring.
+-   **Logging:** Comprehensive structured logging with correlation IDs, method tracking, timing metrics, cache hit rates, and task execution status.
 
-**Start server:**
-```bash
-python main.py
-```
+### Frontend Architecture
+-   **Framework:** React 18 with TypeScript, built using Vite 5.
+-   **Styling:** Tailwind CSS 3 with a modern vertical component architecture and compact, space-efficient layouts.
+-   **UI/UX:** ChatGPT-like interface for LLM interaction with compact inline settings (model selection, show thinking, voice controls integrated with input area), collapsible responses with overview mode, professional panels for integrations, and consistent gradient backgrounds.
+-   **Chat History:** Full conversation management with SQLite/PostgreSQL storage, sidebar navigation, and auto-save.
+-   **Voice Features:** Browser-native Web Speech API for speech-to-text and text-to-speech, with inline voice controls and visual feedback.
+-   **Navigation:** Streamlined 4-tab interface: Voice Assistant, LLM Testing, Integrations Hub, and Doc Orchestrator.
+-   **LLM Testing Panel:** Compact design with inline controls (model selection, show thinking toggle, voice toggle), collapsible AI responses (overview/detail toggle), ReactMarkdown with syntax highlighting, and backend execution steps panel (visible when "Show Thinking" is enabled).
+-   **Integrations Hub:** Unified, extensible system for managing integrations with a modern UI, live status bar, real-time updates, connection history, category-based organization, service cards, and a feature-rich configuration modal supporting various authentication types.
+-   **Doc Orchestrator UI:** User-friendly interface for selective publishing to GitHub, Confluence, and Jira.
+-   **API Client:** Axios-based HTTP client with strong TypeScript typing.
+-   **Activity Logger:** Reactive logging system using Zustand for tracking user actions, API calls, and system events with a floating LogViewer component featuring filtering, expandable details, and performance tracking across all major flows (Chat, Voice, Integrations, LLM, API, Orchestrator, UI).
 
-**Start testing UI:**
-```bash
-cd ui && streamlit run app.py --server.port 8501 --server.address 0.0.0.0
-```
+### Deployment
+-   Configured for Autoscale deployment on Replit, with the FastAPI backend serving both API endpoints and the pre-built React frontend.
 
-**Test health:**
-```bash
-curl http://localhost:5000/health
-```
+### Key Features
+-   **Multi-Source Integration:** Connectors for GitHub, Jira, Confluence, and Grafana.
+-   **AI-Powered Analysis:** Automated bug diagnosis, fix generation, test code generation, and documentation generation using LLMs.
+-   **Resilient LLM Orchestration:** Automatic fallback across multiple LLM providers (Together AI → Azure OpenAI → OpenAI) with circuit breaker pattern, retry logic, and health tracking. If one provider fails, the system automatically tries alternative providers to ensure users always get a response.
+-   **Resilient Vector DB:** Automatic fallback from Qdrant to in-memory when Docker is unavailable. Configured to attempt Qdrant connection first (for persistent storage), then gracefully degrade to in-memory mode in constrained environments like Replit.
+-   **Automated Workflows:** End-to-end processes for context enrichment, root cause analysis, code fix generation, pull request creation, and command-driven documentation orchestration.
+-   **Real-time Backend Activity Streaming:** Live visualization of orchestration pipeline execution via Server-Sent Events (SSE) with a `StreamingOrchestrationWrapper` and a `BackendActivityStream` React component.
+-   **Thinking Process Visualization:** Shared backend component for tracking workflow steps, displayed via a reusable frontend `ThinkingProcess` component.
+-   **GitHub Context Detection:** Advanced repository reference parser with fuzzy matching. Automatically detects repository mentions in natural language (e.g., "repo marketdata"), normalizes variants (one word, hyphenated, spaced), and resolves to full repository paths using intelligent compound word matching with 85% confidence scoring.
+-   **Vector Database & Semantic Search:** Qdrant vector database (persistent, production-ready) with automatic fallback to in-memory mode. Supports 768-dimensional embeddings for GitHub repository code and documentation. Provides semantic search, code search, file explanation, and repository summarization with automatic indexing and intelligent query routing. When Docker is available, data persists across restarts; otherwise operates in-memory with seamless degradation.
+-   **GitHub-LLM Orchestrator:** Specialized orchestration pipeline for GitHub-related queries with automatic detection, vector search integration, LLM-powered response generation, beautified and cleaned output. Provides 6-step workflow (planning, querying, synthesis, summary, beautification, cleaning) with comprehensive timing breakdowns and confidence scoring.
+-   **Response Cleaner:** Automated text cleaning module that ensures proper markdown formatting, spacing, alignment, and line breaks in all LLM responses. Normalizes line breaks, fixes header/list/code block spacing, removes excessive whitespace, and optimizes paragraph structure.
+-   **Automatic Query Detection:** Word-boundary pattern matching for GitHub-related queries in LLM Testing UI. Detects high-confidence keywords (git, repo, pr), medium-confidence code terms (api, function, class, method), and automatically routes to GitHub-LLM orchestrator without false positives.
+-   **Intelligent Commit Workflow:** Advanced LangGraph-based system for intelligent GitHub commits, PRs, and documentation publishing. Features: (1) Natural language intent parsing (understands "commit and PR", "publish to Confluence", etc.), (2) Pre-commit templates for GitHub/Confluence/Jira, (3) UI approval system for write operations with 30-minute expiration, (4) Post-commit actions with clickable links and PR creation prompts, (5) PyGithub integration for reliable GitHub operations, (6) Template customization before commit, (7) Smart detection of platform and action from user messages. API endpoints: POST /api/commit/parse-intent, POST /api/commit/approve, GET /api/commit/pending-approvals.
+-   **Documentation Orchestrator:** Automated workflow for creating branches, committing documentation to GitHub, publishing to Confluence, and creating Jira tickets, with clickable links to all generated artifacts.
+-   **Observability:** Prometheus metrics, OpenTelemetry tracing, and comprehensive structured logging including request correlation IDs, LLM interaction logging, timing information, and enhanced flow tracking across Vector DB, GitHub-LLM, and Summary/Beautify layers.
 
-**View metrics:**
-```bash
-curl http://localhost:5000/metrics
-```
+## External Dependencies
+-   **AI Providers:** Together AI, Azure OpenAI
+-   **Version Control:** GitHub
+-   **Issue Tracking:** Jira
+-   **Documentation:** Confluence
+-   **Monitoring:** Grafana, Prometheus, OpenTelemetry
+-   **Communication:** Microsoft Teams
+-   **Database:** SQLAlchemy (for SQLite and PostgreSQL)
+-   **Frontend Libraries:** React, Vite, Tailwind CSS, Lucide React, Axios
+-   **Browser APIs:** Web Speech Recognition API, Web Speech Synthesis API
 
-**Test analysis:**
-```bash
-curl -X POST http://localhost:5000/api/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"issue_id": "123", "source": "github", "repository": "owner/repo"}'
-```
+## Documentation
+-   **Vector DB Usage Guide:** Comprehensive documentation for Vector Database and GitHub-LLM integration available in `VECTOR_DB_USAGE.md`. Includes quick start, API reference, use cases, troubleshooting, and best practices for indexing repositories and performing semantic code search.
+-   **Qdrant Repository Indexing Guide:** Complete guide for setting up Qdrant with Docker Compose and re-indexing GitHub repositories available in `QDRANT_REPOSITORY_INDEXING.md`. Covers installation, configuration, repository indexing via REST API/UI/Python, re-indexing strategies, data persistence, backup/restore, troubleshooting, and best practices.
 
-**Test individual features:**
-```bash
-# Test LLM
-curl -X POST "http://localhost:5000/api/test/llm?prompt=Hello&provider=together"
-
-# Test GitHub
-curl -X POST "http://localhost:5000/api/test/github?repository=owner/repo"
-```
-
-## Support Documentation
-
-- `README.md` - Project overview and quick start
-- `ACCESS_GUIDE.md` - **How to access API and UI (START HERE!)**
-- `CONFIGURATION.md` - Complete setup guide for all integrations
-- `API_ENDPOINTS.md` - Detailed API documentation
-- `UI_TESTING_GUIDE.md` - Comprehensive UI testing guide
-- `LLM_PROVIDER_GUIDE.md` - LLM provider setup and usage
-- `.env.example` - Environment variables template
-
-## Project Status
-
-**Status:** ✅ Operational
-
-The AI Development Agent is fully implemented and running. All core features are functional, though external integrations require proper API credentials to work fully.
+## Known Issues & Limitations
+-   **Repository Name Matching:** Query filters require full `owner/repo` format. Partial repository names (e.g., "ai-bots") will not match stored documents (e.g., "AM-Portfolio/ai-bots").

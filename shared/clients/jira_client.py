@@ -77,8 +77,9 @@ class JiraClient:
         project_key: str,
         summary: str,
         description: str,
-        issue_type: str = "Task"
-    ) -> Optional[str]:
+        issue_type: str = "Task",
+        labels: Optional[List[str]] = None
+    ) -> Optional[Dict[str, Any]]:
         if not self.client:
             return None
         
@@ -90,12 +91,71 @@ class JiraClient:
                 'issuetype': {'name': issue_type}
             }
             
+            if labels:
+                issue_dict['labels'] = labels
+            
             new_issue = self.client.create_issue(fields=issue_dict)
             logger.info(f"Created Jira issue {new_issue.key}")
-            return new_issue.key
+            
+            return {
+                "key": new_issue.key,
+                "url": f"{settings.jira_url}/browse/{new_issue.key}",
+                "summary": summary,
+                "issue_type": issue_type
+            }
         except JIRAError as e:
             logger.error(f"Failed to create Jira issue: {e}")
             return None
+    
+    def create_documentation_ticket(
+        self,
+        project_key: str,
+        repository: str,
+        doc_type: str,
+        github_commit_url: Optional[str] = None,
+        confluence_url: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Create a Jira ticket for AI-generated documentation"""
+        if not self.client:
+            logger.warning("Jira client not configured")
+            return None
+        
+        summary = f"[AI-Generated] {doc_type.title()} Documentation for {repository}"
+        
+        description_parts = [
+            f"AI-generated {doc_type} documentation has been created for repository: *{repository}*",
+            "",
+            "h3. Documentation Links:"
+        ]
+        
+        if github_commit_url:
+            description_parts.append(f"* GitHub Commit: {github_commit_url}")
+        
+        if confluence_url:
+            description_parts.append(f"* Confluence Page: {confluence_url}")
+        
+        if not github_commit_url and not confluence_url:
+            description_parts.append("* _No links available_")
+        
+        description_parts.extend([
+            "",
+            "h3. Next Steps:",
+            "* Review the generated documentation for accuracy",
+            "* Add any missing context or details",
+            "* Share with the team for feedback",
+            "",
+            "_This ticket was automatically created by the AI Development Agent._"
+        ])
+        
+        description = "\n".join(description_parts)
+        
+        return self.create_issue(
+            project_key=project_key,
+            summary=summary,
+            description=description,
+            issue_type="Task",
+            labels=["ai-generated", "documentation", "auto-created"]
+        )
     
     def add_comment(self, issue_key: str, comment: str) -> bool:
         if not self.client:

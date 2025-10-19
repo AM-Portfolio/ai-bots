@@ -4,6 +4,8 @@ from .code_generator import generate_code_fix
 from .test_orchestrator import orchestrate_tests
 from .doc_publisher import publish_documentation
 from .data_injector import inject_data
+from .doc_generator import generate_documentation
+from .doc_orchestrator import orchestrate_documentation
 
 __all__ = [
     "resolve_context",
@@ -11,5 +13,7 @@ __all__ = [
     "generate_code_fix",
     "orchestrate_tests",
     "publish_documentation",
-    "inject_data"
+    "inject_data",
+    "generate_documentation",
+    "orchestrate_documentation"
 ]

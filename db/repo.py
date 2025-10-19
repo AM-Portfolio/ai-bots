@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
 
-from .models import Issue, Analysis, Fix
+from .models import Issue, Analysis, Fix, ChatConversation, ChatMessage
 
 
 class IssueRepository:
@@ -87,3 +87,61 @@ class AnalysisRepository:
         self.db.commit()
         self.db.refresh(fix)
         return fix
+
+
+class ChatRepository:
+    def __init__(self, db: Session):
+        self.db = db
+    
+    def create_conversation(self, title: str, provider: str) -> ChatConversation:
+        conversation = ChatConversation(
+            title=title,
+            provider=provider
+        )
+        self.db.add(conversation)
+        self.db.commit()
+        self.db.refresh(conversation)
+        return conversation
+    
+    def get_conversation(self, conversation_id: int) -> Optional[ChatConversation]:
+        return self.db.query(ChatConversation).filter(ChatConversation.id == conversation_id).first()
+    
+    def list_conversations(self, skip: int = 0, limit: int = 50) -> List[ChatConversation]:
+        return self.db.query(ChatConversation).order_by(ChatConversation.updated_at.desc()).offset(skip).limit(limit).all()
+    
+    def add_message(
+        self,
+        conversation_id: int,
+        role: str,
+        content: str,
+        duration: Optional[float] = None
+    ) -> ChatMessage:
+        message = ChatMessage(
+            conversation_id=conversation_id,
+            role=role,
+            content=content,
+            duration=duration
+        )
+        self.db.add(message)
+        
+        # Update conversation timestamp
+        conversation = self.get_conversation(conversation_id)
+        if conversation:
+            conversation.updated_at = datetime.utcnow()
+        
+        self.db.commit()
+        self.db.refresh(message)
+        return message
+    
+    def get_messages(self, conversation_id: int) -> List[ChatMessage]:
+        return self.db.query(ChatMessage).filter(
+            ChatMessage.conversation_id == conversation_id
+        ).order_by(ChatMessage.created_at.asc()).all()
+    
+    def delete_conversation(self, conversation_id: int) -> bool:
+        conversation = self.get_conversation(conversation_id)
+        if conversation:
+            self.db.delete(conversation)
+            self.db.commit()
+            return True
+        return False

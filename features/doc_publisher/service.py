@@ -2,7 +2,7 @@ from typing import Optional
 import logging
 
 from shared.models import AnalysisResult, DocumentationPage
-from shared.clients import ConfluenceClient
+from shared.clients.confluence_client import ConfluenceClient
 from shared.llm import llm_client
 
 logger = logging.getLogger(__name__)

@@ -21,6 +21,27 @@ wheels/
 *.egg
 MANIFEST
 
+# Dependencies
+deps/
+node_modules/
+
+# Frontend build
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+
+# Build files
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.out
+*.app
+
 # Virtual environments
 venv/
 env/

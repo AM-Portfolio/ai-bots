@@ -1,0 +1,30 @@
+2025-10-18 11:50:04,392 - interfaces.http_api - INFO - 🔄 Starting orchestration pipeline for message: i want am-market-data repo readme . give summary...
+2025-10-18 11:50:04,393 - shared.llm_providers.factory - INFO - Creating Together AI provider
+2025-10-18T11:50:04.393400 - shared.llm_providers.together_provider - INFO - [530978d0-e927-47f9-9ddf-831e41d751d4] - Together AI client initialized successfully
+{
+  "provider": "together",
+  "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+  "status": "ready"
+}
+2025-10-18 11:50:04,393 - shared.llm_providers.together_provider - INFO - Together AI client initialized successfully
+2025-10-18 11:50:04,393 - orchestration.shared.connection_factory - INFO - 🏭 Connection factory initialized
+2025-10-18 11:50:04,393 - orchestration.shared.connection_factory - ERROR - ❌ Failed to initialize connection factory: No module named 'data'
+2025-10-18T11:50:04.396951 - interfaces.http_api - INFO - [530978d0-e927-47f9-9ddf-831e41d751d4] - 📋 Orchestration facade initialized with integrations, processing message...
+2025-10-18 11:50:04,396 - interfaces.http_api - INFO - 📋 Orchestration facade initialized with integrations, processing message...
+2025-10-18 11:50:04,397 - orchestration.facade - INFO - 🚀 Starting orchestration pipeline
+2025-10-18 11:50:04,397 - orchestration.facade - INFO - 📝 Step 1/4: Parsing message...
+2025-10-18 11:50:04,397 - orchestration.facade - INFO -    📥 INPUT: i want am-market-data repo readme . give summary
+2025-10-18 11:50:04,397 - orchestration.message_parser.implementations.parser - INFO - Starting message parsing
+2025-10-18 11:50:04,397 - orchestration.message_parser.extractors.github_extractor - INFO - Total GitHub references extracted: 0
+2025-10-18 11:50:04,397 - orchestration.message_parser.implementations.parser - INFO - Message parsing completed
+2025-10-18 11:50:04,397 - orchestration.facade - INFO -    📤 OUTPUT: 0 references found
+2025-10-18 11:50:04,397 - orchestration.facade - INFO - ✓ Parsed message: found 0 references
+2025-10-18 11:50:04,397 - orchestration.facade - INFO - 🔍 Step 2/4: Enriching context...
+2025-10-18 11:50:04,397 - orchestration.facade - INFO -    📥 INPUT: 0 references to enrich
+2025-10-18 11:50:04,397 - orchestration.facade - INFO -       Passing ParsedMessage to enricher:
+2025-10-18 11:50:04,397 - orchestration.facade - INFO -       - original_message: i want am-market-data repo readme . give summary...
+2025-10-18 11:50:04,397 - orchestration.facade - INFO -       - references: []
+2025-10-18 11:50:04,397 - orchestration.context_enricher.implementations.enricher - INFO - Starting context enrichment
+2025-10-18 11:50:04,397 - orchestration.context_enricher.implementations.enricher - INFO - Context enrichment completed
+2025-10-18 11:50:04,397 - orchestration.facade - INFO -    📤 OUTPUT: 0 context items
+2025-10-18 11:50:04,397 - orchestration.facade - INFO - ✓ Enriched context: 0 items
