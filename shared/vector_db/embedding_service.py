@@ -16,27 +16,63 @@ logger = logging.getLogger(__name__)
 class EmbeddingService:
     """Service for generating text embeddings with Together AI and hash fallback"""
     
-    def __init__(self, provider: str = "together"):
+    def __init__(self, provider: str = "auto"):
         """
-        Initialize embedding service with Together AI and fallback
+        Initialize embedding service with role-based provider selection
         
         Args:
-            provider: LLM provider to use for embeddings
+            provider: LLM provider to use ('auto', 'azure', 'together')
         """
+        from shared.config import settings
+        from shared.llm_providers.resilient_orchestrator import get_resilient_orchestrator
+        
+        # Get provider based on role
+        if provider == "auto":
+            orchestrator = get_resilient_orchestrator()
+            provider = orchestrator.get_provider_for_role("embedding")
+        
         self.provider_name = provider
-        self.embedding_model = "togethercomputer/m2-bert-80M-32k-retrieval"
-        self.dimension = 768  # Together AI embedding dimension
-        self.fallback_dimension = 768  # Hash-based fallback dimension
+        self.dimension = 768
+        self.fallback_dimension = 768
         self.client = None
         self.api_available = False
         
-        # Initialize Together AI client
-        self._initialize_together_client()
+        # Set model based on provider
+        if provider == "azure":
+            self.embedding_model = settings.azure_openai_embedding_deployment
+            self._initialize_azure_client()
+        else:
+            self.embedding_model = "togethercomputer/m2-bert-80M-32k-retrieval"
+            self._initialize_together_client()
         
         logger.info(f"🎯 Initializing embedding service with provider: {provider}")
         logger.info(f"   • Model: {self.embedding_model}")
         logger.info(f"   • API Available: {self.api_available}")
         logger.info(f"   • Fallback: Hash-based embeddings")
+    
+    def _initialize_azure_client(self):
+        """Initialize Azure OpenAI client for embeddings"""
+        try:
+            from shared.config import settings
+            from openai import AzureOpenAI
+            
+            if not settings.azure_openai_endpoint or not settings.azure_openai_api_key:
+                logger.warning("⚠️  Azure OpenAI credentials not configured, using fallback embeddings")
+                return
+            
+            self.client = AzureOpenAI(
+                api_key=settings.azure_openai_api_key,
+                api_version=settings.azure_openai_api_version,
+                azure_endpoint=settings.azure_openai_endpoint
+            )
+            self.api_available = True
+            logger.info("✅ Azure OpenAI embedding client initialized successfully")
+            
+        except Exception as e:
+            logger.warning(f"⚠️  Failed to initialize Azure OpenAI client: {e}")
+            logger.info("🔄 Will use hash-based fallback embeddings")
+            self.client = None
+            self.api_available = False
     
     def _initialize_together_client(self):
         """Initialize Together AI client for embeddings"""
@@ -58,7 +94,7 @@ class EmbeddingService:
     
     async def generate_embedding(self, text: str) -> List[float]:
         """
-        Generate embedding using Together AI with fallback to hash-based approach
+        Generate embedding using configured provider with fallback to hash-based approach
         
         Args:
             text: Text to embed
@@ -66,16 +102,24 @@ class EmbeddingService:
         Returns:
             Embedding vector (768 dimensions)
         """
-        # First, try Together AI embeddings
+        # Try configured provider (Azure or Together)
         if self.api_available and self.client:
             try:
-                response = self.client.embeddings.create(
-                    model=self.embedding_model,
-                    input=text
-                )
+                if self.provider_name == "azure":
+                    # Azure OpenAI embeddings
+                    response = self.client.embeddings.create(
+                        model=self.embedding_model,
+                        input=text
+                    )
+                else:
+                    # Together AI embeddings
+                    response = self.client.embeddings.create(
+                        model=self.embedding_model,
+                        input=text
+                    )
                 
                 embedding = response.data[0].embedding
-                logger.debug(f"✅ Generated Together AI embedding (dim: {len(embedding)})")
+                logger.debug(f"✅ Generated {self.provider_name} embedding (dim: {len(embedding)})")
                 
                 # Ensure consistent dimensions
                 if len(embedding) > self.dimension:
@@ -86,7 +130,7 @@ class EmbeddingService:
                 return embedding
                 
             except Exception as e:
-                logger.warning(f"⚠️  Together AI embedding failed: {e}")
+                logger.warning(f"⚠️  {self.provider_name} embedding failed: {e}")
                 logger.info("🔄 Falling back to hash-based embeddings")
                 # Continue to fallback method
         

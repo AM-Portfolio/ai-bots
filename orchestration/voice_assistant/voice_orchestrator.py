@@ -262,11 +262,19 @@ class VoiceOrchestrator:
         return response
     
     def _build_general_messages(self, user_input: str, history: list) -> list:
-        """Build messages for general conversation"""
+        """Build messages for general conversation with language detection"""
+        from shared.utils.language_detector import detect_language_with_confidence, get_language_instruction
+        
+        # Detect language from user input
+        detected_lang, confidence = detect_language_with_confidence(user_input)
+        lang_instruction = get_language_instruction(detected_lang)
+        
+        logger.info(f"🌐 Detected language: {detected_lang} (confidence: {confidence:.2f})")
+        
         messages = [
             {
                 "role": "system",
-                "content": "You are a helpful AI development assistant. Respond naturally and conversationally. Keep responses concise for voice interaction."
+                "content": f"You are a helpful AI development assistant. Respond naturally and conversationally. Keep responses concise for voice interaction. {lang_instruction}"
             }
         ]
         

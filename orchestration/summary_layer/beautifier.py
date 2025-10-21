@@ -17,13 +17,20 @@ logger = logging.getLogger(__name__)
 class ResponseBeautifier:
     """Beautifies responses for LLM consumption"""
     
-    def __init__(self, llm_provider: str = "together"):
+    def __init__(self, llm_provider: str = "auto"):
         """
-        Initialize response beautifier
+        Initialize response beautifier with role-based provider selection
         
         Args:
-            llm_provider: LLM provider to use for beautification
+            llm_provider: LLM provider to use ('auto', 'azure', 'together', 'openai')
         """
+        from shared.llm_providers.resilient_orchestrator import get_resilient_orchestrator
+        
+        # Get provider based on role
+        if llm_provider == "auto":
+            orchestrator = get_resilient_orchestrator()
+            llm_provider = orchestrator.get_provider_for_role("beautify")
+        
         self.provider_name = llm_provider
         logger.info(f"✨ Response Beautifier initialized with provider: {llm_provider}")
     
