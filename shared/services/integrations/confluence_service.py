@@ -15,24 +15,23 @@ class ConfluenceService(BaseService):
     async def connect(self) -> bool:
         """Connect to Confluence"""
         try:
-            from shared.clients.confluence_replit_client import get_confluence_access_token
             from atlassian import Confluence
+            from shared.config.settings import settings
             
-            token_data = await get_confluence_access_token()
-            if not token_data:
-                self._set_error("Failed to get Confluence credentials")
+            if not all([settings.confluence_url, settings.confluence_email, settings.confluence_api_token]):
+                self._set_error("Missing Confluence configuration")
                 return False
             
             self._client = Confluence(
-                url=token_data['url'],
-                username=token_data['email'],
-                password=token_data['token'],
+                url=settings.confluence_url,
+                username=settings.confluence_email,
+                password=settings.confluence_api_token,
                 cloud=True
             )
             
             # Test connection
             spaces = self._client.get_all_spaces(limit=1)
-            logger.info(f"Connected to Confluence at {token_data['url']}")
+            logger.info(f"Connected to Confluence at {settings.confluence_url}")
             
             self._set_connected()
             return True

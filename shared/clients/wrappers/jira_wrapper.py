@@ -23,7 +23,7 @@ class JiraWrapper:
     
     def __init__(self):
         self._env_client = None
-        self._replit_client = None
+        # Replit client removed - using regular client only
         self._active_provider = None
         self._initialize()
     
@@ -45,7 +45,7 @@ class JiraWrapper:
     @property
     def is_configured(self) -> bool:
         """Check if any provider is configured"""
-        return self._env_client is not None or self._replit_client is not None
+        return self._env_client is not None
     
     @property
     def provider(self) -> Optional[str]:
@@ -56,8 +56,7 @@ class JiraWrapper:
         """Get Jira issue (works with both ENV and Replit providers)"""
         if self._env_client:
             return self._env_client.get_issue(issue_key)
-        elif self._replit_client:
-            return await self._replit_client.get_issue(issue_key)
+        # Replit client removed - using regular client only
         else:
             logger.error("No Jira provider configured")
             return None
@@ -66,8 +65,7 @@ class JiraWrapper:
         """Search Jira issues using JQL"""
         if self._env_client:
             return self._env_client.search_issues(jql, max_results)
-        elif self._replit_client:
-            return await self._replit_client.search_issues(jql, max_results)
+        # Replit client removed - using regular client only
         else:
             logger.error("No Jira provider configured")
             return []
@@ -85,10 +83,6 @@ class JiraWrapper:
             return self._env_client.create_issue(
                 project_key, summary, description, issue_type, labels
             )
-        elif self._replit_client:
-            return await self._replit_client.create_issue(
-                project_key, summary, description, issue_type, labels
-            )
         else:
             logger.error("No Jira provider configured")
             return None
@@ -97,8 +91,7 @@ class JiraWrapper:
         """Add comment to Jira issue"""
         if self._env_client:
             return self._env_client.add_comment(issue_key, comment)
-        elif self._replit_client:
-            return await self._replit_client.add_comment(issue_key, comment)
+        # Replit client removed - using regular client only
         else:
             logger.error("No Jira provider configured")
             return False
@@ -107,8 +100,6 @@ class JiraWrapper:
         """Transition Jira issue to new status"""
         if self._env_client:
             return self._env_client.transition_issue(issue_key, transition_name)
-        elif self._replit_client:
-            return await self._replit_client.transition_issue(issue_key, transition_name)
         else:
             logger.error("No Jira provider configured")
             return False

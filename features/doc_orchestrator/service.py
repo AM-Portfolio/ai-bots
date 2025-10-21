@@ -6,7 +6,7 @@ from datetime import datetime
 import uuid
 
 from features.doc_generator import generate_documentation
-from shared.clients.confluence_replit_client import confluence_replit_client
+from shared.clients.confluence_client import ConfluenceClient
 from shared.clients.jira_client import jira_client
 from shared.thinking_process import create_doc_orchestrator_thinking_process
 from shared.config import settings
@@ -176,7 +176,8 @@ Provide well-structured documentation in markdown format with sections, examples
                 workflow_summary["step_3_confluence"] = "started"
                 thinking.start_step("publish_confluence")
                 
-                confluence_page = await confluence_replit_client.create_page(
+                confluence_client = ConfluenceClient()
+                confluence_page = confluence_client.create_page(
                     space_key=effective_space_key,
                     title=f"AI Documentation: {doc_result.repository or 'Generated'}",
                     content=doc_result.documentation or "",

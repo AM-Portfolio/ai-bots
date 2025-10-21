@@ -138,6 +138,79 @@ class ConfluenceClient:
         except Exception as e:
             logger.error(f"Failed to add labels to page {page_id}: {e}")
             return False
+    
+    def get_spaces(self) -> List[Dict[str, Any]]:
+        """Get all accessible spaces"""
+        if not self.client:
+            return []
+        
+        try:
+            spaces = self.client.get_all_spaces()
+            return [{
+                "key": space["key"],
+                "name": space["name"],
+                "type": space.get("type", "unknown")
+            } for space in spaces.get("results", [])]
+        except Exception as e:
+            logger.error(f"Failed to get spaces: {e}")
+            return []
+    
+    def get_space_info(self, space_key: str) -> Optional[Dict[str, Any]]:
+        """Get space information"""
+        if not self.client:
+            return None
+        
+        try:
+            space = self.client.get_space(space_key)
+            return {
+                "key": space["key"],
+                "name": space["name"],
+                "type": space.get("type", "unknown")
+            }
+        except Exception as e:
+            logger.error(f"Failed to get space info for {space_key}: {e}")
+            return None
+    
+    def get_pages_in_space(self, space_key: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get pages in a space"""
+        if not self.client:
+            return []
+        
+        try:
+            pages = self.client.get_all_pages_from_space(space_key, limit=limit)
+            return [{
+                "id": page["id"],
+                "title": page["title"]
+            } for page in pages]
+        except Exception as e:
+            logger.error(f"Failed to get pages from space {space_key}: {e}")
+            return []
+    
+    def delete_page(self, page_id: str) -> bool:
+        """Delete a page"""
+        if not self.client:
+            return False
+        
+        try:
+            self.client.remove_page(page_id)
+            logger.info(f"Deleted page {page_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete page {page_id}: {e}")
+            return False
+    
+    def test_connection(self) -> bool:
+        """Test connection to Confluence"""
+        if not self.client:
+            return False
+        
+        try:
+            # Try to get user info as a test
+            self.client.get_current_user()
+            return True
+        except Exception as e:
+            logger.error(f"Connection test failed: {e}")
+            return False
 
 
 confluence_client = ConfluenceClient()

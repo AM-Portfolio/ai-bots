@@ -3,7 +3,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
 
-from shared.clients.github_replit_client import github_replit_client
+from shared.clients.github_client import GitHubClient
 from shared.llm_providers.factory import get_llm_client
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ class DocGeneratorService:
     """Service for generating documentation from natural language prompts"""
     
     def __init__(self):
-        self.github_client = github_replit_client
+        self.github_client = GitHubClient()
     
     async def parse_prompt(self, prompt: str) -> Dict[str, Any]:
         """Use LLM to parse user prompt and extract intent"""

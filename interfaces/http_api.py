@@ -795,14 +795,14 @@ async def stream_orchestration(request: StreamOrchestrationRequest):
 @app.post("/api/test/github")
 async def test_github(repository: str):
     """Test GitHub integration"""
-    from shared.clients.github_replit_client import github_replit_client
+    from shared.clients.github_client import GitHubClient
     
     try:
-        client = await github_replit_client._get_client()
-        if not client:
+        client = GitHubClient()
+        if not client.client:
             return {"success": False, "error": "GitHub client not initialized - please set up GitHub integration"}
         
-        repo = client.get_repo(repository)
+        repo = client.client.get_repo(repository)
         issues = list(repo.get_issues(state="open")[:5])
         return {
             "success": True,
@@ -832,17 +832,18 @@ async def test_jira(project_key: str):
 @app.post("/api/test/confluence")
 async def test_confluence():
     """Test Confluence integration"""
-    from shared.clients.confluence_replit_client import confluence_replit_client
+    from shared.clients.confluence_client import ConfluenceClient
     
     try:
-        if not confluence_replit_client.is_configured():
+        confluence_client = ConfluenceClient()
+        if not confluence_client.client:
             return {"success": False, "error": "Confluence credentials not configured"}
         
-        is_connected = await confluence_replit_client.test_connection()
+        is_connected = confluence_client.test_connection()
         if not is_connected:
             return {"success": False, "error": "Failed to connect to Confluence"}
         
-        spaces = await confluence_replit_client.get_spaces()
+        spaces = confluence_client.get_spaces()
         if spaces is None:
             return {"success": False, "error": "Failed to retrieve spaces"}
         

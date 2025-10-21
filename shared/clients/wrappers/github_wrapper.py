@@ -23,7 +23,6 @@ class GitHubWrapper:
     
     def __init__(self):
         self._env_client = None
-        self._replit_client = None
         self._active_provider = None
         self._initialize()
     
@@ -39,18 +38,13 @@ class GitHubWrapper:
                 logger.warning(f"Failed to initialize ENV-based GitHub client: {e}")
         
         if not self._env_client:
-            try:
-                from shared.clients.github_replit_client import GitHubReplitClient
-                self._replit_client = GitHubReplitClient()
-                self._active_provider = "replit"
-                logger.info("🔄 GitHub wrapper using Replit connector (fallback)")
-            except Exception as e:
-                logger.error(f"Failed to initialize Replit GitHub client: {e}")
+            logger.info("🔄 GitHub wrapper: No ENV config (GITHUB_TOKEN), Replit connector removed")
+            self._active_provider = None
     
     @property
     def is_configured(self) -> bool:
         """Check if any provider is configured"""
-        return self._env_client is not None or self._replit_client is not None
+        return self._env_client is not None
     
     @property
     def provider(self) -> Optional[str]:
@@ -61,8 +55,6 @@ class GitHubWrapper:
         """Get GitHub issue (works with both ENV and Replit providers)"""
         if self._env_client:
             return self._env_client.get_issue(repo_name, issue_number)
-        elif self._replit_client:
-            return await self._replit_client.get_issue(repo_name, issue_number)
         else:
             logger.error("No GitHub provider configured")
             return None
@@ -71,8 +63,6 @@ class GitHubWrapper:
         """Get GitHub pull request"""
         if self._env_client:
             return self._env_client.get_pull_request(repo_name, pr_number)
-        elif self._replit_client:
-            return await self._replit_client.get_pull_request(repo_name, pr_number)
         else:
             logger.error("No GitHub provider configured")
             return None
@@ -88,8 +78,6 @@ class GitHubWrapper:
         """Create GitHub pull request"""
         if self._env_client:
             return self._env_client.create_pull_request(repo_name, title, body, head, base)
-        elif self._replit_client:
-            return await self._replit_client.create_pull_request(repo_name, title, body, head, base)
         else:
             logger.error("No GitHub provider configured")
             return None
@@ -103,8 +91,6 @@ class GitHubWrapper:
         """Get repository file tree"""
         if self._env_client:
             return self._env_client.get_repository_tree(repo_name, branch, recursive)
-        elif self._replit_client and hasattr(self._replit_client, 'get_repository_tree'):
-            return await self._replit_client.get_repository_tree(repo_name, branch, recursive)
         else:
             logger.error("No GitHub provider configured")
             return None
@@ -118,8 +104,6 @@ class GitHubWrapper:
         """Get file content from repository"""
         if self._env_client:
             return self._env_client.get_file_content(repo_name, file_path, branch)
-        elif self._replit_client:
-            return await self._replit_client.get_file_content(repo_name, file_path, branch)
         else:
             logger.error("No GitHub provider configured")
             return None
@@ -137,21 +121,14 @@ class GitHubWrapper:
             return self._env_client.create_or_update_file(
                 repo_name, file_path, content, commit_message, branch
             )
-        elif self._replit_client:
-            return await self._replit_client.create_or_update_file(
-                repo_name, file_path, content, commit_message, branch
-            )
         else:
             logger.error("No GitHub provider configured")
             return False
     
     async def create_branch(self, repo_name: str, branch_name: str, base_branch: str = "main") -> bool:
         """Create a new branch (only available for Replit connector)"""
-        if self._replit_client and hasattr(self._replit_client, 'create_branch'):
-            return await self._replit_client.create_branch(repo_name, branch_name, base_branch)
-        else:
-            logger.warning("create_branch only available with Replit connector")
-            return False
+        logger.error("Branch creation not supported with current configuration")
+        return False
     
     async def commit_documentation(
         self,
@@ -162,11 +139,7 @@ class GitHubWrapper:
         branch_name: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """Commit documentation to repository (primarily for Replit connector)"""
-        if self._replit_client and hasattr(self._replit_client, 'commit_documentation'):
-            return await self._replit_client.commit_documentation(
-                repo_name, file_path, content, commit_message, branch_name or "main"
-            )
-        elif self._env_client:
+        if self._env_client:
             logger.warning("commit_documentation not fully supported for ENV client, using create_or_update_file")
             success = self._env_client.create_or_update_file(
                 repo_name, file_path, content, commit_message, branch_name if branch_name else "main"

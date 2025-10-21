@@ -3,7 +3,7 @@ import asyncio
 import logging
 from typing import Dict, Any
 from shared.config import settings
-from shared.clients.confluence_replit_client import confluence_replit_client
+from shared.clients.confluence_client import ConfluenceClient
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,13 @@ async def test_confluence_connection() -> Dict[str, Any]:
     
     try:
         # Test connection using our client
-        connection_test = await confluence_replit_client.test_connection()
+        confluence_client = ConfluenceClient()
+        if confluence_client.client:
+            # Try to get spaces to test connection
+            spaces = confluence_client.get_spaces()
+            connection_test = spaces is not None
+        else:
+            connection_test = False
         
         if connection_test:
             result["connection"] = True
@@ -65,8 +71,13 @@ async def test_confluence_spaces() -> Dict[str, Any]:
         return result
     
     try:
+        confluence_client = ConfluenceClient()
+        if not confluence_client.client:
+            result["error"] = "Confluence client not initialized"
+            return result
+        
         # Test getting spaces
-        spaces = await confluence_replit_client.get_spaces()
+        spaces = confluence_client.get_spaces()
         
         if spaces:
             result["connection"] = True
@@ -99,12 +110,17 @@ async def test_confluence_space_access() -> Dict[str, Any]:
         return result
     
     try:
+        confluence_client = ConfluenceClient()
+        if not confluence_client.client:
+            result["error"] = "Confluence client not initialized"
+            return result
+        
         # Test getting space info
-        space_info = await confluence_replit_client.get_space_info(settings.confluence_space_key)
+        space_info = confluence_client.get_space_info(settings.confluence_space_key)
         
         if space_info:
             # Try to get pages in the space
-            pages = await confluence_replit_client.get_pages_in_space(settings.confluence_space_key, limit=5)
+            pages = confluence_client.get_pages_in_space(settings.confluence_space_key, limit=5)
             
             result["connection"] = True
             result["details"] = {
@@ -138,34 +154,35 @@ async def test_confluence_create_test_page() -> Dict[str, Any]:
         return result
     
     try:
+        confluence_client = ConfluenceClient()
+        if not confluence_client.client:
+            result["error"] = "Confluence client not initialized"
+            return result
+        
         # Create a test page
         test_title = f"Connection Test - {asyncio.get_event_loop().time()}"
         test_content = "<p>This is a test page created by the AI bot connection test. It will be deleted automatically.</p>"
         
-        page = await confluence_replit_client.create_page(
+        page_id = confluence_client.create_page(
             space_key=settings.confluence_space_key,
             title=test_title,
             content=test_content,
             parent_id=settings.parent_page_id
         )
         
-        if page:
+        if page_id:
             # Try to delete the test page
-            page_id = page.get("id")
-            if page_id:
-                try:
-                    await confluence_replit_client.delete_page(page_id)
-                    deletion_status = "deleted"
-                except:
-                    deletion_status = "failed to delete"
-            else:
-                deletion_status = "no page ID"
+            try:
+                confluence_client.delete_page(page_id)
+                deletion_status = "deleted"
+            except:
+                deletion_status = "failed to delete"
             
             result["connection"] = True
             result["details"] = {
                 "test_page_created": True,
                 "page_id": page_id,
-                "page_url": page.get("url"),
+                "page_url": f"{settings.confluence_url}/wiki/spaces/{settings.confluence_space_key}/pages/{page_id}",
                 "deletion_status": deletion_status
             }
         else:
