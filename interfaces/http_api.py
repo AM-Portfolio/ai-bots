@@ -23,6 +23,7 @@ from shared.config import settings
 from db import ChatRepository, ChatConversation, ChatMessage
 from interfaces.services_api import router as services_router
 from interfaces.vector_db_api import router as vector_db_router, initialize_vector_db
+from interfaces.translation_api import router as translation_router
 
 logger = get_logger(__name__)
 
@@ -114,6 +115,9 @@ app.include_router(services_router)
 
 # Include Vector DB API router
 app.include_router(vector_db_router)
+
+# Include Translation API router
+app.include_router(translation_router)
 
 # Serve React frontend static files in production
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"

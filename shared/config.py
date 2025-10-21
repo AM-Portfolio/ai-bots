@@ -89,8 +89,21 @@ class Settings(BaseSettings):
     
     # Azure Speech Services
     azure_speech_key: Optional[str] = None
-    azure_speech_region: str = "eastus"
+    azure_speech_region: str = "eastus2"
     azure_speech_lang: str = "en-US"
+    
+    # Azure Translation Services
+    azure_translation_key: Optional[str] = None
+    azure_translation_region: str = "eastus2"
+    azure_translation_endpoint: str = "https://api.cognitive.microsofttranslator.com"
+    
+    # Azure AI Services (Multi-service endpoint)
+    azure_ai_services_key: Optional[str] = None
+    azure_ai_services_endpoint: str = "https://munis-mgzdcoho-eastus2.services.ai.azure.com/"
+    
+    # Translation Settings
+    enable_auto_translation: bool = True
+    translation_target_language: str = "en"  # Default target for translation
     
     @property
     def port(self) -> int:

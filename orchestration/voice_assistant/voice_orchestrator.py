@@ -21,6 +21,7 @@ from orchestration.summary_layer.beautifier import ResponseBeautifier
 from .session_manager import SessionManager
 from .intent_classifier import IntentClassifier
 from .response_formatter import VoiceResponseFormatter
+from .azure_voice_adapter import AzureVoiceAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,11 @@ class VoiceOrchestrator:
             max_length=settings.voice_response_max_length
         )
         
+        # Azure Voice Adapter (STT + Translation)
+        self.azure_voice = None
+        if settings.voice_stt_provider == "azure":
+            self.azure_voice = AzureVoiceAdapter()
+        
         # STT/TTS clients (initialized lazily)
         self._stt_client = None
         self._tts_client = None
@@ -103,11 +109,16 @@ class VoiceOrchestrator:
         # Step 1: Get session
         session = self.session_manager.get_or_create_session(request.session_id)
         
-        # Step 2: Transcribe audio
-        transcript = await self._transcribe_audio(request.audio_data, request.audio_format)
+        # Step 2: Transcribe audio (with Azure: STT + Translation)
+        transcript, original_transcript, detected_lang = await self._transcribe_audio(
+            request.audio_data,
+            request.audio_format
+        )
         logger.info(f"📝 Transcript: {transcript}")
+        if original_transcript and original_transcript != transcript:
+            logger.info(f"🌐 Original ({detected_lang}): {original_transcript}")
         
-        # Add user turn to session
+        # Add user turn to session (store translated version for orchestration)
         self.session_manager.add_turn(request.session_id, "user", transcript)
         
         # Step 3: Classify intent
@@ -151,21 +162,39 @@ class VoiceOrchestrator:
             thinking=thinking
         )
     
-    async def _transcribe_audio(self, audio_base64: str, audio_format: str) -> str:
-        """Transcribe audio to text using configured STT provider"""
+    async def _transcribe_audio(
+        self,
+        audio_base64: str,
+        audio_format: str
+    ) -> Tuple[str, Optional[str], Optional[str]]:
+        """
+        Transcribe audio to text using configured STT provider
+        
+        Returns:
+            Tuple of (translated_text, original_text, detected_language)
+            - If Azure: Returns translated English text + original + language
+            - If OpenAI: Returns transcribed text, None, None
+        """
         logger.info(f"🎧 Transcribing audio (format: {audio_format})...")
         
         try:
-            if settings.voice_stt_provider == "openai":
-                return await self._transcribe_openai(audio_base64, audio_format)
-            elif settings.voice_stt_provider == "azure":
-                return await self._transcribe_azure(audio_base64, audio_format)
+            if settings.voice_stt_provider == "azure" and self.azure_voice:
+                # Use Azure STT + Translation pipeline
+                original, translated, lang, note = await self.azure_voice.process_audio(
+                    audio_base64,
+                    audio_format
+                )
+                return translated, original, lang
+            elif settings.voice_stt_provider == "openai":
+                # Use OpenAI Whisper (no translation)
+                text = await self._transcribe_openai(audio_base64, audio_format)
+                return text, None, None
             else:
                 logger.warning(f"Unknown STT provider: {settings.voice_stt_provider}, using fallback")
-                return "[Transcription unavailable - configure STT provider]"
+                return "[Transcription unavailable - configure STT provider]", None, None
         except Exception as e:
             logger.error(f"❌ STT failed: {e}")
-            return f"[Transcription error: {str(e)}]"
+            return f"[Transcription error: {str(e)}]", None, None
     
     async def _transcribe_openai(self, audio_base64: str, audio_format: str) -> str:
         """Transcribe using OpenAI Whisper"""
