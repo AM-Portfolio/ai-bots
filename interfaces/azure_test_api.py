@@ -62,6 +62,8 @@ class MultilingualChatResponse(BaseModel):
 
 class ServiceStatusResponse(BaseModel):
     """Response model for service status"""
+    model_config = {"protected_namespaces": ()}  # Allow model_* field names
+    
     service_endpoints: Dict[str, Any]
     model_deployments: Dict[str, Any]
 

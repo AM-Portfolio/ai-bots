@@ -54,3 +54,4 @@ requests
 qdrant-client
 azure-cognitiveservices-speech
 requests
+openai>=1.0.0

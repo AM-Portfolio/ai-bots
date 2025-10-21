@@ -51,15 +51,16 @@ class AzureAIManager:
             "service_endpoints": {
                 "speech": {
                     "available": self.speech.is_available(),
-                    "endpoint": self.speech.speech_endpoint
+                    "region": self.speech.speech_region if hasattr(self.speech, 'speech_region') else None
                 },
                 "translation": {
                     "available": self.translation.is_available(),
-                    "endpoint": self.translation.translation_endpoint
+                    "endpoint": self.translation.translation_endpoint if hasattr(self.translation, 'translation_endpoint') else None
                 }
             },
-            "model_deployments": self.models.get_deployment_info() if hasattr(self.models, 'get_deployment_info') else {
-                "available": self.models.is_available()
+            "model_deployments": {
+                "available": self.models.is_available(),
+                "endpoint": self.models.endpoint if hasattr(self.models, 'endpoint') else None
             }
         }
     
@@ -243,18 +244,23 @@ class AzureAIManager:
         """
         logger.info("🧪 Testing all Azure AI services...")
         
+        # Get deployment info if available
+        deployment_info = None
+        if self.models.is_available():
+            deployment_info = await self.models.get_deployment_info()
+        
         results = {
             "speech_service": {
                 "available": self.speech.is_available(),
-                "endpoint": self.speech.speech_endpoint if self.speech.is_available() else None
+                "region": self.speech.speech_region if hasattr(self.speech, 'speech_region') else None
             },
             "translation_service": {
                 "available": self.translation.is_available(),
-                "endpoint": self.translation.translation_endpoint if self.translation.is_available() else None
+                "endpoint": self.translation.translation_endpoint if hasattr(self.translation, 'translation_endpoint') else None
             },
             "model_deployments": {
                 "available": self.models.is_available(),
-                "deployments": await self.models.get_deployment_info() if self.models.is_available() else None
+                "deployments": deployment_info
             },
             "workflows_available": []
         }
