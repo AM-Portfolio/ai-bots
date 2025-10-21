@@ -146,6 +146,97 @@ class GitHubClient:
         except GithubException as e:
             logger.error(f"Failed to create/update file {file_path} in {repo_name}: {e}")
             return False
+    
+    async def search_code(
+        self,
+        repo_name: str,
+        query: str,
+        max_results: int = 10
+    ) -> List[Dict[str, Any]]:
+        """
+        Search for code in a GitHub repository
+        
+        Args:
+            repo_name: Repository name in format 'owner/repo'
+            query: Search query string
+            max_results: Maximum number of results to return
+            
+        Returns:
+            List of search results with path, content snippet, and score
+        """
+        if not self.client:
+            logger.warning("GitHub client not initialized")
+            return []
+        
+        try:
+            # Build search query with repository scope
+            search_query = f"{query} repo:{repo_name}"
+            
+            # Search code using GitHub API
+            results = self.client.search_code(search_query)
+            
+            # Convert results to list of dicts
+            code_results = []
+            for idx, item in enumerate(results):
+                if idx >= max_results:
+                    break
+                
+                code_results.append({
+                    'path': item.path,
+                    'name': item.name,
+                    'repository': item.repository.full_name,
+                    'html_url': item.html_url,
+                    'score': item.score,
+                    'sha': item.sha
+                })
+            
+            logger.info(f"🔍 Found {len(code_results)} code results for query: {query} in {repo_name}")
+            return code_results
+            
+        except GithubException as e:
+            logger.error(f"Failed to search code in {repo_name}: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error searching code: {e}")
+            return []
+    
+    async def get_multiple_files(
+        self,
+        repo_name: str,
+        file_paths: List[str],
+        ref: str = "main"
+    ) -> Dict[str, str]:
+        """
+        Fetch contents of multiple files from a repository
+        
+        Args:
+            repo_name: Repository name in format 'owner/repo'
+            file_paths: List of file paths to fetch
+            ref: Branch/tag/commit reference (default: "main")
+            
+        Returns:
+            Dictionary mapping file paths to their contents
+        """
+        if not self.client:
+            logger.warning("GitHub client not initialized")
+            return {}
+        
+        file_contents = {}
+        
+        for file_path in file_paths:
+            try:
+                content = self.get_file_content(repo_name, file_path, ref)
+                if content:
+                    file_contents[file_path] = content
+                    logger.debug(f"✅ Fetched {file_path}")
+                else:
+                    logger.warning(f"⚠️  Could not fetch {file_path}")
+            except Exception as e:
+                logger.error(f"❌ Error fetching {file_path}: {e}")
+                continue
+        
+        logger.info(f"📦 Fetched {len(file_contents)}/{len(file_paths)} files from {repo_name}")
+        return file_contents
 
     async def get_multiple_files(self, repo_name: str, file_paths: List[str], branch: str = "main") -> Dict[str, Optional[str]]:
         """Get multiple files from repository"""

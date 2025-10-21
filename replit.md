@@ -5,7 +5,8 @@ This project is an intelligent, autonomous development agent designed to automat
 
 ## User Preferences
 - **Configuration Method**: ENV variables preferred over Replit connectors
-- **LLM Provider**: Together AI as primary provider with automatic fallback to Azure OpenAI
+- **LLM Provider**: Azure OpenAI as default primary provider with automatic fallback to Together AI and OpenAI. Role-based provider assignment (chat_provider, embedding_provider, beautify_provider) allows granular control.
+- **Multilingual Support**: Automatic Hindi/English language detection enabled with language-aware responses
 - **Vector Database**: Qdrant (persistent) preferred over in-memory for production use
 - **UI Design**: Compact, space-efficient layouts with inline controls
 
