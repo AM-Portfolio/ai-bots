@@ -18,6 +18,7 @@ The project employs a clean architecture with a modular design for scalability a
 -   **Core Layers:** Orchestration (parser, enricher, prompt builder, agent workflow), Enhanced GitHub Extractor, Interfaces (API, webhooks, bot), Features (business logic), Shared utilities, Data management, and Observability (Prometheus, OpenTelemetry).
 -   **Database:** SQLAlchemy ORM supporting SQLite (default) and PostgreSQL with a repository pattern.
 -   **AI Integration:** Factory pattern for pluggable LLM providers (Together AI, Azure OpenAI) with automatic fallback.
+-   **Azure AI Services:** Comprehensive integration with both Service Endpoints (Speech, Translation) and Model Deployments (GPT-4o Transcribe, Model Router, GPT Audio Mini). Unified Azure AI Manager coordinates all services for complete workflows.
 -   **Vector Database:** Qdrant (persistent, production-ready) with automatic fallback to in-memory when Docker is unavailable. Defaults to Qdrant with seamless degradation for environments without Docker support.
 -   **Service Architecture:** Modular, LLM-powered service layer with `BaseService`, `ServiceManager`, and `ServiceLLMWrapper` for intelligent interactions across integrations like GitHub, Confluence, and MongoDB.
 -   **Integration Wrappers:** Unified wrapper pattern for all external services (GitHub, Jira, Confluence) that uses ENV config by default and automatically falls back to Replit connectors. Makes integrations easily removable and switchable without changing business logic.
@@ -45,6 +46,7 @@ The project employs a clean architecture with a modular design for scalability a
 -   **Multi-Source Integration:** Connectors for GitHub, Jira, Confluence, and Grafana.
 -   **AI-Powered Analysis:** Automated bug diagnosis, fix generation, test code generation, and documentation generation using LLMs.
 -   **Resilient LLM Orchestration:** Automatic fallback across multiple LLM providers (Together AI → Azure OpenAI → OpenAI) with circuit breaker pattern, retry logic, and health tracking. If one provider fails, the system automatically tries alternative providers to ensure users always get a response.
+-   **Comprehensive Azure AI Integration:** Dual integration approach combining Service Endpoints (Speech STT, Translation) and Model Deployments (GPT-4o Transcribe with diarization, Model Router, GPT Audio Mini). Unified Azure AI Manager orchestrates complex workflows: Voice Assistant (STT → Translation → Chat), Meeting Transcription (Diarization → Summarization), and Multilingual Chat (Translation → Chat → Translation back). All services have graceful fallback when credentials not configured.
 -   **Resilient Vector DB:** Automatic fallback from Qdrant to in-memory when Docker is unavailable. Configured to attempt Qdrant connection first (for persistent storage), then gracefully degrade to in-memory mode in constrained environments like Replit.
 -   **Automated Workflows:** End-to-end processes for context enrichment, root cause analysis, code fix generation, pull request creation, and command-driven documentation orchestration.
 -   **Real-time Backend Activity Streaming:** Live visualization of orchestration pipeline execution via Server-Sent Events (SSE) with a `StreamingOrchestrationWrapper` and a `BackendActivityStream` React component.
@@ -71,6 +73,7 @@ The project employs a clean architecture with a modular design for scalability a
 -   **Browser APIs:** MediaRecorder API, Web Speech Synthesis API (fallback)
 
 ## Documentation
+-   **Azure AI Integration Guide:** Complete integration guide for Azure AI Services with both Service Endpoints and Model Deployments available in `AZURE_AI_INTEGRATION.md`. Includes configuration, API endpoints, usage examples, workflow recommendations, and testing instructions for Voice Assistant, Meeting Transcription, and Multilingual Chat workflows.
 -   **Vector DB Usage Guide:** Comprehensive documentation for Vector Database and GitHub-LLM integration available in `VECTOR_DB_USAGE.md`. Includes quick start, API reference, use cases, troubleshooting, and best practices for indexing repositories and performing semantic code search.
 -   **Qdrant Repository Indexing Guide:** Complete guide for setting up Qdrant with Docker Compose and re-indexing GitHub repositories available in `QDRANT_REPOSITORY_INDEXING.md`. Covers installation, configuration, repository indexing via REST API/UI/Python, re-indexing strategies, data persistence, backup/restore, troubleshooting, and best practices.
 
