@@ -802,12 +802,14 @@ async def test_github(repository: str):
         if not client.client:
             return {"success": False, "error": "GitHub client not initialized - please set up GitHub integration"}
         
-        repo = client.client.get_repo(repository)
-        issues = list(repo.get_issues(state="open")[:5])
+        issues = await client.get_issues(repository, limit=5)
+        if issues is None:
+            return {"success": False, "error": "Failed to fetch issues"}
+        
         return {
             "success": True,
             "issues_count": len(issues),
-            "issues": [{"number": i.number, "title": i.title} for i in issues]
+            "issues": [{"number": i["number"], "title": i["title"]} for i in issues]
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -839,11 +841,11 @@ async def test_confluence():
         if not confluence_client.client:
             return {"success": False, "error": "Confluence credentials not configured"}
         
-        is_connected = confluence_client.test_connection()
+        is_connected = await confluence_client.test_connection()
         if not is_connected:
             return {"success": False, "error": "Failed to connect to Confluence"}
         
-        spaces = confluence_client.get_spaces()
+        spaces = await confluence_client.get_spaces()
         if spaces is None:
             return {"success": False, "error": "Failed to retrieve spaces"}
         

@@ -52,7 +52,7 @@ class ConfluenceWrapper:
     async def get_page(self, page_id: str) -> Optional[Dict[str, Any]]:
         """Get Confluence page"""
         if self._env_client:
-            return self._env_client.get_page(page_id)
+            return await self._env_client.get_page(page_id)
         else:
             logger.error("No Confluence provider configured")
             return None
@@ -66,7 +66,7 @@ class ConfluenceWrapper:
     ) -> Optional[str]:
         """Create Confluence page"""
         if self._env_client:
-            return self._env_client.create_page(space_key, title, content, parent_id)
+            return await self._env_client.create_page(space_key, title, content, parent_id)
         else:
             logger.error("No Confluence provider configured")
             return None
@@ -79,7 +79,7 @@ class ConfluenceWrapper:
     ) -> bool:
         """Update Confluence page"""
         if self._env_client:
-            return self._env_client.update_page(page_id, title, content)
+            return await self._env_client.update_page(page_id, title, content)
         else:
             logger.error("No Confluence provider configured")
             return False
@@ -87,7 +87,7 @@ class ConfluenceWrapper:
     async def search_pages(self, cql: str, limit: int = 25) -> List[Dict[str, Any]]:
         """Search Confluence pages using CQL"""
         if self._env_client:
-            return self._env_client.search_pages(cql, limit)
+            return await self._env_client.search_pages(cql, limit)
         else:
             logger.error("No Confluence provider configured")
             return []
@@ -95,7 +95,7 @@ class ConfluenceWrapper:
     async def add_labels(self, page_id: str, labels: List[str]) -> bool:
         """Add labels to Confluence page"""
         if self._env_client:
-            return self._env_client.add_labels(page_id, labels)
+            return await self._env_client.add_labels(page_id, labels)
         else:
             logger.error("No Confluence provider configured")
             return False

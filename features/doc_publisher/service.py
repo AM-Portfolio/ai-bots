@@ -47,7 +47,7 @@ async def publish_documentation(
     
     confluence_client = ConfluenceClient()
     
-    page_id = confluence_client.create_page(
+    page_id = await confluence_client.create_page(
         space_key=space_key,
         title=f"Issue Analysis: {analysis.issue_id}",
         content=enhanced_doc or doc_content,
@@ -56,6 +56,6 @@ async def publish_documentation(
     
     if page_id:
         logger.info(f"Published documentation to Confluence page: {page_id}")
-        confluence_client.add_labels(page_id, ["ai-analysis", "auto-generated"])
+        await confluence_client.add_labels(page_id, ["ai-analysis", "auto-generated"])
     
     return page_id

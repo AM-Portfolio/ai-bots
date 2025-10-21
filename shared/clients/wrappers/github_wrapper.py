@@ -54,7 +54,7 @@ class GitHubWrapper:
     async def get_issue(self, repo_name: str, issue_number: int) -> Optional[Dict[str, Any]]:
         """Get GitHub issue (works with both ENV and Replit providers)"""
         if self._env_client:
-            return self._env_client.get_issue(repo_name, issue_number)
+            return await self._env_client.get_issue(repo_name, issue_number)
         else:
             logger.error("No GitHub provider configured")
             return None
@@ -62,7 +62,7 @@ class GitHubWrapper:
     async def get_pull_request(self, repo_name: str, pr_number: int) -> Optional[Dict[str, Any]]:
         """Get GitHub pull request"""
         if self._env_client:
-            return self._env_client.get_pull_request(repo_name, pr_number)
+            return await self._env_client.get_pull_request(repo_name, pr_number)
         else:
             logger.error("No GitHub provider configured")
             return None
@@ -77,7 +77,7 @@ class GitHubWrapper:
     ) -> Optional[str]:
         """Create GitHub pull request"""
         if self._env_client:
-            return self._env_client.create_pull_request(repo_name, title, body, head, base)
+            return await self._env_client.create_pull_request(repo_name, title, body, head, base)
         else:
             logger.error("No GitHub provider configured")
             return None
@@ -90,7 +90,7 @@ class GitHubWrapper:
     ) -> Optional[List[Dict[str, Any]]]:
         """Get repository file tree"""
         if self._env_client:
-            return self._env_client.get_repository_tree(repo_name, branch, recursive)
+            return await self._env_client.get_repository_tree(repo_name, branch, recursive)
         else:
             logger.error("No GitHub provider configured")
             return None
@@ -103,7 +103,7 @@ class GitHubWrapper:
     ) -> Optional[str]:
         """Get file content from repository"""
         if self._env_client:
-            return self._env_client.get_file_content(repo_name, file_path, branch)
+            return await self._env_client.get_file_content(repo_name, file_path, branch)
         else:
             logger.error("No GitHub provider configured")
             return None
@@ -118,7 +118,7 @@ class GitHubWrapper:
     ) -> bool:
         """Create or update file in repository"""
         if self._env_client:
-            return self._env_client.create_or_update_file(
+            return await self._env_client.create_or_update_file(
                 repo_name, file_path, content, commit_message, branch
             )
         else:
