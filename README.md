@@ -106,6 +106,40 @@ cp .env.example .env
 
 See [CONFIGURATION.md](CONFIGURATION.md) for detailed setup instructions.
 
+## 📚 Documentation
+
+Comprehensive documentation is organized in the [`docs/`](./docs/) directory:
+
+### 🔗 Quick Links
+- **[📖 Complete Documentation](./docs/README.md)** - Central documentation hub
+- **[🚀 Quick Start Guide](./docs/setup/QUICK_START.md)** - Get up and running fast
+- **[⚙️ Configuration Guide](./docs/setup/CONFIGURATION_GUIDE.md)** - Detailed configuration
+- **[🔌 API Reference](./docs/api/API_ENDPOINTS.md)** - Complete API documentation
+
+### 📁 Documentation Categories
+- **[Setup & Configuration](./docs/setup/)** - Installation and configuration guides
+- **[Features](./docs/features/)** - Feature-specific documentation  
+- **[API](./docs/api/)** - API reference and endpoints
+- **[Deployment](./docs/deployment/)** - Deployment guides and troubleshooting
+- **[Testing](./docs/testing/)** - Testing procedures and guides
+- **[User Guides](./docs/guides/)** - How-to guides and tutorials
+
+### 🔧 Service Connection Testing
+Test all integrated services with the built-in testing suite:
+
+```bash
+# Test all service connections
+python test_connections.py
+
+# Test specific services
+python test_connections.py confluence  # Test Confluence connection
+python test_connections.py jira       # Test Jira connection  
+python test_connections.py github     # Test GitHub connection
+python test_connections.py azure      # Test Azure services
+python test_connections.py together   # Test Together AI
+python test_connections.py vector     # Test vector database
+```
+
 #### 3. Run the Application
 
 ```bash
