@@ -31,10 +31,14 @@ class Settings(BaseSettings):
     jira_url: Optional[str] = None
     jira_email: Optional[str] = None
     jira_api_token: Optional[str] = None
+    jira_project_key: Optional[str] = None
+    jira_issue_type: str = "Task"
     
     confluence_url: Optional[str] = None
     confluence_email: Optional[str] = None
     confluence_api_token: Optional[str] = None
+    confluence_space_key: Optional[str] = None
+    parent_page_id: Optional[str] = None
     
     grafana_url: Optional[str] = None
     grafana_api_key: Optional[str] = None

@@ -1,0 +1,355 @@
+{
+  "timestamp": "2025-10-21T15:58:59.424758",
+  "services_tested": [
+    "azure",
+    "together",
+    "github",
+    "confluence",
+    "jira",
+    "vector"
+  ],
+  "results": {
+    "azure": {
+      "key_vault": {
+        "service": "Azure Key Vault",
+        "configured": true,
+        "connection": false,
+        "error": "Connection failed: <urllib3.connection.HTTPSConnection object at 0x00000218E332F410>: Failed to establish a new connection: [Errno 11001] getaddrinfo failed",
+        "details": {}
+      },
+      "openai": {
+        "service": "Azure OpenAI",
+        "configured": true,
+        "connection": false,
+        "error": "Connection failed: Connection error.",
+        "details": {}
+      },
+      "summary": {
+        "total_services": 2,
+        "configured_services": 2,
+        "connected_services": 0,
+        "success_rate": "0/2"
+      }
+    },
+    "together": {
+      "connection": {
+        "service": "Together AI",
+        "configured": true,
+        "connection": true,
+        "error": null,
+        "details": {
+          "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+          "api_key_prefix": "bff39f38...",
+          "test_response": ""
+        }
+      },
+      "models": {
+        "service": "Together AI Models",
+        "configured": true,
+        "connection": true,
+        "error": null,
+        "details": {
+          "total_models": 93,
+          "text_models": 66,
+          "current_model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+          "sample_models": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        }
+      },
+      "summary": {
+        "total_services": 2,
+        "configured_services": 2,
+        "connected_services": 2,
+        "success_rate": "2/2"
+      }
+    },
+    "github": {
+      "connection": {
+        "service": "GitHub API",
+        "configured": true,
+        "connection": true,
+        "error": "Connection failed: 'RateLimitOverview' object has no attribute 'core'",
+        "details": {}
+      },
+      "organization": {
+        "service": "GitHub Organization",
+        "configured": true,
+        "connection": true,
+        "error": null,
+        "details": {
+          "organization": "AM-Portfolio",
+          "name": null,
+          "description": null,
+          "public_repos": 13,
+          "total_repos": 16,
+          "members_count": 0,
+          "sample_repos": [
+            "am-common-data",
+            "am-document-processor",
+            "am-portfolio",
+            "am-common-investment-data",
+            "am-market-data"
+          ]
+        }
+      },
+      "repository": {
+        "service": "GitHub Repository Access",
+        "configured": true,
+        "connection": true,
+        "error": null,
+        "details": {
+          "repository": "AM-Portfolio/ai-bots",
+          "full_name": "AM-Portfolio/ai-bots",
+          "description": null,
+          "private": false,
+          "default_branch": "main",
+          "branches_count": 5,
+          "recent_commits": [
+            {
+              "sha": "73f56a7",
+              "message": "Merge pull request #1 from AM-Portfolio/bot-testing-local"
+            },
+            {
+              "sha": "25c1ab2",
+              "message": "Improve code commit and branch creation workflow"
+            },
+            {
+              "sha": "6bf5fea",
+              "message": "Improve commit intent parsing by using a resilient orchestrator"
+            },
+            {
+              "sha": "b5eda63",
+              "message": "Add GitHub token support for commit operations"
+            },
+            {
+              "sha": "e95b4a7",
+              "message": "Improve GitHub integration by using a centralized client"
+            }
+          ]
+        }
+      },
+      "summary": {
+        "total_services": 3,
+        "configured_services": 3,
+        "connected_services": 3,
+        "success_rate": "3/3"
+      }
+    },
+    "confluence": {
+      "connection": {
+        "service": "Confluence API",
+        "configured": true,
+        "connection": true,
+        "error": null,
+        "details": {
+          "url": "https://munishmaersk.atlassian.net/wiki",
+          "email": "munish.maersk@outlook.com",
+          "space_key": "~712020d4f71b3abac74895ba25e7e54d4cfc10",
+          "parent_page_id": ""
+        }
+      },
+      "spaces": {
+        "service": "Confluence Spaces",
+        "configured": true,
+        "connection": true,
+        "error": null,
+        "details": {
+          "total_spaces": 2,
+          "default_space_key": "~712020d4f71b3abac74895ba25e7e54d4cfc10",
+          "available_spaces": [
+            {
+              "key": "~712020d4f71b3abac74895ba25e7e54d4cfc10",
+              "name": "Munish Maersk"
+            },
+            {
+              "key": "SD",
+              "name": "Software development"
+            }
+          ]
+        }
+      },
+      "space_access": {
+        "service": "Confluence Space Access",
+        "configured": true,
+        "connection": false,
+        "error": "Space access failed: 'ConfluenceReplitClient' object has no attribute 'get_space_info'",
+        "details": {}
+      },
+      "page_creation": {
+        "service": "Confluence Page Creation",
+        "configured": true,
+        "connection": true,
+        "error": null,
+        "details": {
+          "test_page_created": true,
+          "page_id": "688145",
+          "page_url": "https://munishmaersk.atlassian.net/wiki/spaces/~712020d4f71b3abac74895ba25e7e54d4cfc10/pages/688145/Connection+Test+-+12044.937",
+          "deletion_status": "failed to delete"
+        }
+      },
+      "summary": {
+        "total_services": 4,
+        "configured_services": 4,
+        "connected_services": 3,
+        "success_rate": "3/4"
+      }
+    },
+    "jira": {
+      "connection": {
+        "service": "Jira API",
+        "configured": true,
+        "connection": true,
+        "error": null,
+        "details": {
+          "url": "https://munishmaersk.atlassian.net",
+          "email": "munish.maersk@outlook.com",
+          "user": "712020:d4f71b3a-bac7-4895-ba25-e7e54d4cfc10",
+          "project_key": "KAN",
+          "issue_type": "Task"
+        }
+      },
+      "projects": {
+        "service": "Jira Projects",
+        "configured": true,
+        "connection": true,
+        "error": null,
+        "details": {
+          "total_projects": 1,
+          "default_project_key": "KAN",
+          "available_projects": [
+            {
+              "key": "KAN",
+              "name": "ai-bots"
+            }
+          ]
+        }
+      },
+      "project_access": {
+        "service": "Jira Project Access",
+        "configured": true,
+        "connection": true,
+        "error": null,
+        "details": {
+          "project_key": "KAN",
+          "project_name": "ai-bots",
+          "project_lead": "Munish Maersk",
+          "recent_issues_count": 1,
+          "sample_issues": [
+            {
+              "key": "KAN-1",
+              "summary": "Test Issue - 2025-10-21 03:59:48"
+            }
+          ],
+          "available_issue_types": [
+            "Subtask",
+            "Story",
+            "Feature",
+            "Bug",
+            "Task"
+          ]
+        }
+      },
+      "issue_creation": {
+        "service": "Jira Issue Creation",
+        "configured": true,
+        "connection": true,
+        "error": null,
+        "details": {
+          "test_issue_created": true,
+          "issue_key": "KAN-3",
+          "issue_url": "https://munishmaersk.atlassian.net/browse/KAN-3",
+          "deletion_status": "deleted"
+        }
+      },
+      "summary": {
+        "total_services": 4,
+        "configured_services": 4,
+        "connected_services": 4,
+        "success_rate": "4/4"
+      }
+    },
+    "vector": {
+      "qdrant_connection": {
+        "service": "Qdrant Vector DB",
+        "configured": true,
+        "connection": true,
+        "error": null,
+        "details": {
+          "host": "localhost",
+          "port": 6333,
+          "collections_count": 1,
+          "collection_names": [
+            "github_repos"
+          ]
+        }
+      },
+      "qdrant_operations": {
+        "service": "Qdrant Operations",
+        "configured": true,
+        "connection": true,
+        "error": null,
+        "details": {
+          "test_collection": "test_collection_12052",
+          "vectors_added": 2,
+          "search_results": 2,
+          "collection_size": null
+        }
+      },
+      "fallback": {
+        "service": "Vector DB Fallback",
+        "configured": true,
+        "connection": true,
+        "error": null,
+        "details": {
+          "fallback_enabled": true,
+          "primary_provider": "qdrant",
+          "fallback_provider": "in-memory",
+          "test_data": {
+            "provider": "in-memory",
+            "collections": [],
+            "supports_persistence": false
+          }
+        }
+      },
+      "embeddings": {
+        "service": "Vector Embeddings",
+        "configured": true,
+        "connection": true,
+        "error": null,
+        "details": {
+          "available_services": 2,
+          "total_services": 2,
+          "services": {
+            "sentence_transformers": {
+              "available": true,
+              "embedding_size": 384
+            },
+            "openai": {
+              "available": true,
+              "note": "API key configured"
+            }
+          }
+        }
+      },
+      "summary": {
+        "total_services": 4,
+        "configured_services": 4,
+        "connected_services": 4,
+        "success_rate": "4/4"
+      }
+    }
+  },
+  "overall_summary": {
+    "total_services": 19,
+    "configured_services": 19,
+    "connected_services": 16,
+    "success_rate": "16/19",
+    "service_categories": 6,
+    "healthy_categories": 5
+  }
+}
