@@ -25,9 +25,15 @@ class Settings(BaseSettings):
     # Azure OpenAI Configuration
     azure_openai_endpoint: Optional[str] = None
     azure_openai_api_key: Optional[str] = None
+    azure_openai_key: Optional[str] = None  # Alias for azure_openai_api_key
     azure_openai_deployment_name: str = "gpt-4"
-    azure_openai_api_version: str = "2024-02-15-preview"
+    azure_openai_api_version: str = "2024-10-21"
     azure_openai_embedding_deployment: str = "text-embedding-ada-002"
+    
+    # Azure Model Deployments (from Azure AI Foundry)
+    azure_gpt4o_transcribe_deployment: str = "gpt-4o-transcribe-diarize"
+    azure_model_router_deployment: str = "model-router"
+    azure_gpt_audio_mini_deployment: str = "gpt-audio-mini"
     
     # Role-Based Provider Assignment (which provider to use for specific tasks)
     # Options: 'azure', 'together', or 'auto' (uses llm_provider default)
