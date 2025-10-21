@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Mic, MicOff, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { Send, Loader2, Mic, MicOff, ChevronDown, ChevronUp, Sparkles, ExternalLink, GitBranch, GitPullRequest } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -7,6 +7,7 @@ import { apiClient } from '../../services/api';
 import type { Provider, ThinkingProcessData } from '../../types/api';
 import { logger } from '../../utils/logger';
 import ThinkingProcess from '../Shared/ThinkingProcess';
+import ApprovalDialog from '../Shared/ApprovalDialog';
 import 'highlight.js/styles/github-dark.css';
 
 interface Message {
@@ -16,6 +17,18 @@ interface Message {
   duration?: number;
   thinking?: ThinkingProcessData;
   isExpanded?: boolean;
+  approvalRequest?: any;
+  workflow?: string;
+  intent?: any;
+  repoContent?: string;
+  nextActions?: Array<{
+    action: string;
+    label: string;
+    url?: string;
+    repository?: string;
+    source_branch?: string;
+    target_branch?: string;
+  }>;
 }
 
 const LLMTestPanel = () => {
@@ -26,6 +39,7 @@ const LLMTestPanel = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showBackendDetails, setShowBackendDetails] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
+  const [isApprovingCommit, setIsApprovingCommit] = useState(false);
   
   // Voice features
   const [isListening, setIsListening] = useState(false);
@@ -176,17 +190,167 @@ const LLMTestPanel = () => {
     ));
   };
 
+  const detectCommitIntent = (message: string): boolean => {
+    const lowerMessage = message.toLowerCase();
+    const commitKeywords = ['commit', 'push', 'create pr', 'pull request', 'merge', 'branch'];
+    return commitKeywords.some(keyword => lowerMessage.includes(keyword));
+  };
+
+  const extractRepository = (message: string): string | undefined => {
+    const repoPatterns = [
+      /repo(?:sitory)?\s+([a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+)/i,
+      /in\s+([a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+)/i,
+      /to\s+([a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+)/i,
+    ];
+    for (const pattern of repoPatterns) {
+      const match = message.match(pattern);
+      if (match) return match[1];
+    }
+    return undefined;
+  };
+
+  const handleApprove = async (messageIndex: number) => {
+    const message = messages[messageIndex];
+    if (!message.approvalRequest) return;
+
+    setIsApprovingCommit(true);
+    try {
+      const result = await apiClient.approveCommit(message.approvalRequest.id, true);
+      
+      if (result.success && result.operation_result) {
+        const opResult = result.operation_result;
+        let responseMessage = `## ✅ Operation Completed Successfully!\n\n`;
+        
+        if (opResult.repository) {
+          responseMessage += `**Repository**: \`${opResult.repository}\`\n`;
+        }
+        if (opResult.branch) {
+          responseMessage += `**Branch**: \`${opResult.branch}\`\n`;
+        }
+        if (opResult.commit_sha) {
+          responseMessage += `**Commit**: \`${opResult.commit_sha.substring(0, 7)}\`\n`;
+        }
+        
+        const assistantMessage: Message = {
+          role: 'assistant',
+          content: responseMessage,
+          isExpanded: true,
+          nextActions: opResult.next_actions || []
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      } else {
+        throw new Error(result.operation_result?.error || 'Operation failed');
+      }
+    } catch (error) {
+      const errorMessage: Message = {
+        role: 'assistant',
+        content: `❌ Operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        isExpanded: true
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsApprovingCommit(false);
+    }
+  };
+
+  const handleReject = async (messageIndex: number) => {
+    const message = messages[messageIndex];
+    if (!message.approvalRequest) return;
+
+    setIsApprovingCommit(true);
+    try {
+      await apiClient.approveCommit(message.approvalRequest.id, false, undefined, 'User rejected');
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: '❌ Operation rejected by user.',
+        isExpanded: true
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      const errorMessage: Message = {
+        role: 'assistant',
+        content: `Error rejecting operation: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        isExpanded: true
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsApprovingCommit(false);
+    }
+  };
+
+  const handleCommitWorkflow = async (userMessage: string) => {
+    try {
+      const repository = extractRepository(userMessage);
+      
+      // Step 1: Fetch GitHub content first using orchestrator
+      const fetchMessage: Message = {
+        role: 'assistant',
+        content: '🔍 Fetching repository content...',
+        isExpanded: true
+      };
+      setMessages((prev) => [...prev, fetchMessage]);
+      
+      const repoQuery = repository 
+        ? `Get content from repository ${repository}` 
+        : userMessage;
+      const contentResult = await apiClient.testLLM(repoQuery, provider, false, model);
+      
+      if (!contentResult.success || !contentResult.response) {
+        throw new Error('Failed to fetch repository content');
+      }
+      
+      // Step 2: Parse commit intent with fetched content
+      const result = await apiClient.parseCommitIntent(
+        userMessage, 
+        repository, 
+        undefined, 
+        { repo_content: contentResult.response }
+      );
+      
+      if (result.success && result.approval_request) {
+        const assistantMessage: Message = {
+          role: 'assistant',
+          content: '',
+          approvalRequest: result.approval_request,
+          workflow: result.workflow,
+          intent: result.intent,
+          repoContent: contentResult.response,
+          isExpanded: true
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      } else {
+        throw new Error('Failed to parse commit intent');
+      }
+    } catch (error) {
+      const errorMessage: Message = {
+        role: 'assistant',
+        content: `Error processing commit request: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        isExpanded: true
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = { role: 'user', content: input.trim(), isExpanded: true };
     setMessages((prev) => [...prev, userMessage]);
+    const currentInput = input.trim();
     setInput('');
     setIsLoading(true);
 
     await logger.llm.track('LLM query', async () => {
       try {
-        const result = await apiClient.testLLM(input.trim(), provider, showBackendDetails, model);
+        // Check if this is a commit/PR intent
+        if (detectCommitIntent(currentInput)) {
+          await handleCommitWorkflow(currentInput);
+          setIsLoading(false);
+          return;
+        }
+
+        // Regular LLM query
+        const result = await apiClient.testLLM(currentInput, provider, showBackendDetails, model);
         
         if (result.success && result.response) {
           const assistantMessage: Message = {
@@ -282,22 +446,57 @@ const LLMTestPanel = () => {
 
                   {/* Response Content */}
                   <div className="px-4 py-4">
-                    <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-strong:text-gray-900 prose-code:text-blue-600 prose-code:bg-blue-50 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-a:text-blue-600">
-                      <ReactMarkdown 
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeHighlight as any]}
-                      >
-                        {message.isExpanded ? message.content : extractOverview(message.content)}
-                      </ReactMarkdown>
-                      {!message.isExpanded && (
-                        <button
-                          onClick={() => toggleMessageExpansion(index)}
-                          className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    {message.approvalRequest ? (
+                      <ApprovalDialog
+                        approvalRequest={message.approvalRequest}
+                        workflow={message.workflow || 'unknown'}
+                        intent={message.intent || {}}
+                        onApprove={() => handleApprove(index)}
+                        onReject={() => handleReject(index)}
+                        isLoading={isApprovingCommit}
+                      />
+                    ) : (
+                      <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-strong:text-gray-900 prose-code:text-blue-600 prose-code:bg-blue-50 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-a:text-blue-600">
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          rehypePlugins={[rehypeHighlight as any]}
                         >
-                          Read full response →
-                        </button>
-                      )}
-                    </div>
+                          {message.isExpanded ? message.content : extractOverview(message.content)}
+                        </ReactMarkdown>
+                        {!message.isExpanded && message.content && (
+                          <button
+                            onClick={() => toggleMessageExpansion(index)}
+                            className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                          >
+                            Read full response →
+                          </button>
+                        )}
+                        
+                        {/* Next Actions Buttons */}
+                        {message.nextActions && message.nextActions.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <p className="text-sm font-semibold text-gray-700 mb-2">🎯 Next Actions:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {message.nextActions.map((action, idx) => {
+                                const Icon = action.action === 'view_commit' ? ExternalLink : action.action === 'view_branch' ? GitBranch : GitPullRequest;
+                                return (
+                                  <a
+                                    key={idx}
+                                    href={action.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-medium rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-sm hover:shadow-md"
+                                  >
+                                    <Icon className="w-4 h-4" />
+                                    {action.label}
+                                  </a>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Backend Execution Steps / Thinking Process */}

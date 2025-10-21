@@ -152,9 +152,9 @@ async def api_root():
         }
     }
 
-@app.get("/", response_class=FileResponse)
+@app.get("/")
 async def serve_frontend():
-    """Serve the React frontend"""
+    """Serve the React frontend or API info"""
     frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
     index_file = frontend_dist / "index.html"
     
@@ -165,7 +165,13 @@ async def serve_frontend():
             "service": "AI Dev Agent",
             "version": "1.0.0",
             "status": "running",
-            "note": "Frontend not built. Run 'cd frontend && npm run build' to build the frontend."
+            "note": "Frontend not built. Run 'cd frontend && npm run build' to build the frontend.",
+            "endpoints": {
+                "health": "/health",
+                "analyze": "/api/analyze",
+                "webhook": "/api/webhook",
+                "docs": "/docs"
+            }
         }
 
 
@@ -1264,6 +1270,414 @@ async def process_github_issue(issue_number: int, repository: str):
         await analyze_issue_endpoint(request, BackgroundTasks())
     except Exception as e:
         logger.error(f"Failed to process issue: {e}")
+
+
+# ==================== COMMIT WORKFLOW API ====================
+
+from orchestration.commit_workflow import CommitWorkflowRouter, GitHubOperations
+from orchestration.commit_workflow.approval_system import get_approval_manager
+
+class CommitWorkflowRequest(BaseModel):
+    """Request to initiate commit/publish workflow"""
+    message: str
+    repository: Optional[str] = None
+    branch: Optional[str] = None
+    files: Optional[Dict[str, str]] = None
+    context: Optional[Dict[str, Any]] = None
+
+
+@app.post("/api/commit/parse-intent")
+async def parse_commit_intent(request: CommitWorkflowRequest):
+    """
+    Parse user message to detect commit/publish intent
+    Returns approval template for user confirmation
+    
+    IMPORTANT: Requires repo_content in context to prevent commits without GitHub data
+    """
+    from shared.llm_providers.resilient_orchestrator import get_resilient_orchestrator
+    
+    logger.info(f"🧠 Parsing commit intent: {request.message[:100]}...")
+    
+    try:
+        # Validate that GitHub content was fetched
+        if not request.files or 'repo_content' not in request.files:
+            logger.error("❌ GitHub content not provided - commit workflow requires repository content")
+            raise HTTPException(
+                status_code=400,
+                detail="GitHub content must be fetched before creating commit. Please ensure repository content is loaded first."
+            )
+        
+        logger.info(f"✅ GitHub content validated (length: {len(request.files.get('repo_content', ''))} chars)")
+        
+        llm_orchestrator = get_resilient_orchestrator()
+        router = CommitWorkflowRouter(llm_orchestrator)
+        
+        intent = await router.parse_user_intent(request.message, request.context)
+        
+        workflow_result = await router.route_to_workflow(
+            intent,
+            {
+                "repository": request.repository,
+                "branch": request.branch or "main",
+                "files": request.files or {},
+                "context": request.context or {}
+            }
+        )
+        
+        approval_manager = get_approval_manager()
+        approval_request = approval_manager.create_approval_request(
+            operation_type=workflow_result["workflow"],
+            title=workflow_result["template"].title,
+            description=workflow_result["template"].description,
+            template_data=workflow_result["template"].fields
+        )
+        
+        return {
+            "success": True,
+            "intent": {
+                "platform": intent.platform,
+                "action": intent.action,
+                "confidence": intent.confidence
+            },
+            "workflow": workflow_result["workflow"],
+            "template": workflow_result["template"].fields,
+            "approval_request": approval_request.to_dict(),
+            "requires_approval": workflow_result.get("requires_approval", True)
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to parse commit intent: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class ApprovalResponse(BaseModel):
+    """User's response to approval request"""
+    approval_id: str
+    approved: bool
+    updated_template: Optional[Dict[str, Any]] = None
+    rejection_reason: Optional[str] = None
+
+
+@app.post("/api/commit/approve")
+async def approve_commit(response: ApprovalResponse):
+    """
+    User approves/rejects commit operation
+    If approved, executes the operation
+    """
+    approval_manager = get_approval_manager()
+    
+    logger.info(f"📋 Processing approval: {response.approval_id}, approved={response.approved}")
+    
+    try:
+        if not response.approved:
+            approval_manager.reject_request(response.approval_id, response.rejection_reason)
+            return {
+                "success": True,
+                "status": "rejected",
+                "message": "Operation cancelled by user"
+            }
+        
+        approval_request = approval_manager.approve_request(
+            response.approval_id,
+            response.updated_template
+        )
+        
+        if not approval_request:
+            raise HTTPException(status_code=404, detail="Approval request not found or expired")
+        
+        result = await execute_commit_operation(
+            operation_type=approval_request.operation_type,
+            template_data=approval_request.template_data
+        )
+        
+        return {
+            "success": True,
+            "status": "approved",
+            "operation_result": result
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to process approval: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def execute_commit_operation(operation_type: str, template_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Execute approved commit/publish operation
+    Returns result with links for next actions
+    Uses centralized GitHub client from wrapper
+    """
+    logger.info(f"⚡ Executing operation: {operation_type}")
+    
+    # Get GitHub client from centralized wrapper
+    from shared.clients.wrappers.github_wrapper import GitHubWrapper
+    github_wrapper = GitHubWrapper()
+    
+    # Extract PyGithub client from wrapper
+    github_client = None
+    if github_wrapper._env_client and hasattr(github_wrapper._env_client, 'client'):
+        github_client = github_wrapper._env_client.client
+        logger.info("✅ Using centralized GitHub client from ENV wrapper")
+    elif github_wrapper._replit_client:
+        logger.warning("⚠️ Replit connector detected, but PyGithub operations require ENV-based client")
+    
+    github_ops = GitHubOperations(github_client)
+    
+    if operation_type == "github_commit":
+        result = await github_ops.commit_files(
+            repository=template_data["repository"],
+            branch=template_data["branch"],
+            files=template_data.get("files", {}),
+            commit_message=template_data["commit_message"],
+            commit_description=template_data.get("commit_description")
+        )
+        
+        if result["success"]:
+            pr_url = f"https://github.com/{template_data['repository']}/compare/{result.get('base_branch', 'main')}...{result['branch']}?expand=1"
+            
+            return {
+                **result,
+                "next_actions": [
+                    {
+                        "action": "view_commit",
+                        "label": "View Commit",
+                        "url": result["commit_url"]
+                    },
+                    {
+                        "action": "view_branch",
+                        "label": "View Branch",
+                        "url": result.get("branch_url", result["commit_url"])
+                    },
+                    {
+                        "action": "create_pr",
+                        "label": "Create Pull Request",
+                        "url": pr_url,
+                        "repository": template_data["repository"],
+                        "source_branch": result["branch"],
+                        "target_branch": result.get("base_branch", "main")
+                    }
+                ]
+            }
+        return result
+    
+    elif operation_type == "github_pr":
+        result = await github_ops.create_pull_request(
+            repository=template_data["repository"],
+            source_branch=template_data.get("source_branch", "main"),
+            target_branch=template_data.get("target_branch", "main"),
+            title=template_data.get("pr_title", ""),
+            description=template_data.get("pr_description"),
+            reviewers=template_data.get("reviewers"),
+            assignees=template_data.get("assignees"),
+            labels=template_data.get("labels"),
+            draft=template_data.get("draft", False)
+        )
+        
+        if result["success"]:
+            return {
+                **result,
+                "next_actions": [
+                    {
+                        "action": "view_pr",
+                        "label": "View Pull Request",
+                        "url": result["pr_url"]
+                    }
+                ]
+            }
+        return result
+    
+    elif operation_type == "github_commit_and_pr":
+        result = await github_ops.commit_and_create_pr(
+            repository=template_data["repository"],
+            branch=template_data.get("branch", "main"),
+            files=template_data.get("files", {}),
+            commit_message=template_data["commit_message"],
+            pr_title=template_data.get("pr_title", template_data["commit_message"]),
+            pr_description=template_data.get("pr_description", ""),
+            target_branch=template_data.get("target_branch", "main")
+        )
+        
+        if result["success"]:
+            return {
+                **result,
+                "next_actions": [
+                    {
+                        "action": "view_commit",
+                        "label": "View Commit",
+                        "url": result["commit_url"]
+                    },
+                    {
+                        "action": "view_pr",
+                        "label": "View Pull Request",
+                        "url": result["pr_url"]
+                    }
+                ]
+            }
+        return result
+    
+    else:
+        logger.warning(f"Unknown operation type: {operation_type}")
+        return {"success": False, "error": "Unknown operation type"}
+
+
+@app.get("/api/commit/pending-approvals")
+async def list_pending_approvals():
+    """List all pending approval requests"""
+    approval_manager = get_approval_manager()
+    pending = approval_manager.list_pending_requests()
+    
+    return {
+        "pending_approvals": [req.to_dict() for req in pending],
+        "count": len(pending)
+    }
+
+
+# ==================== Voice Assistant API ====================
+
+# Initialize voice orchestrator (lazy-loaded)
+_voice_orchestrator = None
+
+def get_voice_orchestrator():
+    """Get or create voice orchestrator instance"""
+    global _voice_orchestrator
+    if _voice_orchestrator is None:
+        from orchestration.voice_assistant import VoiceOrchestrator
+        _voice_orchestrator = VoiceOrchestrator()
+    return _voice_orchestrator
+
+
+class VoiceSessionRequest(BaseModel):
+    """Request to create or get a voice session"""
+    session_id: Optional[str] = None
+    user_id: Optional[str] = None
+
+
+class VoiceSessionResponse(BaseModel):
+    """Response for voice session"""
+    session_id: str
+    created_at: datetime
+    turn_count: int
+    status: str
+
+
+class VoiceProcessRequest(BaseModel):
+    """Request to process voice input"""
+    session_id: str
+    audio_data: str  # Base64 encoded audio
+    audio_format: str = "webm"  # webm, mp3, wav
+
+
+class VoiceProcessResponse(BaseModel):
+    """Response from voice processing"""
+    session_id: str
+    transcript: str
+    intent: str
+    confidence: float
+    response_text: str
+    response_audio: Optional[str] = None
+    orchestration_used: str
+    thinking: Optional[Dict] = None
+
+
+@app.post("/api/voice/session", response_model=VoiceSessionResponse)
+async def create_voice_session(request: VoiceSessionRequest):
+    """
+    Create or retrieve a voice conversation session
+    
+    This maintains conversation context across multiple voice interactions.
+    """
+    logger.info(f"🎤 Voice session request: {request.session_id}")
+    
+    try:
+        orchestrator = get_voice_orchestrator()
+        
+        # Generate session ID if not provided
+        import uuid
+        session_id = request.session_id or str(uuid.uuid4())
+        
+        # Get or create session
+        session = orchestrator.session_manager.get_or_create_session(
+            session_id,
+            request.user_id
+        )
+        
+        return VoiceSessionResponse(
+            session_id=session.session_id,
+            created_at=session.created_at,
+            turn_count=len(session.turns),
+            status="active"
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Voice session creation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/voice/process", response_model=VoiceProcessResponse)
+async def process_voice(request: VoiceProcessRequest):
+    """
+    Process voice input end-to-end
+    
+    Flow:
+    1. Transcribe audio (STT)
+    2. Classify intent
+    3. Route to orchestration (commit, GitHub query, general)
+    4. Format response for voice
+    5. Synthesize speech (TTS)
+    
+    Returns transcript, intent, response text, and audio.
+    """
+    logger.info(f"🎤 Processing voice for session: {request.session_id}")
+    
+    try:
+        orchestrator = get_voice_orchestrator()
+        
+        # Create voice request
+        from orchestration.voice_assistant.voice_orchestrator import VoiceRequest
+        voice_request = VoiceRequest(
+            session_id=request.session_id,
+            audio_data=request.audio_data,
+            audio_format=request.audio_format
+        )
+        
+        # Process voice request
+        result = await orchestrator.process_voice_request(voice_request)
+        
+        return VoiceProcessResponse(
+            session_id=result.session_id,
+            transcript=result.transcript,
+            intent=result.intent,
+            confidence=result.confidence,
+            response_text=result.response_text,
+            response_audio=result.response_audio,
+            orchestration_used=result.orchestration_used,
+            thinking=result.thinking
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Voice processing failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/voice/session/{session_id}/history")
+async def get_conversation_history(session_id: str):
+    """Get conversation history for a session"""
+    try:
+        orchestrator = get_voice_orchestrator()
+        history = orchestrator.session_manager.get_conversation_history(session_id)
+        
+        return {
+            "session_id": session_id,
+            "history": history,
+            "count": len(history)
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to get conversation history: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== End Voice Assistant API ====================
 
 
 @app.get("/{full_path:path}", response_class=FileResponse)

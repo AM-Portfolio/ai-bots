@@ -1,17 +1,27 @@
 {
-  "name": "workspace",
+  "name": "ai-dev-agent-full-stack",
   "version": "1.0.0",
-  "description": "An intelligent, autonomous development agent that diagnoses bugs, generates fixes, creates pull requests, and publishes documentation across multiple platforms.",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
+  "description": "AI Development Agent - Full Stack Application",
   "license": "ISC",
   "dependencies": {
     "react-markdown": "^10.1.0",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1"
+  },
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd . && python main.py",
+    "dev:frontend": "cd frontend && npm run dev",
+    "install:frontend": "cd frontend && npm install",
+    "build:frontend": "cd frontend && npm run build",
+    "setup": "npm run install:frontend && pip install -r requirements.txt",
+    "start": "npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "python": ">=3.8.0"
   }
 }

@@ -57,6 +57,9 @@ class RepositoryIndexer:
             Indexing results with statistics
         """
         logger.info(f"🔍 Starting to index repository: {owner}/{repo}")
+        logger.info(f"   📋 Repository: {owner}/{repo}")
+        logger.info(f"   🌿 Branch: {branch}")
+        logger.info(f"   📦 Collection: {collection_name}")
         
         if not self.github_client:
             logger.error("❌ GitHub client not configured")
@@ -64,42 +67,80 @@ class RepositoryIndexer:
         
         try:
             # Get repository tree
+            logger.info(f"📂 Fetching repository tree from GitHub...")
             tree = await self._get_repository_tree(owner, repo, branch)
             
             if not tree:
+                logger.error("❌ Failed to fetch repository tree")
                 return {'success': False, 'error': 'Failed to fetch repository tree'}
             
+            logger.info(f"✅ Retrieved {len(tree)} items from repository")
+            
             # Filter files to index (code, docs, markdown)
+            logger.info(f"🔍 Filtering indexable files...")
             files_to_index = self._filter_indexable_files(tree)
             
-            logger.info(f"📝 Found {len(files_to_index)} files to index")
+            logger.info(f"📝 Found {len(files_to_index)} files to index out of {len(tree)} total files")
+            if len(files_to_index) > 0:
+                logger.info(f"   📄 File types: {', '.join(set(f.get('path', '').split('.')[-1] for f in files_to_index if '.' in f.get('path', '')))}")
             
             # Fetch file contents and create documents
+            logger.info(f"📥 Processing {len(files_to_index)} files and fetching content...")
             documents = []
             metadatas = []
+            processed_count = 0
+            skipped_count = 0
             
-            for file_info in files_to_index:
+            for i, file_info in enumerate(files_to_index):
+                if (i + 1) % 10 == 0 or i == 0:
+                    logger.info(f"   📊 Processing file {i + 1}/{len(files_to_index)}: {file_info.get('path', 'unknown')}")
+                
                 doc, metadata = await self._process_file(
                     owner, repo, file_info, branch
                 )
                 if doc and metadata:
                     documents.append(doc)
                     metadatas.append(metadata)
+                    processed_count += 1
+                else:
+                    skipped_count += 1
+            
+            logger.info(f"✅ Content processing complete: {processed_count} processed, {skipped_count} skipped")
             
             if not documents:
                 return {'success': False, 'error': 'No documents to index'}
             
             # Generate embeddings
             logger.info(f"🎯 Generating embeddings for {len(documents)} documents...")
+            logger.info(f"   🤖 Using embedding service: {self.embedding_service.provider_name}")
+            logger.info(f"   📐 Model: {self.embedding_service.embedding_model}")
+            logger.info(f"   📏 Dimensions: {self.embedding_service.get_dimension()}")
+            
+            start_time = datetime.now()
             embeddings = await self.embedding_service.generate_embeddings_batch(documents)
+            end_time = datetime.now()
+            
+            duration = (end_time - start_time).total_seconds()
+            logger.info(f"✅ Embedding generation completed in {duration:.2f} seconds")
+            logger.info(f"   ⚡ Average: {duration/len(documents):.3f}s per document")
             
             # Add to vector database
+            logger.info(f"💾 Adding documents to vector database...")
+            logger.info(f"   📊 Collection: {collection_name}")
+            logger.info(f"   📄 Documents: {len(documents)}")
+            logger.info(f"   🎯 Embeddings: {len(embeddings)}")
+            
+            start_time = datetime.now()
             success = await self.vector_db.add_documents(
                 collection=collection_name,
                 documents=documents,
                 embeddings=embeddings,
                 metadatas=metadatas
             )
+            end_time = datetime.now()
+            
+            db_duration = (end_time - start_time).total_seconds()
+            logger.info(f"✅ Vector DB storage completed in {db_duration:.2f} seconds")
             
             if success:
                 logger.info(f"✅ Successfully indexed {len(documents)} documents from {owner}/{repo}")
@@ -196,7 +237,12 @@ class RepositoryIndexer:
             
             # Skip very large files (>500KB)
             if len(content) > 500_000:
-                logger.info(f"⏭️  Skipping large file {file_path} ({len(content)} bytes)")
+                logger.warning(f"⏭️  Skipping large file {file_path} ({len(content):,} bytes > 500KB limit)")
+                return None, None
+            
+            # Skip empty files
+            if len(content.strip()) == 0:
+                logger.debug(f"⏭️  Skipping empty file {file_path}")
                 return None, None
             
             # Create unique document ID
