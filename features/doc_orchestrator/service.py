@@ -177,14 +177,18 @@ Provide well-structured documentation in markdown format with sections, examples
                 thinking.start_step("publish_confluence")
                 
                 confluence_client = ConfluenceClient()
-                confluence_page = confluence_client.create_page(
+                confluence_page_id = await confluence_client.create_page(
                     space_key=effective_space_key,
                     title=f"AI Documentation: {doc_result.repository or 'Generated'}",
                     content=doc_result.documentation or "",
                     parent_id=effective_parent_id
                 )
                 
-                if confluence_page:
+                if confluence_page_id:
+                    # Get full page information including URL
+                    confluence_page_info = await confluence_client.get_page(confluence_page_id)
+                    confluence_page = confluence_page_info or {"id": confluence_page_id, "url": f"{settings.confluence_url}/wiki/pages/{confluence_page_id}"}
+                    
                     workflow_summary["step_3_confluence"] = f"published: {confluence_page.get('url', 'N/A')}"
                     thinking.complete_step("publish_confluence", {"page_url": confluence_page.get('url')})
                     logger.info(f"Published to Confluence: {confluence_page.get('url')}")

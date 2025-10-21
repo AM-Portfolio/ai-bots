@@ -64,6 +64,17 @@ Respond in JSON format:
                 messages=[{"role": "user", "content": parse_prompt}],
                 temperature=0.3
             )
+            
+            if response is None:
+                logger.error("LLM response is None, using fallback parsing")
+                return {
+                    "repository": None,
+                    "files": [],
+                    "task_type": "general",
+                    "focus_areas": [],
+                    "search_query": None
+                }
+            
             import json
             parsed = json.loads(response.strip().strip('```json').strip('```').strip())
             logger.info(f"Parsed prompt: {parsed}")

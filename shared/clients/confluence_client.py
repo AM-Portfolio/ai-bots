@@ -64,7 +64,7 @@ class ConfluenceClient:
         """Check if Confluence is configured"""
         return bool(self.auth_header)
     
-    def get_page(self, page_id: str) -> Optional[Dict[str, Any]]:
+    async def get_page(self, page_id: str) -> Optional[Dict[str, Any]]:
         if not self.client:
             return None
         
@@ -85,7 +85,7 @@ class ConfluenceClient:
             logger.error(f"Failed to get Confluence page {page_id}: {e}")
             return None
     
-    def create_page(
+    async def create_page(
         self,
         space_key: str,
         title: str,

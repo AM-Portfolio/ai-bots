@@ -82,7 +82,11 @@ class EmbeddingService:
                 logger.warning("⚠️  TOGETHER_API_KEY not found, using fallback embeddings only")
                 return
             
-            self.client = Together(api_key=api_key)
+            # Set environment variable for Together client (it reads from env)
+            if api_key and not os.environ.get("TOGETHER_API_KEY"):
+                os.environ["TOGETHER_API_KEY"] = api_key
+            
+            self.client = Together()
             self.api_available = True
             logger.info("✅ Together AI embedding client initialized successfully")
             
