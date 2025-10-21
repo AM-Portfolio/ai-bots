@@ -15,6 +15,8 @@ from enum import Enum
 from shared.azure_services.speech_service import AzureSpeechService
 from shared.azure_services.translation_service import AzureTranslationService
 from shared.azure_services.model_deployment_service import AzureModelDeploymentService
+from shared.azure_services.azure_config_validator import azure_config_validator
+from shared.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -40,27 +42,41 @@ class AzureAIManager:
         self.translation = AzureTranslationService()
         self.models = AzureModelDeploymentService()
         
+        # Validate configuration using external validator
+        azure_config_validator.log_validation_results()
+        
         logger.info("🧠 Azure AI Manager initialized")
         logger.info(f"   • Speech Service: {'✓' if self.speech.is_available() else '✗'}")
         logger.info(f"   • Translation Service: {'✓' if self.translation.is_available() else '✗'}")
         logger.info(f"   • Model Deployments: {'✓' if self.models.is_available() else '✗'}")
     
+    def get_configuration_status(self) -> Dict[str, Any]:
+        """Get detailed configuration status from .env using the validator"""
+        return azure_config_validator.get_configuration_status()
+    
+    def check_missing_env_variables(self, update_file: bool = False) -> Dict[str, Any]:
+        """Check for missing environment variables using the validator"""
+        return azure_config_validator.check_missing_variables(update_file=update_file)
+    
     def get_service_status(self) -> Dict[str, Any]:
-        """Get status of all Azure AI services"""
+        """Get status of all Azure AI services with configuration details from .env"""
+        config_status = self.get_configuration_status()
+        
         return {
+            "configuration": config_status,
             "service_endpoints": {
                 "speech": {
                     "available": self.speech.is_available(),
-                    "region": self.speech.speech_region if hasattr(self.speech, 'speech_region') else None
+                    "region": config_status["azure_speech"]["region"]
                 },
                 "translation": {
                     "available": self.translation.is_available(),
-                    "endpoint": self.translation.translation_endpoint if hasattr(self.translation, 'translation_endpoint') else None
+                    "endpoint": config_status["azure_translation"]["endpoint"]
                 }
             },
             "model_deployments": {
                 "available": self.models.is_available(),
-                "endpoint": self.models.endpoint if hasattr(self.models, 'endpoint') else None
+                "endpoint": config_status["azure_openai"]["endpoint"]
             }
         }
     
@@ -238,11 +254,14 @@ class AzureAIManager:
     
     async def test_all_services(self) -> Dict[str, Any]:
         """
-        Test all Azure AI services
+        Test all Azure AI services with configuration details from .env
         
-        Returns health status and capabilities of each service
+        Returns health status, capabilities, and configuration of each service
         """
         logger.info("🧪 Testing all Azure AI services...")
+        
+        # Get configuration status
+        config_status = self.get_configuration_status()
         
         # Get deployment info if available
         deployment_info = None
@@ -250,17 +269,21 @@ class AzureAIManager:
             deployment_info = await self.models.get_deployment_info()
         
         results = {
+            "configuration_from_env": config_status,
             "speech_service": {
                 "available": self.speech.is_available(),
-                "region": self.speech.speech_region if hasattr(self.speech, 'speech_region') else None
+                "region": config_status["azure_speech"]["region"],
+                "configured": config_status["azure_speech"]["configured"]
             },
             "translation_service": {
                 "available": self.translation.is_available(),
-                "endpoint": self.translation.translation_endpoint if hasattr(self.translation, 'translation_endpoint') else None
+                "endpoint": config_status["azure_translation"]["endpoint"],
+                "configured": config_status["azure_translation"]["configured"]
             },
             "model_deployments": {
                 "available": self.models.is_available(),
-                "deployments": deployment_info
+                "deployments": deployment_info,
+                "configured": config_status["azure_openai"]["configured"]
             },
             "workflows_available": []
         }
@@ -275,8 +298,19 @@ class AzureAIManager:
         
         logger.info(f"✅ Service test complete")
         logger.info(f"   • Available workflows: {len(results['workflows_available'])}")
+        logger.info(f"   • Speech configured: {config_status['azure_speech']['configured']}")
+        logger.info(f"   • Translation configured: {config_status['azure_translation']['configured']}")
+        logger.info(f"   • OpenAI configured: {config_status['azure_openai']['configured']}")
         
         return results
+    
+    def get_configuration_status(self) -> Dict[str, Any]:
+        """Get detailed configuration status from .env using the validator"""
+        return azure_config_validator.get_configuration_status()
+    
+    def check_missing_env_variables(self, update_file: bool = False) -> Dict[str, Any]:
+        """Check for missing environment variables using the validator"""
+        return azure_config_validator.check_missing_variables(update_file=update_file)
 
 
 # Global instance

@@ -28,24 +28,22 @@ class AzureModelDeploymentService:
     """
     
     def __init__(self):
-        self.endpoint = getattr(settings, 'azure_openai_endpoint', None)
-        self.api_key = getattr(settings, 'azure_openai_key', None)
-        self.api_version = getattr(settings, 'azure_openai_api_version', '2024-10-21')
+        # Get configuration from .env via settings
+        self.endpoint = settings.azure_openai_endpoint
+        self.api_key = settings.azure_openai_api_key or settings.azure_openai_key
+        self.api_version = settings.azure_openai_api_version or '2024-10-21'
         
-        # Deployment names from Azure
-        self.gpt4o_transcribe_deployment = getattr(
-            settings,
-            'azure_gpt4o_transcribe_deployment',
+        # Deployment names from .env configuration with fallbacks
+        self.gpt4o_transcribe_deployment = (
+            settings.azure_gpt4o_transcribe_deployment or
             'gpt-4o-transcribe-diarize'
         )
-        self.model_router_deployment = getattr(
-            settings,
-            'azure_model_router_deployment',
+        self.model_router_deployment = (
+            settings.azure_model_router_deployment or
             'model-router'
         )
-        self.gpt_audio_mini_deployment = getattr(
-            settings,
-            'azure_gpt_audio_mini_deployment',
+        self.gpt_audio_mini_deployment = (
+            settings.azure_gpt_audio_mini_deployment or
             'gpt-audio-mini'
         )
         
@@ -66,7 +64,8 @@ class AzureModelDeploymentService:
             except Exception as e:
                 logger.warning(f"⚠️  Azure Model Deployment initialization failed: {e}")
         else:
-            logger.warning("⚠️  Azure Model Deployment credentials not configured")
+            logger.warning("⚠️  Azure Model Deployment credentials not configured in .env")
+            logger.warning("   Required: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY")
     
     def is_available(self) -> bool:
         """Check if Azure Model Deployment service is available"""

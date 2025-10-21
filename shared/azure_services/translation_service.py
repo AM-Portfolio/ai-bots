@@ -27,9 +27,20 @@ class AzureTranslationService:
     """
     
     def __init__(self):
-        self.translation_key = settings.azure_translation_key
-        self.translation_region = settings.azure_translation_region
-        self.translation_endpoint = "https://api.cognitive.microsofttranslator.com"
+        # Use new variable names with fallback to legacy names
+        self.translation_key = (
+            settings.azure_translation_key or 
+            settings.azure_translator_key
+        )
+        self.translation_region = (
+            settings.azure_translation_region or 
+            settings.azure_translator_region
+        )
+        self.translation_endpoint = (
+            settings.azure_translation_endpoint or 
+            settings.azure_translator_endpoint or
+            "https://api.cognitive.microsofttranslator.com"
+        )
         self._headers = None
         self._initialize()
     
