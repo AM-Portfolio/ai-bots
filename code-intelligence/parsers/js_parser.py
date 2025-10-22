@@ -29,7 +29,7 @@ class JavaScriptParser(BaseParser):
         if HAS_TREE_SITTER:
             try:
                 self.parser = Parser()
-                JS_LANGUAGE = Language(tsjs.language())
+                JS_LANGUAGE = Language(tsjs.language(), 'javascript')
                 self.parser.language = JS_LANGUAGE
                 self.language_obj = JS_LANGUAGE
             except Exception as e:

@@ -241,6 +241,10 @@ class RepoState:
             return self.chunk_states[chunk_id].summary
         return None
     
+    def get_chunk_state(self, chunk_id: str) -> Optional[ChunkState]:
+        """Get state for a specific chunk"""
+        return self.chunk_states.get(chunk_id)
+    
     def get_failed_chunks(self) -> List[str]:
         """Get list of chunks that failed to embed"""
         return [

@@ -29,7 +29,7 @@ class PythonParser(BaseParser):
         if HAS_TREE_SITTER:
             try:
                 self.parser = Parser()
-                PY_LANGUAGE = Language(tspython.language())
+                PY_LANGUAGE = Language(tspython.language(), 'python')
                 self.parser.language = PY_LANGUAGE
                 self.language_obj = PY_LANGUAGE
             except Exception as e:

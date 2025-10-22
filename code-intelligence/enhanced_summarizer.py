@@ -464,45 +464,78 @@ class EnhancedCodeSummarizer:
         chunks: List[CodeChunk],
         use_cache: bool = True
     ) -> Dict[str, str]:
-        """Summarize multiple chunks in parallel"""
-        logger.info(f"📝 Starting batch summarization of {len(chunks)} chunks")
+        """Summarize chunks in smaller batches with real-time progress tracking"""
+        total_chunks = len(chunks)
+        logger.info(f"📝 Starting batch summarization of {total_chunks} chunks")
         logger.info(f"   Cache enabled: {use_cache}")
         
         # Check cache hits
         cache_hits = 0
+        chunks_to_process = []
+        cached_results = {}
+        
         if use_cache:
             for chunk in chunks:
-                if self.repo_state.get_chunk_state(chunk.chunk_id):
+                cached_state = self.repo_state.get_chunk_state(chunk.chunk_id)
+                if cached_state and cached_state.summary:
                     cache_hits += 1
+                    cached_results[chunk.chunk_id] = cached_state.summary
+                else:
+                    chunks_to_process.append(chunk)
+        else:
+            chunks_to_process = chunks
         
         if cache_hits > 0:
-            logger.info(f"   💾 Cache: {cache_hits}/{len(chunks)} chunks already summarized")
-            logger.info(f"   🔄 Will generate {len(chunks) - cache_hits} new summaries")
+            logger.info(f"   💾 Cache: {cache_hits}/{total_chunks} chunks already summarized")
+            logger.info(f"   🔄 Will generate {len(chunks_to_process)} new summaries")
         
-        tasks = [
-            self.summarize_chunk(chunk, use_cache)
-            for chunk in chunks
-        ]
-        
-        # Process with progress tracking
-        logger.info("   ⏳ Processing summaries (this may take a few minutes)...")
-        summaries = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        result = {}
+        # Process in smaller batches for better progress visibility
+        batch_size = 10  # Process 10 at a time for progress updates
+        result = cached_results.copy()
         error_count = 0
         fallback_count = 0
+        total_processed = cache_hits
         
-        for chunk, summary in zip(chunks, summaries):
-            if isinstance(summary, Exception):
-                error_count += 1
-                logger.error(f"   ✗ Failed to summarize {chunk.chunk_id}: {summary}")
-                metadata = self.extract_metadata(chunk)
-                result[chunk.chunk_id] = self._fallback_summary(chunk, metadata)
-                fallback_count += 1
-            else:
-                result[chunk.chunk_id] = summary
+        logger.info(f"   ⏳ Processing {len(chunks_to_process)} summaries in batches of {batch_size}...")
+        logger.info(f"   📊 Starting: {total_processed}/{total_chunks} complete ({(total_processed/total_chunks)*100:.1f}%)")
         
-        logger.info(f"   ✅ Batch complete: {len(result)} summaries generated")
+        for i in range(0, len(chunks_to_process), batch_size):
+            batch = chunks_to_process[i:i + batch_size]
+            batch_start_time = asyncio.get_event_loop().time()
+            
+            # Process this batch in parallel
+            tasks = [self.summarize_chunk(chunk, use_cache) for chunk in batch]
+            summaries = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Collect results
+            for chunk, summary in zip(batch, summaries):
+                if isinstance(summary, Exception):
+                    error_count += 1
+                    logger.debug(f"   ✗ Failed to summarize {chunk.chunk_id}: {summary}")
+                    metadata = self.extract_metadata(chunk)
+                    result[chunk.chunk_id] = self._fallback_summary(chunk, metadata)
+                    fallback_count += 1
+                else:
+                    result[chunk.chunk_id] = summary
+                
+                total_processed += 1
+            
+            # Calculate progress and ETA
+            progress_pct = (total_processed / total_chunks) * 100
+            batch_time = asyncio.get_event_loop().time() - batch_start_time
+            avg_time_per_chunk = batch_time / len(batch)
+            remaining_chunks = total_chunks - total_processed
+            eta_seconds = remaining_chunks * avg_time_per_chunk
+            eta_minutes = eta_seconds / 60
+            
+            # Log progress with ETA
+            logger.info(
+                f"   📊 Progress: {total_processed}/{total_chunks} summaries "
+                f"({progress_pct:.1f}% complete) - "
+                f"ETA: {eta_minutes:.1f} min"
+            )
+        
+        logger.info(f"   ✅ Batch complete: {len(result)} summaries generated (100.0%)")
         if error_count > 0:
             logger.warning(f"   ⚠️  {error_count} errors, {fallback_count} fallback summaries used")
         

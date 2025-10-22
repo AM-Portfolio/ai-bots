@@ -286,33 +286,10 @@ class EmbeddingOrchestrator:
                 avg_length = sum(summary_lengths) / len(summary_lengths)
                 logger.info(f"   ✅ Generated {len(summaries)} summaries (avg length: {avg_length:.0f} chars)")
             
-            # Step 6: Generate embeddings (Phase 2)
-            logger.info("🔢 Phase 2: Embedding Generation")
-            embeddings = await self._embed_batch(all_chunks, summaries)
-            
-            # Step 7: Store in Qdrant
-            logger.info("💾 Storing embeddings in Qdrant...")
-            embedding_points = [
-                EmbeddingPoint(
-                    chunk_id=chunk.chunk_id,
-                    embedding=embeddings[i],
-                    content=chunk.content,
-                    summary=summaries.get(chunk.chunk_id, ""),
-                    metadata={
-                        "file_path": chunk.metadata.file_path,
-                        "language": chunk.metadata.language,
-                        "chunk_type": chunk.metadata.chunk_type,
-                        "symbol_name": chunk.metadata.symbol_name,
-                        "start_line": chunk.metadata.start_line,
-                        "end_line": chunk.metadata.end_line,
-                        "token_count": chunk.metadata.token_count
-                    }
-                )
-                for i, chunk in enumerate(all_chunks)
-                if i < len(embeddings)
-            ]
-            
-            upsert_result = await self.vector_store.upsert_batch(embedding_points)
+            # Step 6 & 7: Generate embeddings AND store incrementally (Phase 2)
+            logger.info("🔢 Phase 2: Embedding Generation & Storage")
+            logger.info(f"   Processing {len(all_chunks)} chunks in batches")
+            chunks_embedded = await self._embed_and_store_incremental(all_chunks, summaries)
             
             # Step 8: Update repo state
             for file_path in prioritized_files:
@@ -332,9 +309,9 @@ class EmbeddingOrchestrator:
                 "files_changed": len(changed_files),
                 "files_processed": len(prioritized_files),
                 "chunks_generated": len(all_chunks),
-                "chunks_embedded": upsert_result["successful"],
-                "chunks_failed": upsert_result["failed"],
-                "success_rate": upsert_result["success_rate"],
+                "chunks_embedded": chunks_embedded,
+                "chunks_failed": len(all_chunks) - chunks_embedded,
+                "success_rate": (chunks_embedded / len(all_chunks) * 100) if all_chunks else 0,
                 "rate_limiter_stats": {
                     quota.value: self.rate_limiter.get_metrics(quota)
                     for quota in QuotaType
@@ -352,28 +329,44 @@ class EmbeddingOrchestrator:
         finally:
             await self.rate_limiter.stop()
     
-    async def _embed_batch(
+    async def _embed_and_store_incremental(
         self,
         chunks: List,
         summaries: Dict[str, str]
-    ) -> List[List[float]]:
+    ) -> int:
         """
-        Generate embeddings for chunks with summaries using shared embedding service.
+        Generate embeddings AND store incrementally in small batches.
+        This avoids memory issues with large repos and provides better progress tracking.
         
         Args:
             chunks: List of code chunks
             summaries: Dict of chunk_id -> summary
             
         Returns:
-            List of embedding vectors
+            Number of chunks successfully embedded and stored
         """
-        embeddings = []
         batch_size = self.rate_limiter.get_adaptive_batch_size(QuotaType.EMBEDDING)
+        # Keep batch size reasonable for storage (max 50 at a time)
+        batch_size = min(batch_size, 50)
         
-        logger.info(f"Embedding {len(chunks)} chunks in batches of {batch_size}")
+        total_chunks = len(chunks)
+        total_embedded = 0
+        total_failed = 0
+        num_batches = (total_chunks + batch_size - 1) // batch_size
         
-        for i in tqdm(range(0, len(chunks), batch_size), desc="Embedding"):
-            batch = chunks[i:i + batch_size]
+        logger.info(f"   Batch size: {batch_size} chunks")
+        logger.info(f"   Total batches: {num_batches}")
+        
+        for batch_num in range(num_batches):
+            start_idx = batch_num * batch_size
+            end_idx = min(start_idx + batch_size, total_chunks)
+            batch = chunks[start_idx:end_idx]
+            
+            # Calculate progress
+            progress = ((batch_num + 1) / num_batches) * 100
+            
+            logger.info(f"\n📦 Batch {batch_num + 1}/{num_batches} ({progress:.1f}% complete)")
+            logger.info(f"   Processing chunks {start_idx + 1}-{end_idx} of {total_chunks}")
             
             # Prepare texts (summary + code)
             texts = [
@@ -383,26 +376,56 @@ class EmbeddingOrchestrator:
             
             # Embed with rate limiting using shared embedding service
             async def embed_batch():
-                # Use shared embedding service (handles Azure, Together AI, fallback)
                 return await self.embedding_service.generate_embeddings_batch(texts)
             
             try:
+                # Generate embeddings
+                logger.debug(f"   🔢 Generating embeddings...")
                 batch_embeddings = await self.rate_limiter.submit(
                     QuotaType.EMBEDDING,
                     embed_batch,
                     priority=2
                 )
-                embeddings.extend(batch_embeddings)
-                logger.debug(f"✅ Batch {i//batch_size + 1} embedded: {len(batch_embeddings)} vectors")
+                
+                # Create embedding points
+                embedding_points = [
+                    EmbeddingPoint(
+                        chunk_id=chunk.chunk_id,
+                        embedding=batch_embeddings[i],
+                        content=chunk.content,
+                        summary=summaries.get(chunk.chunk_id, ""),
+                        metadata={
+                            "file_path": chunk.metadata.file_path,
+                            "language": chunk.metadata.language,
+                            "chunk_type": chunk.metadata.chunk_type,
+                            "symbol_name": chunk.metadata.symbol_name,
+                            "start_line": chunk.metadata.start_line,
+                            "end_line": chunk.metadata.end_line,
+                            "token_count": chunk.metadata.token_count
+                        }
+                    )
+                    for i, chunk in enumerate(batch)
+                    if i < len(batch_embeddings)
+                ]
+                
+                # Store immediately in Qdrant
+                logger.debug(f"   💾 Storing {len(embedding_points)} embeddings...")
+                upsert_result = await self.vector_store.upsert_batch(embedding_points)
+                
+                successful = upsert_result["successful"]
+                failed = upsert_result["failed"]
+                total_embedded += successful
+                total_failed += failed
+                
+                logger.info(f"   ✅ Batch complete: {successful} embedded, {failed} failed")
+                logger.info(f"   📊 Total progress: {total_embedded}/{total_chunks} chunks ({(total_embedded/total_chunks)*100:.1f}%)")
+                
             except Exception as e:
-                logger.error(f"Failed to embed batch {i//batch_size + 1}: {e}")
-                # Add placeholder embeddings for failed batch (use configured dimension)
-                placeholder_dim = self.embedding_service.get_dimension()
-                embeddings.extend([[0.0] * placeholder_dim] * len(batch))
+                logger.error(f"   ❌ Batch {batch_num + 1} failed: {e}")
+                total_failed += len(batch)
         
-        return embeddings
-        
-        return embeddings
+        logger.info(f"\n✅ Embedding complete: {total_embedded} successful, {total_failed} failed")
+        return total_embedded
 
 
 async def main():

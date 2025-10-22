@@ -169,10 +169,20 @@ class AzureModelDeploymentService:
         deployment = model or self.chat_model
         
         try:
+            # Log request details
             logger.info(f"💬 Azure Chat Completion")
             logger.info(f"   • Model: {deployment}")
             logger.info(f"   • Messages: {len(messages)}")
             logger.info(f"   • Temperature: {temperature}")
+            if max_tokens:
+                logger.info(f"   • Max tokens: {max_tokens}")
+            
+            # Log message details at debug level
+            for i, msg in enumerate(messages):
+                role = msg.get('role', 'unknown')
+                content = msg.get('content', '')
+                content_preview = content[:100] + '...' if len(content) > 100 else content
+                logger.info(f"   • Message {i+1} [{role}]: {content_preview}")
             
             response = await self.client.chat.completions.create(
                 model=deployment,
@@ -187,6 +197,8 @@ class AzureModelDeploymentService:
             logger.info(f"✅ Chat complete")
             logger.info(f"   • Model used: {model_used}")
             logger.info(f"   • Response length: {len(result)} chars")
+            if result:
+                logger.info(f"   • Response preview: {result[:150]}...")
             
             return result
             
