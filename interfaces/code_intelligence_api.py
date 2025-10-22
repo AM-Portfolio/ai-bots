@@ -22,20 +22,29 @@ from parsers import parser_registry
 from change_planner import ChangePlanner
 from enhanced_summarizer import EnhancedCodeSummarizer
 from vector_store import VectorStore, EmbeddingPoint
+from embed_repo import EmbeddingOrchestrator
 
 from shared.logger import get_logger
 from shared.azure_services.azure_ai_manager import azure_ai_manager
+from shared.llm_providers.github_llm_provider import (
+    GitHubLLMProvider,
+    RepoAnalysisRequest,
+    QueryType
+)
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/api/code-intelligence", tags=["code-intelligence"])
+router = APIRouter(prefix="/api/repo-code-intelligence", tags=["repo-code-intelligence"])
 
 
 class EmbedRepoRequest(BaseModel):
-    repo_path: str = "."
+    github_repository: str  # Required: GitHub repository (owner/repo)
+    repo_path: str = "."  # Local path for code-intelligence processing
     max_files: Optional[int] = None
     force_reindex: bool = False
     collection_name: str = "code_intelligence"
+    query: Optional[str] = None  # Optional: Filter files by query
+    language: Optional[str] = None  # Optional: Filter by language
 
 
 class EmbedRepoResponse(BaseModel):
@@ -61,46 +70,28 @@ class QueryCodeResponse(BaseModel):
 
 class CodeIntelligenceOrchestrator:
     """
-    Orchestrator for code intelligence operations.
-    Integrates with the main app's Azure AI and vector DB systems.
+    Thin API orchestrator - delegates to code-intelligence orchestrator.
     """
     
     def __init__(self):
-        self.rate_limiter = None
-        self.summarizer = None
-        self.vector_store = None
+        self.code_intel_orchestrator = None
         self._initialized = False
     
     async def initialize(self):
-        """Initialize the orchestrator with app's Azure AI"""
+        """Initialize the orchestrator"""
         if self._initialized:
             return
         
         try:
-            logger.info("🚀 Initializing Code Intelligence Orchestrator...")
+            logger.info("🚀 Initializing Code Intelligence API Orchestrator...")
             
-            # Initialize rate limiter
-            self.rate_limiter = RateLimitController()
-            await self.rate_limiter.start()
+            # Import and initialize main orchestrator from code-intelligence
+            from orchestrator import CodeIntelligenceOrchestrator as MainOrchestrator
             
-            # Initialize repo state
-            self.repo_state = RepoState(".code-intelligence-state.json")
-            
-            # Initialize enhanced summarizer with app's Azure AI
-            self.summarizer = EnhancedCodeSummarizer(
-                self.repo_state,
-                self.rate_limiter,
-                azure_ai_manager.models if azure_ai_manager.models.is_available() else None
-            )
-            
-            # Initialize vector store
-            self.vector_store = VectorStore(
-                collection_name="code_intelligence",
-                qdrant_path="./qdrant_data"
-            )
+            self.code_intel_orchestrator = MainOrchestrator(repo_path=".")
             
             self._initialized = True
-            logger.info("✅ Code Intelligence Orchestrator initialized")
+            logger.info("✅ Code Intelligence API Orchestrator initialized")
             
         except Exception as e:
             logger.error(f"Failed to initialize orchestrator: {e}")
@@ -108,372 +99,94 @@ class CodeIntelligenceOrchestrator:
     
     async def embed_repository(
         self,
+        github_repository: str,
         repo_path: str = ".",
         max_files: Optional[int] = None,
-        force_reindex: bool = False
+        force_reindex: bool = False,
+        query: Optional[str] = None,
+        language: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Embed repository with enhanced summaries.
+        Embed repository - delegates to main orchestrator.
         
         Args:
-            repo_path: Path to repository
+            github_repository: GitHub repository (owner/repo)
+            repo_path: Local path for processing
             max_files: Maximum files to process
             force_reindex: Force re-embedding of all files
+            query: Optional query to filter relevant files
+            language: Optional language filter
             
         Returns:
             Statistics about the embedding process
         """
         await self.initialize()
         
-        logger.info(f"📖 Starting code intelligence embedding for: {repo_path}")
+        logger.info(f"📖 API: Embed repository request for: {github_repository}")
         
-        # Initialize change planner
-        change_planner = ChangePlanner(repo_path)
-        
-        # Discover files
-        all_files = self._discover_files(repo_path)
-        logger.info(f"📁 Discovered {len(all_files)} files")
-        
-        # Detect changes
-        if force_reindex:
-            changed_files = set(all_files)
-            logger.info("🔄 Force reindex enabled - processing all files")
-        else:
-            changed_files = self.repo_state.get_changed_files(all_files)
-            logger.info(f"📊 {len(changed_files)} files changed")
-        
-        # Prioritize files
-        prioritized_files = change_planner.get_top_priority_files(
-            all_files,
-            max_files=max_files or len(all_files),
-            changed_files=changed_files
+        # Delegate to main CodeIntelligenceOrchestrator which handles GitHub LLM + embedding
+        stats = await self.code_intel_orchestrator.embed_repository(
+            collection_name="code_intelligence",
+            max_files=max_files,
+            force_reindex=force_reindex,
+            github_repository=github_repository,
+            query=query,
+            language=language
         )
         
-        # Parse and chunk
-        all_chunks = []
-        for file_path in prioritized_files:
-            try:
-                chunks = parser_registry.parse_file(file_path)
-                all_chunks.extend(chunks)
-            except Exception as e:
-                logger.error(f"Failed to parse {file_path}: {e}")
-        
-        logger.info(f"✂️ Generated {len(all_chunks)} code chunks")
-        
-        # Generate enhanced summaries
-        logger.info("📝 Generating enhanced summaries...")
-        summaries = await self.summarizer.summarize_batch(all_chunks)
-        
-        # Generate TWO embeddings per chunk (code + summary)
-        logger.info("🔢 Generating dual embeddings (raw code + enhanced summary)...")
-        code_embeddings, summary_embeddings = await self._embed_batch(all_chunks, summaries)
-        
-        # Store BOTH embeddings in vector DB
-        logger.info("💾 Storing in vector database...")
-        
-        # Create TWO embedding points per chunk
-        embedding_points = []
-        
-        for i, chunk in enumerate(all_chunks):
-            if i >= len(code_embeddings):
-                continue
-            
-            base_metadata = {
-                "file_path": chunk.metadata.file_path,
-                "language": chunk.metadata.language,
-                "chunk_type": chunk.metadata.chunk_type,
-                "symbol_name": chunk.metadata.symbol_name,
-                "start_line": chunk.metadata.start_line,
-                "end_line": chunk.metadata.end_line,
-                "token_count": chunk.metadata.token_count
-            }
-            
-            # 1. Raw code embedding
-            embedding_points.append(
-                EmbeddingPoint(
-                    chunk_id=f"{chunk.chunk_id}_code",
-                    embedding=code_embeddings[i],
-                    content=chunk.content,
-                    summary="",  # No summary for raw code embedding
-                    metadata={
-                        **base_metadata,
-                        "embedding_type": "raw_code",
-                        "parent_chunk_id": chunk.chunk_id
-                    }
-                )
-            )
-            
-            # 2. Enhanced summary embedding
-            embedding_points.append(
-                EmbeddingPoint(
-                    chunk_id=f"{chunk.chunk_id}_summary",
-                    embedding=summary_embeddings[i],
-                    content=chunk.content,
-                    summary=summaries.get(chunk.chunk_id, ""),
-                    metadata={
-                        **base_metadata,
-                        "embedding_type": "enhanced_summary",
-                        "parent_chunk_id": chunk.chunk_id
-                    }
-                )
-            )
-        
-        logger.info(f"📊 Created {len(embedding_points)} embedding points ({len(embedding_points)//2} code + {len(embedding_points)//2} summaries)")
-        
-        upsert_result = await self.vector_store.upsert_batch(embedding_points)
-        
-        # Update repo state
-        for file_path in prioritized_files:
-            file_chunks = [c for c in all_chunks if c.metadata.file_path == file_path]
-            if file_chunks:
-                self.repo_state.update_file_state(
-                    file_path=file_path,
-                    language=file_chunks[0].metadata.language,
-                    chunk_count=len(file_chunks),
-                    status="completed"
-                )
-        
-        self.repo_state.save_manifest()
-        
-        # Return statistics
-        stats = {
-            "files_discovered": len(all_files),
-            "files_changed": len(changed_files),
-            "files_processed": len(prioritized_files),
-            "chunks_generated": len(all_chunks),
-            "chunks_embedded": upsert_result["successful"],
-            "chunks_failed": upsert_result["failed"],
-            "success_rate": upsert_result["success_rate"],
-        }
-        
-        logger.info(f"✅ Embedding complete: {stats['chunks_embedded']}/{stats['chunks_generated']} chunks")
-        
         return stats
-    
-    async def _embed_batch(
-        self,
-        chunks: List,
-        summaries: Dict[str, str]
-    ) -> tuple[List[List[float]], List[List[float]]]:
-        """
-        Generate TWO embeddings per chunk:
-        1. Raw code embedding - for exact code matching
-        2. Enhanced summary embedding - for conceptual/technical understanding
-        
-        Returns:
-            Tuple of (code_embeddings, summary_embeddings)
-        """
-        code_embeddings = []
-        summary_embeddings = []
-        batch_size = self.rate_limiter.get_adaptive_batch_size(QuotaType.EMBEDDING)
-        
-        for i in range(0, len(chunks), batch_size):
-            batch = chunks[i:i + batch_size]
-            
-            # Prepare TWO sets of texts
-            # 1. Raw code only (for exact matching)
-            code_texts = [chunk.content[:2000] for chunk in batch]
-            
-            # 2. Enhanced summary with context (for conceptual search)
-            summary_texts = [
-                f"Summary: {summaries.get(chunk.chunk_id, '')}\n\nCode Context:\n{chunk.content[:500]}"
-                for chunk in batch
-            ]
-            
-            # Embed raw code
-            async def embed_code():
-                if not azure_ai_manager.models.is_available():
-                    raise Exception("Azure OpenAI not configured")
-                
-                response = await azure_ai_manager.models.create_embeddings(
-                    texts=code_texts,
-                    model="text-embedding-3-large"
-                )
-                return [item["embedding"] for item in response]
-            
-            # Embed enhanced summaries
-            async def embed_summaries():
-                if not azure_ai_manager.models.is_available():
-                    raise Exception("Azure OpenAI not configured")
-                
-                response = await azure_ai_manager.models.create_embeddings(
-                    texts=summary_texts,
-                    model="text-embedding-3-large"
-                )
-                return [item["embedding"] for item in response]
-            
-            try:
-                # Execute both embeddings in parallel
-                code_batch, summary_batch = await asyncio.gather(
-                    self.rate_limiter.submit(
-                        QuotaType.EMBEDDING,
-                        embed_code,
-                        priority=2
-                    ),
-                    self.rate_limiter.submit(
-                        QuotaType.EMBEDDING,
-                        embed_summaries,
-                        priority=2
-                    )
-                )
-                
-                code_embeddings.extend(code_batch)
-                summary_embeddings.extend(summary_batch)
-                
-            except Exception as e:
-                logger.error(f"Failed to embed batch: {e}")
-                # Add placeholder embeddings
-                code_embeddings.extend([[0.0] * 3072] * len(batch))
-                summary_embeddings.extend([[0.0] * 3072] * len(batch))
-        
-        return code_embeddings, summary_embeddings
-    
-    def _discover_files(self, repo_path: str) -> List[str]:
-        """Discover code files in repository"""
-        import os
-        from pathlib import Path
-        
-        exclude_patterns = [
-            '.git', 'node_modules', '__pycache__', 'venv',
-            '.venv', 'dist', 'build', '.next', 'target'
-        ]
-        
-        files = []
-        supported_extensions = parser_registry.get_supported_extensions()
-        
-        for root, dirs, filenames in os.walk(repo_path):
-            dirs[:] = [d for d in dirs if d not in exclude_patterns]
-            
-            for filename in filenames:
-                file_path = Path(root) / filename
-                if file_path.suffix.lower() in supported_extensions:
-                    files.append(str(file_path.relative_to(repo_path)))
-        
-        return files
     
     async def query_code(
         self,
         query: str,
         limit: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-        embedding_type: str = "both"
+        filters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
-        Query code using semantic search.
+        Query code - delegates to EmbeddingOrchestrator's vector store.
         
         Args:
             query: Natural language query
             limit: Maximum results
-            filters: Metadata filters (language, file_path, etc.)
-            embedding_type: Search "code", "summary", or "both" embeddings
+            filters: Metadata filters
             
         Returns:
             List of matching code chunks with summaries
         """
         await self.initialize()
         
+        logger.info(f"🔍 API: Query code request: '{query}'")
+        
+        # Delegate to VectorStore search (via embedding orchestrator)
+        # Note: Direct search on vector store, no special query logic needed
+        from vector_store import VectorStore
+        from shared.vector_db.embedding_service import EmbeddingService
+        
         # Generate query embedding
-        query_embedding = await self._embed_query(query)
+        embedding_service = EmbeddingService(provider="auto")
+        query_embedding = await embedding_service.generate_embeddings_batch([query])
         
-        # Add embedding_type filter
-        search_filters = filters.copy() if filters else {}
-        
-        if embedding_type == "code":
-            search_filters["embedding_type"] = "raw_code"
-        elif embedding_type == "summary":
-            search_filters["embedding_type"] = "enhanced_summary"
-        # "both" - no filter, search all
-        
-        # Search vector DB
-        results = self.vector_store.search(
-            query_embedding=query_embedding,
-            limit=limit * 2 if embedding_type == "both" else limit,  # Get more for deduplication
-            filter_dict=search_filters
+        # Search vector store
+        vector_store = VectorStore(
+            collection_name="code_intelligence",
+            qdrant_path="./qdrant_data"
         )
         
-        # If searching both, deduplicate by parent_chunk_id and merge
-        if embedding_type == "both":
-            results = self._merge_dual_results(results, limit)
+        results = vector_store.search(
+            query_embedding=query_embedding[0],
+            limit=limit,
+            filter_dict=filters
+        )
+        
+        logger.info(f"✅ Found {len(results)} results")
         
         return results
     
-    def _merge_dual_results(
-        self,
-        results: List[Dict[str, Any]],
-        limit: int
-    ) -> List[Dict[str, Any]]:
-        """
-        Merge results from both code and summary embeddings.
-        For each chunk, combine scores from both embedding types.
-        """
-        chunk_map = {}
-        
-        for result in results:
-            parent_id = result["metadata"].get("parent_chunk_id")
-            if not parent_id:
-                continue
-            
-            if parent_id not in chunk_map:
-                chunk_map[parent_id] = {
-                    "content": result["content"],
-                    "summary": result.get("summary", ""),
-                    "metadata": {k: v for k, v in result["metadata"].items() if k != "embedding_type"},
-                    "code_score": 0.0,
-                    "summary_score": 0.0,
-                    "combined_score": 0.0
-                }
-            
-            # Add score based on embedding type
-            emb_type = result["metadata"].get("embedding_type")
-            if emb_type == "raw_code":
-                chunk_map[parent_id]["code_score"] = result.get("score", 0.0)
-            elif emb_type == "enhanced_summary":
-                chunk_map[parent_id]["summary_score"] = result.get("score", 0.0)
-                # Use summary from summary embedding
-                chunk_map[parent_id]["summary"] = result.get("summary", "")
-        
-        # Calculate combined score (weighted average: 40% code, 60% summary)
-        for chunk_data in chunk_map.values():
-            chunk_data["combined_score"] = (
-                0.4 * chunk_data["code_score"] +
-                0.6 * chunk_data["summary_score"]
-            )
-        
-        # Sort by combined score and return top results
-        merged_results = [
-            {
-                "content": data["content"],
-                "summary": data["summary"],
-                "metadata": data["metadata"],
-                "score": data["combined_score"],
-                "code_score": data["code_score"],
-                "summary_score": data["summary_score"]
-            }
-            for data in chunk_map.values()
-        ]
-        
-        merged_results.sort(key=lambda x: x["score"], reverse=True)
-        return merged_results[:limit]
-    
-    async def _embed_query(self, query: str) -> List[float]:
-        """Generate embedding for query"""
-        async def embed():
-            response = await azure_ai_manager.models.create_embeddings(
-                texts=[query],
-                model="text-embedding-3-large"
-            )
-            return response[0]["embedding"]
-        
-        return await self.rate_limiter.submit(
-            QuotaType.EMBEDDING,
-            embed,
-            priority=1  # High priority for queries
-        )
-    
     async def cleanup(self):
         """Cleanup resources"""
-        if self.rate_limiter:
-            await self.rate_limiter.stop()
+        if self.code_intel_orchestrator:
+            # Cleanup handled by code-intelligence orchestrator
+            pass
 
 
 # Global orchestrator instance
@@ -481,29 +194,54 @@ orchestrator = CodeIntelligenceOrchestrator()
 
 
 @router.post("/embed", response_model=EmbedRepoResponse)
+@router.post("/embed", response_model=EmbedRepoResponse)
 async def embed_repository(request: EmbedRepoRequest):
     """
     Embed a repository with enhanced summaries.
     
+    Endpoint: POST /api/repo-code-intelligence/embed
+    
     This endpoint:
-    1. Discovers and prioritizes code files
-    2. Generates rich technical summaries
-    3. Embeds code + summaries together
-    4. Stores in vector database
+    1. Uses GitHub LLM to analyze repository structure
+    2. Identifies relevant files based on query/filters
+    3. Discovers and prioritizes code files locally
+    4. Generates rich technical summaries
+    5. Embeds code + summaries together
+    6. Stores in vector database
+    
+    Workflow:
+    - GitHub repository analysis → Local file discovery → Code intelligence embedding
     """
     try:
+        logger.info(f"📥 Embed request for GitHub repository: {request.github_repository}")
+        if request.query:
+            logger.info(f"   Query filter: {request.query}")
+        if request.language:
+            logger.info(f"   Language filter: {request.language}")
+        
         stats = await orchestrator.embed_repository(
+            github_repository=request.github_repository,
             repo_path=request.repo_path,
             max_files=request.max_files,
-            force_reindex=request.force_reindex
+            force_reindex=request.force_reindex,
+            query=request.query,
+            language=request.language
         )
+        
+        if not stats.get("success", True):
+            raise HTTPException(
+                status_code=500,
+                detail=stats.get("error", "Embedding failed")
+            )
         
         return EmbedRepoResponse(
             success=True,
             stats=stats,
-            message=f"Successfully embedded {stats['chunks_embedded']} code chunks"
+            message=f"Successfully embedded {stats.get('chunks_embedded', 0)} code chunks from {request.github_repository}"
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Embedding failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -513,6 +251,8 @@ async def embed_repository(request: EmbedRepoRequest):
 async def query_code(request: QueryCodeRequest):
     """
     Query code using semantic search with dual embeddings.
+    
+    Endpoint: POST /api/repo-code-intelligence/query
     
     Embedding Types:
     - "code": Search raw code embeddings (exact code matching)
@@ -559,7 +299,10 @@ async def query_code(request: QueryCodeRequest):
 
 @router.get("/status")
 async def get_status():
-    """Get code intelligence system status"""
+    """Get repository code intelligence system status
+    
+    Endpoint: GET /api/repo-code-intelligence/status
+    """
     try:
         await orchestrator.initialize()
         
@@ -582,7 +325,10 @@ async def get_status():
 
 @router.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint
+    
+    Endpoint: GET /api/repo-code-intelligence/health
+    """
     try:
         await orchestrator.initialize()
         is_healthy = orchestrator.vector_store.health_check()

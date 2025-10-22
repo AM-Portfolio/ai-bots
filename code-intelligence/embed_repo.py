@@ -1,23 +1,26 @@
 """
-Main Orchestrator for Code Intelligence Embedding Pipeline
+Embedding Pipeline - Pure Embedding Logic
 
-Two-Phase Approach:
-1. Phase 1: Parse → Summarize (with caching)
-2. Phase 2: Embed code + summaries → Store in Qdrant
+Responsibilities:
+- File discovery and filtering
+- Parsing and chunking code
+- Enhanced summarization
+- Batch embedding generation
 
-Features:
-- Incremental updates (only embed changed files)
-- Rate-limit aware with adaptive batching
-- Smart prioritization (changed files first)
-- Resilient error handling with DLQ
-- Progress tracking and reporting
+Does NOT handle:
+- Vector DB operations (done in orchestrator)
+- GitHub LLM analysis (done in orchestrator)
+- API requests (done in API layer)
+- CLI commands (done in orchestrator)
+
+This module focuses purely on generating embeddings from code.
 """
 
 import asyncio
 import os
 import sys
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 import logging
 from tqdm import tqdm
 
@@ -29,7 +32,6 @@ from repo_state import RepoState
 from parsers import parser_registry
 from change_planner import ChangePlanner
 from enhanced_summarizer import EnhancedCodeSummarizer
-from vector_store import VectorStore, EmbeddingPoint
 
 # Import shared embedding service from vector_db module
 from shared.vector_db.embedding_service import EmbeddingService
@@ -41,41 +43,37 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class EmbeddingOrchestrator:
+class EmbeddingPipeline:
     """
-    Main orchestrator for the embedding pipeline.
+    Pure embedding pipeline - generates embeddings from code.
     
-    Coordinates all stages:
-    1. File discovery and change detection
-    2. Prioritization
-    3. Parsing and chunking
-    4. Summarization (Phase 1)
-    5. Embedding (Phase 2)
-    6. Vector DB storage
+    Stages:
+    1. File discovery and filtering
+    2. Parsing and chunking
+    3. Enhanced summarization
+    4. Batch embedding generation
+    
+    Returns structured data ready for vector DB storage.
     """
     
     def __init__(
         self,
         repo_path: str = ".",
         manifest_path: str = ".code-intelligence-state.json",
-        collection_name: str = "code_intelligence",
-        qdrant_path: str = "./qdrant_data",
         embedding_provider: str = "auto"
     ):
         """
-        Initialize orchestrator.
+        Initialize embedding pipeline.
         
         Args:
             repo_path: Path to repository
             manifest_path: Path to state manifest
-            collection_name: Qdrant collection name
-            qdrant_path: Path to Qdrant storage
             embedding_provider: Embedding provider ('auto', 'azure', 'together')
         """
         self.repo_path = Path(repo_path)
         
         # Initialize components
-        logger.info("🚀 Initializing Code Intelligence Pipeline...")
+        logger.info("🚀 Initializing Embedding Pipeline...")
         
         self.rate_limiter = RateLimitController()
         self.repo_state = RepoState(manifest_path)
@@ -86,15 +84,9 @@ class EmbeddingOrchestrator:
         logger.info(f"📦 Initializing embedding service (provider: {embedding_provider})...")
         self.embedding_service = EmbeddingService(provider=embedding_provider)
         
-        # Get dimension from embedding service for vector store
+        # Get dimension from embedding service
         embedding_dim = self.embedding_service.get_dimension()
         logger.info(f"   Embedding dimension: {embedding_dim}")
-        
-        self.vector_store = VectorStore(
-            collection_name=collection_name,
-            qdrant_path=qdrant_path,
-            embedding_dim=embedding_dim
-        )
         
         logger.info("✅ Pipeline initialized")
     
@@ -199,20 +191,32 @@ class EmbeddingOrchestrator:
         logger.info(f"   Supported extensions: {', '.join(list(supported_extensions)[:10])}...")
         return files
     
-    async def run_incremental(
+    async def generate_embeddings(
         self,
         max_files: Optional[int] = None,
-        force_reindex: bool = False
+        force_reindex: bool = False,
+        file_filter: Optional[set] = None
     ) -> Dict[str, Any]:
         """
-        Run incremental embedding (only changed files).
+        Generate embeddings for code files.
+        
+        Workflow:
+        1. Discover local files
+        2. Filter by file_filter (if provided) or change detection
+        3. Parse and chunk
+        4. Summarize
+        5. Generate embeddings
         
         Args:
             max_files: Limit number of files to process (None = all)
             force_reindex: Force re-embedding of all files
+            file_filter: Optional set of file paths to filter (from GitHub LLM)
             
         Returns:
-            Stats about the run
+            Dict with:
+            - embedding_data: List of dicts with chunk info and embeddings
+            - stats: Statistics
+            - files_processed: List of processed files
         """
         logger.info("="* 60)
         logger.info("🎯 Starting Incremental Embedding Pipeline")
@@ -227,29 +231,58 @@ class EmbeddingOrchestrator:
         await self.rate_limiter.start()
         
         try:
+            stats = {
+                "success": True,
+                "files_discovered": 0,
+                "files_processed": 0,
+                "chunks_generated": 0,
+                "chunks_embedded": 0,
+                "failed_chunks": 0,
+                "success_rate": 0.0
+            }
+            
             # Step 1: Discover files
             all_files = self.discover_files()
+            stats["files_discovered"] = len(all_files)
             
-            # Step 2: Detect changed files
-            if force_reindex:
-                logger.info("🔄 Force reindex enabled - processing all files")
-                changed_files = set(all_files)
+            # Step 2: Filter files
+            if file_filter and not force_reindex:
+                # Use provided file filter (e.g., from GitHub LLM)
+                logger.info(f"🎯 Filtering files using provided filter ({len(file_filter)} files)")
+                prioritized_files = []
+                
+                for file_path in all_files:
+                    # Check if file_path matches any filter path
+                    if any(filter_path in file_path for filter_path in file_filter):
+                        prioritized_files.append(file_path)
+                
+                logger.info(f"   Filtered to {len(prioritized_files)} files")
+                
+                if max_files and len(prioritized_files) > max_files:
+                    prioritized_files = prioritized_files[:max_files]
+                    logger.info(f"   Limited to {max_files} files")
             else:
-                changed_files = self.repo_state.get_changed_files(all_files)
+                # Normal prioritization using change detection
+                if force_reindex:
+                    logger.info("🔄 Force reindex enabled - processing all files")
+                    changed_files = set(all_files)
+                else:
+                    changed_files = self.repo_state.get_changed_files(all_files)
+                
+                prioritized_files = self.change_planner.get_top_priority_files(
+                    all_files,
+                    max_files=max_files or len(all_files),
+                    changed_files=changed_files
+                )
+                
+                logger.info(
+                    f"📊 Processing {len(prioritized_files)} files "
+                    f"({len(changed_files)} changed)"
+                )
             
-            # Step 3: Prioritize files
-            prioritized_files = self.change_planner.get_top_priority_files(
-                all_files,
-                max_files=max_files or len(all_files),
-                changed_files=changed_files
-            )
+            stats["files_processed"] = len(prioritized_files)
             
-            logger.info(
-                f"📊 Processing {len(prioritized_files)} files "
-                f"({len(changed_files)} changed)"
-            )
-            
-            # Step 4: Parse and chunk
+            # Step 3: Parse and chunk
             logger.info("📖 Phase 1: Parsing and Summarization")
             all_chunks = []
             parse_errors = []
@@ -268,6 +301,8 @@ class EmbeddingOrchestrator:
             if parse_errors:
                 logger.warning(f"   ⚠️  {len(parse_errors)} files failed to parse")
             
+            stats["chunks_generated"] = len(all_chunks)
+            
             # Show chunk type distribution
             chunk_types = {}
             for chunk in all_chunks:
@@ -275,7 +310,7 @@ class EmbeddingOrchestrator:
                 chunk_types[chunk_type] = chunk_types.get(chunk_type, 0) + 1
             logger.info(f"   Chunk types: {dict(sorted(chunk_types.items(), key=lambda x: x[1], reverse=True))}")
             
-            # Step 5: Summarize chunks (Phase 1)
+            # Step 4: Summarize chunks
             logger.info("📝 Generating enhanced summaries...")
             logger.info(f"   Processing {len(all_chunks)} chunks with AI summarization")
             summaries = await self.summarizer.summarize_batch(all_chunks)
@@ -286,41 +321,33 @@ class EmbeddingOrchestrator:
                 avg_length = sum(summary_lengths) / len(summary_lengths)
                 logger.info(f"   ✅ Generated {len(summaries)} summaries (avg length: {avg_length:.0f} chars)")
             
-            # Step 6 & 7: Generate embeddings AND store incrementally (Phase 2)
-            logger.info("🔢 Phase 2: Embedding Generation & Storage")
+            # Step 5: Generate embeddings
+            logger.info("🔢 Generating embeddings...")
             logger.info(f"   Processing {len(all_chunks)} chunks in batches")
-            chunks_embedded = await self._embed_and_store_incremental(all_chunks, summaries)
+            embedding_data = await self._generate_embeddings_batch(all_chunks, summaries)
             
-            # Step 8: Update repo state
-            for file_path in prioritized_files:
-                file_chunks = [c for c in all_chunks if c.metadata.file_path == file_path]
-                self.repo_state.update_file_state(
-                    file_path=file_path,
-                    language=file_chunks[0].metadata.language if file_chunks else None,
-                    chunk_count=len(file_chunks),
-                    status="completed"
-                )
-            
-            self.repo_state.save_manifest()
-            
-            # Step 9: Generate report
-            stats = {
-                "files_discovered": len(all_files),
-                "files_changed": len(changed_files),
-                "files_processed": len(prioritized_files),
-                "chunks_generated": len(all_chunks),
-                "chunks_embedded": chunks_embedded,
-                "chunks_failed": len(all_chunks) - chunks_embedded,
-                "success_rate": (chunks_embedded / len(all_chunks) * 100) if all_chunks else 0,
-                "rate_limiter_stats": {
-                    quota.value: self.rate_limiter.get_metrics(quota)
-                    for quota in QuotaType
-                }
-            }
+            stats["chunks_embedded"] = len(embedding_data)
+            stats["failed_chunks"] = len(all_chunks) - len(embedding_data)
+            stats["success_rate"] = (len(embedding_data) / len(all_chunks) * 100) if all_chunks else 0
             
             logger.info("=" * 60)
+            logger.info("✅ Embedding Generation Complete!")
+            logger.info(f"📊 Generated: {len(embedding_data)}/{len(all_chunks)} embeddings")
+            logger.info("=" * 60)
+            
+            # Return embedding data for orchestrator to store
+            return {
+                "success": True,
+                "embedding_data": embedding_data,
+                "chunks": all_chunks,
+                "summaries": summaries,
+                "prioritized_files": prioritized_files,
+                "stats": stats
+            }
             logger.info("✅ Pipeline Complete!")
             logger.info(f"📊 Processed: {stats['chunks_embedded']}/{stats['chunks_generated']} chunks")
+            if stats.get("github_analysis"):
+                logger.info(f"🔍 GitHub: {stats['github_analysis']['files_found']} files, confidence: {stats['github_analysis']['confidence']:.2f}")
             logger.info(f"📈 Success Rate: {stats['success_rate']:.1f}%")
             logger.info("=" * 60)
             
@@ -329,29 +356,35 @@ class EmbeddingOrchestrator:
         finally:
             await self.rate_limiter.stop()
     
-    async def _embed_and_store_incremental(
+    async def _generate_embeddings_batch(
         self,
         chunks: List,
         summaries: Dict[str, str]
-    ) -> int:
+    ) -> List[Dict]:
         """
-        Generate embeddings AND store incrementally in small batches.
-        This avoids memory issues with large repos and provides better progress tracking.
+        Generate embeddings in small batches WITHOUT storing them.
+        Returns embedding data for the orchestrator to handle storage.
         
         Args:
             chunks: List of code chunks
             summaries: Dict of chunk_id -> summary
             
         Returns:
-            Number of chunks successfully embedded and stored
+            List of dicts containing embedding data with structure:
+            {
+                "chunk_id": str,
+                "embedding": List[float],
+                "content": str,
+                "summary": str,
+                "metadata": dict
+            }
         """
         batch_size = self.rate_limiter.get_adaptive_batch_size(QuotaType.EMBEDDING)
-        # Keep batch size reasonable for storage (max 50 at a time)
+        # Keep batch size reasonable (max 50 at a time)
         batch_size = min(batch_size, 50)
         
         total_chunks = len(chunks)
-        total_embedded = 0
-        total_failed = 0
+        embedding_data = []
         num_batches = (total_chunks + batch_size - 1) // batch_size
         
         logger.info(f"   Batch size: {batch_size} chunks")
@@ -387,49 +420,41 @@ class EmbeddingOrchestrator:
                     priority=2
                 )
                 
-                # Create embedding points
-                embedding_points = [
-                    EmbeddingPoint(
-                        chunk_id=chunk.chunk_id,
-                        embedding=batch_embeddings[i],
-                        content=chunk.content,
-                        summary=summaries.get(chunk.chunk_id, ""),
-                        metadata={
-                            "file_path": chunk.metadata.file_path,
-                            "language": chunk.metadata.language,
-                            "chunk_type": chunk.metadata.chunk_type,
-                            "symbol_name": chunk.metadata.symbol_name,
-                            "start_line": chunk.metadata.start_line,
-                            "end_line": chunk.metadata.end_line,
-                            "token_count": chunk.metadata.token_count
-                        }
-                    )
-                    for i, chunk in enumerate(batch)
-                    if i < len(batch_embeddings)
-                ]
+                # Create embedding data structures (no storage)
+                for i, chunk in enumerate(batch):
+                    if i < len(batch_embeddings):
+                        embedding_data.append({
+                            "chunk_id": chunk.chunk_id,
+                            "embedding": batch_embeddings[i],
+                            "content": chunk.content,
+                            "summary": summaries.get(chunk.chunk_id, ""),
+                            "metadata": {
+                                "file_path": chunk.metadata.file_path,
+                                "language": chunk.metadata.language,
+                                "chunk_type": chunk.metadata.chunk_type,
+                                "symbol_name": chunk.metadata.symbol_name,
+                                "start_line": chunk.metadata.start_line,
+                                "end_line": chunk.metadata.end_line,
+                                "token_count": chunk.metadata.token_count
+                            }
+                        })
                 
-                # Store immediately in Qdrant
-                logger.debug(f"   💾 Storing {len(embedding_points)} embeddings...")
-                upsert_result = await self.vector_store.upsert_batch(embedding_points)
-                
-                successful = upsert_result["successful"]
-                failed = upsert_result["failed"]
-                total_embedded += successful
-                total_failed += failed
-                
-                logger.info(f"   ✅ Batch complete: {successful} embedded, {failed} failed")
-                logger.info(f"   📊 Total progress: {total_embedded}/{total_chunks} chunks ({(total_embedded/total_chunks)*100:.1f}%)")
+                logger.info(f"   ✅ Batch complete: {len(batch_embeddings)} embeddings generated")
+                logger.info(f"   📊 Total progress: {len(embedding_data)}/{total_chunks} chunks ({(len(embedding_data)/total_chunks)*100:.1f}%)")
                 
             except Exception as e:
                 logger.error(f"   ❌ Batch {batch_num + 1} failed: {e}")
-                total_failed += len(batch)
+                # Continue with next batch even if this one fails
         
-        logger.info(f"\n✅ Embedding complete: {total_embedded} successful, {total_failed} failed")
-        return total_embedded
+        logger.info(f"\n✅ Embedding generation complete: {len(embedding_data)} embeddings generated")
+        return embedding_data
 
 
 async def main():
-    """Main entry point"""
+    """
+    Main entry point for standalone embedding pipeline execution.
+    Note: For production use, call this through orchestrator.py instead.
+    """
     import argparse
     
     parser = argparse.ArgumentParser(description="Code Intelligence Embedding Pipeline")
@@ -449,28 +474,27 @@ async def main():
         action="store_true",
         help="Force re-embedding of all files"
     )
-    parser.add_argument(
-        "--collection",
-        default="code_intelligence",
-        help="Qdrant collection name"
-    )
     
     args = parser.parse_args()
     
-    orchestrator = EmbeddingOrchestrator(
-        repo_path=args.repo,
-        collection_name=args.collection
+    # Create pipeline (no collection needed - that's orchestrator's job)
+    pipeline = EmbeddingPipeline(
+        repo_path=args.repo
     )
     
-    stats = await orchestrator.run_incremental(
+    # Generate embeddings (returns data, doesn't store)
+    result = await pipeline.generate_embeddings(
+        file_filter=None,  # Process all files
         max_files=args.max_files,
         force_reindex=args.force
     )
     
-    print("\n📊 Final Statistics:")
-    print(f"  Files processed: {stats['files_processed']}")
-    print(f"  Chunks embedded: {stats['chunks_embedded']}")
-    print(f"  Success rate: {stats['success_rate']:.1f}%")
+    print("\n📊 Embedding Generation Results:")
+    print(f"  Files processed: {result['stats']['files_processed']}")
+    print(f"  Chunks generated: {len(result['embedding_data'])}")
+    print(f"  Success rate: {result['stats']['success_rate']:.1f}%")
+    print("\n⚠️  Note: Embeddings generated but NOT stored.")
+    print("   Use orchestrator.py to store embeddings in vector DB.")
 
 
 if __name__ == "__main__":
