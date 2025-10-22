@@ -93,6 +93,122 @@ Provide a structured summary with:
 
 Summary:"""
 
+    # Kafka/Message Queue Configuration
+    KAFKA_TEMPLATE = """Analyze this Kafka/messaging configuration:
+
+File: {file_path}
+Type: {file_type}
+
+Content:
+```
+{content}
+```
+
+Provide a structured summary with:
+1. **Purpose**: What this messaging configuration does
+2. **Topics/Queues**: Kafka topics, RabbitMQ queues, or message channels
+3. **Producers**: Services that publish messages
+4. **Consumers**: Services that consume messages
+5. **Message Schema**: Data format and structure
+6. **Partitioning**: Partition strategy and key
+7. **Replication**: Replication factor and fault tolerance
+8. **Performance**: Throughput, batching, compression settings
+9. **Error Handling**: Dead letter queues, retry policies
+
+Summary:"""
+
+    # Database Schema/Migration
+    DATABASE_TEMPLATE = """Analyze this database schema or migration:
+
+File: {file_path}
+Type: {file_type}
+
+Content:
+```
+{content}
+```
+
+Provide a structured summary with:
+1. **Purpose**: What database changes this defines
+2. **Tables/Collections**: Tables or collections modified
+3. **Schema Changes**: Columns added/modified/removed
+4. **Relationships**: Foreign keys, joins, references
+5. **Indexes**: Indexes for query optimization
+6. **Constraints**: Unique, not null, check constraints
+7. **Migration Strategy**: Up/down migrations, rollback plan
+8. **Data Impact**: Existing data handling
+
+Summary:"""
+
+    # Infrastructure as Code (Terraform, CloudFormation)
+    IAC_TEMPLATE = """Analyze this infrastructure as code:
+
+File: {file_path}
+Type: {file_type}
+
+Content:
+```
+{content}
+```
+
+Provide a structured summary with:
+1. **Purpose**: What infrastructure this provisions
+2. **Resources**: Cloud resources created (EC2, S3, RDS, etc.)
+3. **Networking**: VPCs, subnets, security groups
+4. **Storage**: Volumes, buckets, databases
+5. **Compute**: Instances, containers, serverless functions
+6. **Variables**: Input variables and configuration
+7. **Outputs**: Exported values for other modules
+8. **Cost**: Estimated cost and resource sizing
+
+Summary:"""
+
+    # CI/CD Pipeline Configuration
+    CICD_TEMPLATE = """Analyze this CI/CD pipeline configuration:
+
+File: {file_path}
+Type: {file_type}
+
+Content:
+```
+{content}
+```
+
+Provide a structured summary with:
+1. **Purpose**: What this pipeline automates
+2. **Triggers**: Events that start the pipeline (push, PR, schedule)
+3. **Stages**: Build, test, deploy stages
+4. **Jobs**: Specific jobs and their dependencies
+5. **Environment**: Target environments (dev, staging, prod)
+6. **Artifacts**: Build outputs and deployments
+7. **Secrets**: Required credentials and API keys
+8. **Notifications**: Alert and reporting mechanisms
+
+Summary:"""
+
+    # Monitoring/Observability Configuration
+    MONITORING_TEMPLATE = """Analyze this monitoring/observability configuration:
+
+File: {file_path}
+Type: {file_type}
+
+Content:
+```
+{content}
+```
+
+Provide a structured summary with:
+1. **Purpose**: What this monitoring configuration does
+2. **Metrics**: Metrics collected and tracked
+3. **Alerts**: Alert rules and thresholds
+4. **Dashboards**: Visualization and graphs
+5. **Targets**: Services or endpoints monitored
+6. **Retention**: Data retention and storage
+7. **Exporters**: Metric exporters and integrations
+8. **SLOs/SLIs**: Service level objectives and indicators
+
+Summary:"""
+
     # API Specifications (OpenAPI, GraphQL, Proto)
     API_SPEC_TEMPLATE = """Analyze this API specification:
 
@@ -179,6 +295,58 @@ class EnhancedCodeSummarizer:
         """Detect special file types for targeted summarization"""
         file_path_lower = file_path.lower()
         
+        # Kafka configurations
+        if any(x in file_path_lower for x in ['kafka', 'producer', 'consumer', 'streams']):
+            if any(x in content.lower() for x in ['kafka', 'topic', 'broker', 'partition']):
+                return 'kafka'
+        
+        # Message queues
+        if any(x in file_path_lower for x in ['rabbitmq', 'amqp', 'redis-stream', 'sqs', 'pubsub']):
+            return 'message-queue'
+        
+        # Database schemas and migrations
+        if any(x in file_path_lower for x in ['migration', 'schema', 'ddl', 'alembic', 'liquibase', 'flyway']):
+            return 'database-schema'
+        if file_path.endswith(('.sql', '.ddl')):
+            if any(x in content.upper() for x in ['CREATE TABLE', 'ALTER TABLE', 'DROP TABLE', 'CREATE INDEX']):
+                return 'database-schema'
+        
+        # Infrastructure as Code
+        if file_path.endswith(('.tf', '.tfvars')) or 'terraform' in file_path_lower:
+            return 'terraform'
+        if 'cloudformation' in file_path_lower or file_path.endswith('.cfn.yaml'):
+            return 'cloudformation'
+        if 'ansible' in file_path_lower or file_path.endswith('.playbook.yml'):
+            return 'ansible'
+        
+        # CI/CD Pipelines
+        if '.github/workflows' in file_path:
+            return 'github-actions'
+        if '.gitlab-ci' in file_path_lower or file_path.endswith('.gitlab-ci.yml'):
+            return 'gitlab-ci'
+        if 'jenkinsfile' in file_path_lower:
+            return 'jenkins'
+        if '.circleci' in file_path:
+            return 'circleci'
+        if 'azure-pipelines' in file_path_lower:
+            return 'azure-pipelines'
+        
+        # Monitoring/Observability
+        if 'prometheus' in file_path_lower and file_path.endswith(('.yml', '.yaml')):
+            return 'prometheus'
+        if 'grafana' in file_path_lower:
+            return 'grafana'
+        if file_path.endswith('.alert.yml') or 'alerts' in file_path_lower:
+            return 'alerting'
+        
+        # Service Mesh
+        if any(x in file_path_lower for x in ['istio', 'linkerd', 'envoy']):
+            return 'service-mesh'
+        
+        # API Gateway
+        if any(x in file_path_lower for x in ['kong', 'nginx.conf', 'traefik', 'api-gateway']):
+            return 'api-gateway'
+        
         # Docker files
         if 'dockerfile' in file_path_lower or file_path.endswith('.dockerfile'):
             return 'docker'
@@ -210,10 +378,6 @@ class EnhancedCodeSummarizer:
         # Package/dependency files
         if file_path.endswith(('package.json', 'pom.xml', 'build.gradle', 'requirements.txt', 'Cargo.toml')):
             return 'dependencies'
-        
-        # GitHub workflows
-        if '.github/workflows' in file_path:
-            return 'github-workflow'
         
         return 'code'
     
@@ -347,8 +511,18 @@ class EnhancedCodeSummarizer:
         file_type = self.detect_file_type(chunk.metadata.file_path, chunk.content)
         language = chunk.metadata.language
         
-        # Select appropriate template
-        if file_type in ['docker', 'docker-compose', 'helm', 'kubernetes']:
+        # Select appropriate template based on file type
+        if file_type in ['kafka', 'message-queue']:
+            template = self.templates.KAFKA_TEMPLATE
+        elif file_type == 'database-schema':
+            template = self.templates.DATABASE_TEMPLATE
+        elif file_type in ['terraform', 'cloudformation', 'ansible']:
+            template = self.templates.IAC_TEMPLATE
+        elif file_type in ['github-actions', 'gitlab-ci', 'jenkins', 'circleci', 'azure-pipelines']:
+            template = self.templates.CICD_TEMPLATE
+        elif file_type in ['prometheus', 'grafana', 'alerting']:
+            template = self.templates.MONITORING_TEMPLATE
+        elif file_type in ['docker', 'docker-compose', 'helm', 'kubernetes', 'service-mesh', 'api-gateway']:
             template = self.templates.INFRASTRUCTURE_TEMPLATE
         elif file_type in ['openapi', 'protobuf', 'graphql']:
             template = self.templates.API_SPEC_TEMPLATE
