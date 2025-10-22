@@ -24,12 +24,12 @@ from tqdm import tqdm
 # Add parent directory to path for imports
 sys.path.append(str(Path(__file__).parent.parent))
 
-from code_intelligence.rate_limiter import RateLimitController, QuotaType
-from code_intelligence.repo_state import RepoState
-from code_intelligence.parsers import parser_registry
-from code_intelligence.change_planner import ChangePlanner
-from code_intelligence.summarizer import CodeSummarizer
-from code_intelligence.vector_store import VectorStore, EmbeddingPoint
+from rate_limiter import RateLimitController, QuotaType
+from repo_state import RepoState
+from parsers import parser_registry
+from change_planner import ChangePlanner
+from enhanced_summarizer import EnhancedCodeSummarizer
+from vector_store import VectorStore, EmbeddingPoint
 
 logging.basicConfig(
     level=logging.INFO,
@@ -78,7 +78,7 @@ class EmbeddingOrchestrator:
         self.rate_limiter = RateLimitController()
         self.repo_state = RepoState(manifest_path)
         self.change_planner = ChangePlanner(repo_path)
-        self.summarizer = CodeSummarizer(self.repo_state, self.rate_limiter)
+        self.summarizer = EnhancedCodeSummarizer(self.repo_state, self.rate_limiter)
         self.vector_store = VectorStore(
             collection_name=collection_name,
             qdrant_path=qdrant_path

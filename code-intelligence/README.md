@@ -4,11 +4,13 @@ Optimized multi-language code embedding system with intelligent rate limiting, c
 
 ## 🎯 Features
 
+- **Enhanced Summarization** ⭐ NEW: Rich, structured summaries with technical details, business logic, configurations, error handling, API specs, and performance notes
 - **Multi-Language Support**: Python, JavaScript/TypeScript, Java, Kotlin, C/C++, Dart (Flutter), and more
 - **Intelligent Rate Limiting**: Adaptive batching with exponential backoff to prevent Azure 429 errors
 - **Incremental Updates**: Only embeds changed files using SHA256 hashing
 - **Smart Prioritization**: Changed files and entry points processed first
 - **Two-Phase Pipeline**: Summarization → Embedding for optimal quality
+- **Special File Detection**: Auto-detects Docker, Helm, API specs, configs, and applies specialized analysis
 - **Caching**: Summaries and embeddings cached to avoid reprocessing
 - **Tree-Sitter Parsing**: Semantic chunking at function/class level
 - **Resilient**: DLQ for failed chunks, automatic retry with backoff
@@ -17,12 +19,13 @@ Optimized multi-language code embedding system with intelligent rate limiting, c
 
 ```
 code-intelligence/
-├── embed_repo.py          # Main orchestrator
-├── rate_limiter.py        # Azure-aware rate limiting
-├── repo_state.py          # File hashing & caching
-├── change_planner.py      # Smart prioritization
-├── summarizer.py          # GPT-4 mini summaries
-├── vector_store.py        # Qdrant interface
+├── embed_repo.py              # Main orchestrator
+├── rate_limiter.py            # Azure-aware rate limiting
+├── repo_state.py              # File hashing & caching
+├── change_planner.py          # Smart prioritization
+├── enhanced_summarizer.py     # ⭐ Rich technical summaries
+├── vector_store.py            # Qdrant interface
+├── examples/                  # Sample code & docs
 └── parsers/
     ├── __init__.py        # Parser registry
     ├── base_parser.py     # Base interface
