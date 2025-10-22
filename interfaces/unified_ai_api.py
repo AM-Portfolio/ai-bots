@@ -19,6 +19,13 @@ logger = get_logger(__name__)
 
 router = APIRouter(prefix="/api/ai", tags=["Unified AI"])
 
+# In-memory provider configuration (in production, this would be in a database)
+_provider_config = {
+    "stt_provider": "azure",
+    "chat_provider": "together",
+    "tts_provider": "openai"
+}
+
 
 class ChatRequest(BaseModel):
     """Request model for chat completion"""
@@ -219,27 +226,115 @@ async def list_providers():
     """
     try:
         from orchestration.cloud_providers.templates.base import ProviderCapability
+        from orchestration.cloud_providers.factory import ProviderFactory
         
-        providers = {}
+        providers = []
         
         for provider_name in ["azure", "together", "openai"]:
             capabilities = []
+            available_status = False
+            
             for capability in ProviderCapability:
                 try:
-                    from orchestration.cloud_providers.factory import ProviderFactory
                     available = ProviderFactory.get_available_providers(capability)
                     if provider_name in available:
                         capabilities.append(capability.value)
+                        available_status = True
                 except:
                     continue
             
-            providers[provider_name] = {
-                "capabilities": capabilities,
-                "configured": len(capabilities) > 0
-            }
+            providers.append({
+                "provider": provider_name,
+                "available": available_status,
+                "capabilities": capabilities
+            })
         
         return {"providers": providers}
     
     except Exception as e:
         logger.error(f"❌ Provider listing failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/config")
+async def get_provider_config():
+    """
+    Get current provider configuration for STT, Chat, and TTS
+    """
+    try:
+        logger.info("📋 Get provider config request")
+        return _provider_config
+    except Exception as e:
+        logger.error(f"❌ Get config failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/config")
+async def save_provider_config(config: Dict[str, str]):
+    """
+    Save provider configuration for STT, Chat, and TTS
+    
+    Updates the backend provider preferences used by the orchestrator
+    """
+    try:
+        global _provider_config
+        from orchestration.cloud_providers.templates.base import ProviderCapability
+        from orchestration.cloud_providers.factory import ProviderFactory
+        
+        logger.info(f"💾 Saving provider config: {config}")
+        
+        # Validate configuration keys
+        valid_keys = {"stt_provider", "chat_provider", "tts_provider"}
+        if not all(key in valid_keys for key in config.keys()):
+            raise HTTPException(status_code=400, detail="Invalid configuration keys")
+        
+        # Map config keys to required capabilities
+        capability_map = {
+            "stt_provider": ProviderCapability.SPEECH_TO_TEXT,
+            "chat_provider": ProviderCapability.LLM_CHAT,
+            "tts_provider": ProviderCapability.TEXT_TO_SPEECH
+        }
+        
+        # Validate each provider supports its required capability
+        validation_errors = []
+        for key, provider_name in config.items():
+            if key in capability_map:
+                required_capability = capability_map[key]
+                try:
+                    available_providers = ProviderFactory.get_available_providers(required_capability)
+                    if provider_name not in available_providers:
+                        validation_errors.append(
+                            f"{provider_name} does not support {required_capability.value}"
+                        )
+                except Exception as e:
+                    validation_errors.append(
+                        f"Failed to validate {provider_name} for {key}: {str(e)}"
+                    )
+        
+        # If validation failed, return error
+        if validation_errors:
+            logger.warning(f"❌ Provider validation failed: {validation_errors}")
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Provider validation failed",
+                    "details": validation_errors
+                }
+            )
+        
+        # Update configuration only if validation passed
+        _provider_config.update(config)
+        
+        logger.info(f"✅ Provider config saved: {_provider_config}")
+        
+        return {
+            "success": True,
+            "message": "Provider configuration saved successfully",
+            "config": _provider_config
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Save config failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
