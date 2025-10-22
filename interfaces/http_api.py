@@ -22,6 +22,7 @@ from interfaces.services_api import router as services_router
 from interfaces.vector_db_api import router as vector_db_router, initialize_vector_db
 from interfaces.translation_api import router as translation_router
 from interfaces.azure_test_api import router as azure_test_router
+from interfaces.unified_ai_api import router as unified_ai_router
 from shared.logger import get_logger
 
 logger = get_logger(__name__)
@@ -60,6 +61,7 @@ app.include_router(services_router)
 app.include_router(vector_db_router)
 app.include_router(translation_router)
 app.include_router(azure_test_router)
+app.include_router(unified_ai_router)
 
 logger.info("✅ Modular HTTP API application initialized")
 logger.info("📋 Registered endpoints:")
@@ -75,3 +77,4 @@ logger.info("   • Services management (/api/services/*)")
 logger.info("   • Vector DB (/api/vector-db/*)")
 logger.info("   • Translation (/api/translation/*)")
 logger.info("   • Azure testing (/api/azure/*)")
+logger.info("   • Unified AI (cloud-agnostic) (/api/ai/*)")
