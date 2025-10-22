@@ -105,12 +105,12 @@ async def initialize_vector_db():
         if not init_success:
             raise Exception("Vector DB initialization returned False")
         
-        # Create embedding service - use Together AI for embeddings to match existing vectors
-        # Note: Existing vectors in Qdrant were created with Together AI embeddings
-        # To use Azure embeddings, you'll need to re-index all documents
+        # Create embedding service - use Azure OpenAI for embeddings
+        # Azure text-embedding-ada-002 is optimized for technical/business content and code
+        # Note: When switching embedding providers, you need to re-index all documents
         logger.info("   Creating embedding service...")
-        embedding_service = EmbeddingService(provider="together")
-        logger.info(f"   Using embedding provider: together (matches existing vector data)")
+        embedding_service = EmbeddingService(provider="azure")
+        logger.info(f"   Using embedding provider: azure (text-embedding-ada-002 for technical content)")
         
         # Create collection
         logger.info("   Creating github_repos collection...")
@@ -133,9 +133,13 @@ async def initialize_vector_db():
         else:
             logger.warning("   ⚠️  GitHub client not configured - repository indexing will be limited")
         
-        # Create GitHub-LLM orchestrator
+        # Create GitHub-LLM orchestrator with Azure for response generation
         logger.info("   Creating GitHub-LLM orchestrator...")
-        beautifier = ResponseBeautifier(llm_provider="together")
+        # Use Azure for LLM analysis and response generation (better quality)
+        # Keep Together AI for embeddings (matches existing vector data)
+        beautify_provider = settings.beautify_provider or settings.llm_provider or "azure"
+        logger.info(f"   Using LLM provider for analysis: {beautify_provider}")
+        beautifier = ResponseBeautifier(llm_provider=beautify_provider)
         github_llm_orchestrator = GitHubLLMOrchestrator(
             vector_query_service=query_service,
             beautifier=beautifier
@@ -241,6 +245,44 @@ async def get_repository_examples():
     }
 
 
+@router.get("/embedding/health")
+async def check_embedding_health():
+    """Check embedding service connection and health
+    
+    Returns detailed status about the embedding service including:
+    - Connection status
+    - Provider (azure/together)
+    - Model name
+    - Dimension
+    - API availability
+    """
+    try:
+        if not embedding_service:
+            raise HTTPException(status_code=503, detail="Embedding service not initialized")
+        
+        health_status = await embedding_service.health_check()
+        
+        if not health_status.get('connected', False):
+            logger.warning(f"⚠️  Embedding service health check failed: {health_status.get('error', 'Unknown error')}")
+            raise HTTPException(
+                status_code=503, 
+                detail=f"Embedding service not connected: {health_status.get('error', 'Unknown error')}",
+                headers={"X-Health-Status": health_status.get('status', 'unhealthy')}
+            )
+        
+        return {
+            "status": "healthy",
+            "connected": True,
+            "details": health_status
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to check embedding health: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/test-embedding")
 async def test_embedding(request: dict):
     """Test embedding generation with Together AI and fallback
@@ -316,27 +358,27 @@ async def list_repository_documents(
         
         search_results = await vector_db.search(
             collection=collection,
-            query_vector=dummy_vector,
-            limit=limit,
-            filters={"repo_name": repo_name}
+            query_embedding=dummy_vector,
+            top_k=limit,
+            filter_metadata={"repo_name": repo_name}
         )
         
         if not search_results:
             # Try alternative metadata field names
             search_results = await vector_db.search(
                 collection=collection,
-                query_vector=dummy_vector,
-                limit=limit,
-                filters={"repository": repo_name}
+                query_embedding=dummy_vector,
+                top_k=limit,
+                filter_metadata={"repository": repo_name}
             )
         
         if not search_results:
             # Try with owner/repo split
             search_results = await vector_db.search(
                 collection=collection,
-                query_vector=dummy_vector,
-                limit=limit,
-                filters={"owner": owner, "repo": repo}
+                query_embedding=dummy_vector,
+                top_k=limit,
+                filter_metadata={"owner": owner, "repo": repo}
             )
         
         documents = []
@@ -466,9 +508,9 @@ async def delete_documents(request: dict):
                 # Search for documents from this repository (using a dummy query vector)
                 search_results = await vector_db.search(
                     collection=collection_name,
-                    query_vector=[0.0] * (embedding_service.get_dimension() if embedding_service else 768),
-                    limit=10000,  # Large limit to get all documents
-                    filters={"repo_name": repo_name} if hasattr(vector_db, 'search_with_filters') else None
+                    query_embedding=[0.0] * (embedding_service.get_dimension() if embedding_service else 768),
+                    top_k=10000,  # Large limit to get all documents
+                    filter_metadata={"repo_name": repo_name} if hasattr(vector_db, 'search_with_filters') else None
                 )
                 
                 if search_results and hasattr(search_results, 'matches'):
@@ -566,9 +608,9 @@ async def delete_repository_documents_full_path(collection_name: str, owner: str
         logger.info(f"🔍 Searching for documents with filter: repo_name='{repo_name}'")
         search_results = await vector_db.search(
             collection=collection_name,
-            query_vector=dummy_vector,
-            limit=10000,  # Large limit to get all
-            filters={"repo_name": repo_name}
+            query_embedding=dummy_vector,
+            top_k=10000,  # Large limit to get all
+            filter_metadata={"repo_name": repo_name}
         )
         
         if not search_results:
@@ -576,9 +618,9 @@ async def delete_repository_documents_full_path(collection_name: str, owner: str
             # Try alternative metadata field names
             search_results = await vector_db.search(
                 collection=collection_name,
-                query_vector=dummy_vector,
-                limit=10000,
-                filters={"repository": repo_name}
+                query_embedding=dummy_vector,
+                top_k=10000,
+                filter_metadata={"repository": repo_name}
             )
         
         if not search_results:
@@ -586,9 +628,9 @@ async def delete_repository_documents_full_path(collection_name: str, owner: str
             logger.info(f"🔍 Trying with split owner/repo filters...")
             search_results = await vector_db.search(
                 collection=collection_name,
-                query_vector=dummy_vector,
-                limit=10000,
-                filters={"owner": owner, "repo": repo}
+                query_embedding=dummy_vector,
+                top_k=10000,
+                filter_metadata={"owner": owner, "repo": repo}
             )
         
         # Also try without any filters to see all documents (for debugging)
@@ -596,8 +638,8 @@ async def delete_repository_documents_full_path(collection_name: str, owner: str
             logger.info(f"🔍 No documents found with filters, checking total documents in collection...")
             all_results = await vector_db.search(
                 collection=collection_name,
-                query_vector=dummy_vector,
-                limit=50  # Just a sample
+                query_embedding=dummy_vector,
+                top_k=50  # Just a sample
             )
             logger.info(f"📊 Total documents in collection: {len(all_results)}")
             if all_results:

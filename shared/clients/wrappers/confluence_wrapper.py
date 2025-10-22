@@ -116,4 +116,15 @@ class ConfluenceWrapper:
             return None
 
 
-confluence_wrapper = ConfluenceWrapper()
+# Lazy initialization: create wrapper only when needed
+_confluence_wrapper_instance: Optional[ConfluenceWrapper] = None
+
+def get_confluence_wrapper() -> ConfluenceWrapper:
+    """Get or create the Confluence wrapper instance (lazy initialization)"""
+    global _confluence_wrapper_instance
+    if _confluence_wrapper_instance is None:
+        _confluence_wrapper_instance = ConfluenceWrapper()
+    return _confluence_wrapper_instance
+
+# For backward compatibility
+confluence_wrapper = property(lambda self: get_confluence_wrapper())

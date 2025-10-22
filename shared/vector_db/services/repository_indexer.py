@@ -65,6 +65,26 @@ class RepositoryIndexer:
             logger.error("❌ GitHub client not configured")
             return {'success': False, 'error': 'GitHub client not configured'}
         
+        # Check embedding service connection before indexing
+        logger.info(f"🔌 Checking embedding service connection...")
+        embedding_health = await self.embedding_service.health_check()
+        
+        if not embedding_health.get('connected', False):
+            error_msg = embedding_health.get('error', 'Embedding service not available')
+            logger.error(f"❌ Embedding service not connected: {error_msg}")
+            logger.error(f"   Provider: {embedding_health.get('provider', 'unknown')}")
+            logger.error(f"   Status: {embedding_health.get('status', 'unknown')}")
+            return {
+                'success': False, 
+                'error': f'Embedding service not connected: {error_msg}',
+                'health_check': embedding_health
+            }
+        
+        logger.info(f"✅ Embedding service connected")
+        logger.info(f"   Provider: {embedding_health.get('provider')}")
+        logger.info(f"   Model: {embedding_health.get('model')}")
+        logger.info(f"   Dimension: {embedding_health.get('dimension')}")
+        
         try:
             # Get repository tree
             logger.info(f"📂 Fetching repository tree from GitHub...")

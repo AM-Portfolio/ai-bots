@@ -105,4 +105,15 @@ class JiraWrapper:
             return False
 
 
-jira_wrapper = JiraWrapper()
+# Lazy initialization: create wrapper only when needed
+_jira_wrapper_instance: Optional[JiraWrapper] = None
+
+def get_jira_wrapper() -> JiraWrapper:
+    """Get or create the Jira wrapper instance (lazy initialization)"""
+    global _jira_wrapper_instance
+    if _jira_wrapper_instance is None:
+        _jira_wrapper_instance = JiraWrapper()
+    return _jira_wrapper_instance
+
+# For backward compatibility
+jira_wrapper = property(lambda self: get_jira_wrapper())

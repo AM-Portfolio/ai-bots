@@ -32,23 +32,34 @@ class EmbeddingService:
             provider = orchestrator.get_provider_for_role("embedding")
         
         self.provider_name = provider
-        self.dimension = 768
         self.fallback_dimension = 768
         self.client = None
         self.api_available = False
         
-        # Set model based on provider
+        # Set model and dimension based on provider
         if provider == "azure":
             self.embedding_model = settings.azure_openai_embedding_deployment
+            # Azure embedding dimensions:
+            # - text-embedding-ada-002: 1536 dimensions
+            # - text-embedding-3-small: 1536 dimensions
+            # - text-embedding-3-large: 3072 dimensions
+            # Optimized for technical documentation, code, and business content
+            if "3-large" in self.embedding_model:
+                self.dimension = 3072
+            else:
+                self.dimension = 1536
             self._initialize_azure_client()
         else:
             self.embedding_model = "togethercomputer/m2-bert-80M-32k-retrieval"
+            # Together AI m2-bert produces 768-dimensional embeddings
+            self.dimension = 768
             self._initialize_together_client()
         
         logger.info(f"🎯 Initializing embedding service with provider: {provider}")
         logger.info(f"   • Model: {self.embedding_model}")
+        logger.info(f"   • Dimension: {self.dimension}")
         logger.info(f"   • API Available: {self.api_available}")
-        logger.info(f"   • Fallback: Hash-based embeddings")
+        logger.info(f"   • Fallback: Hash-based embeddings ({self.fallback_dimension}d)")
     
     def _initialize_azure_client(self):
         """Initialize Azure OpenAI client for embeddings"""
@@ -60,13 +71,17 @@ class EmbeddingService:
                 logger.warning("⚠️  Azure OpenAI credentials not configured, using fallback embeddings")
                 return
             
+            # Use dedicated embedding API version if specified, otherwise fallback to general API version
+            embedding_api_version = getattr(settings, 'azure_openai_embedding_api_version', None) or settings.azure_openai_api_version
+            
             self.client = AzureOpenAI(
                 api_key=settings.azure_openai_api_key,
-                api_version=settings.azure_openai_api_version,
+                api_version=embedding_api_version,
                 azure_endpoint=settings.azure_openai_endpoint
             )
             self.api_available = True
-            logger.info("✅ Azure OpenAI embedding client initialized successfully")
+            logger.info(f"✅ Azure OpenAI embedding client initialized successfully")
+            logger.info(f"   • API Version: {embedding_api_version}")
             
         except Exception as e:
             logger.warning(f"⚠️  Failed to initialize Azure OpenAI client: {e}")
@@ -190,12 +205,19 @@ class EmbeddingService:
             # Return zero vector on complete failure
             return [0.0] * self.fallback_dimension
     
-    async def generate_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
+    async def generate_embeddings_batch(
+        self, 
+        texts: List[str],
+        batch_size: Optional[int] = None,
+        delay_between_batches: Optional[float] = None
+    ) -> List[List[float]]:
         """
-        Generate embeddings for multiple texts with intelligent batching
+        Generate embeddings for multiple texts with intelligent chunked batching
         
         Args:
             texts: List of texts to embed
+            batch_size: Number of texts to process per API call (default from settings or 20)
+            delay_between_batches: Seconds to wait between batches (default from settings or 1.0)
             
         Returns:
             List of embedding vectors
@@ -203,38 +225,102 @@ class EmbeddingService:
         if not texts:
             return []
         
-        embeddings = []
-        together_success = 0
-        fallback_used = 0
+        import asyncio
+        from shared.config import settings
         
-        # Try batch processing with Together AI first
+        # Use settings defaults if not specified
+        if batch_size is None:
+            batch_size = getattr(settings, 'azure_openai_embedding_batch_size', 20)
+        if delay_between_batches is None:
+            delay_between_batches = getattr(settings, 'azure_openai_embedding_batch_delay', 1.0)
+        
+        embeddings = []
+        provider_success = 0
+        fallback_used = 0
+        total_texts = len(texts)
+        
+        logger.info(f"📦 Processing {total_texts} texts in batches of {batch_size}")
+        
+        # Process in chunks to avoid rate limits
         if self.api_available and self.client and len(texts) > 1:
             try:
-                # Together AI supports batch processing
-                response = self.client.embeddings.create(
-                    model=self.embedding_model,
-                    input=texts
-                )
+                # Split texts into batches
+                for batch_idx in range(0, total_texts, batch_size):
+                    batch_texts = texts[batch_idx:batch_idx + batch_size]
+                    batch_num = (batch_idx // batch_size) + 1
+                    total_batches = (total_texts + batch_size - 1) // batch_size
+                    
+                    logger.info(f"   🔄 Processing batch {batch_num}/{total_batches} ({len(batch_texts)} texts)")
+                    
+                    if self.provider_name == "azure":
+                        # Azure OpenAI batch embeddings
+                        response = self.client.embeddings.create(
+                            model=self.embedding_model,
+                            input=batch_texts
+                        )
+                        
+                        for data_point in response.data:
+                            embedding = data_point.embedding
+                            # Ensure consistent dimensions
+                            if len(embedding) > self.dimension:
+                                embedding = embedding[:self.dimension]
+                            elif len(embedding) < self.dimension:
+                                embedding.extend([0.0] * (self.dimension - len(embedding)))
+                            embeddings.append(embedding)
+                        
+                        provider_success += len(batch_texts)
+                        logger.info(f"   ✅ Batch {batch_num}/{total_batches} complete ({len(batch_texts)} embeddings)")
+                        
+                    else:
+                        # Together AI batch embeddings - use direct REST API
+                        import requests
+                        api_key = os.environ.get("TOGETHER_API_KEY")
+                        headers = {
+                            "Authorization": f"Bearer {api_key}",
+                            "Content-Type": "application/json"
+                        }
+                        data = {
+                            "model": self.embedding_model,
+                            "input": batch_texts
+                        }
+                        response = requests.post(
+                            "https://api.together.xyz/v1/embeddings",
+                            headers=headers,
+                            json=data,
+                            timeout=60
+                        )
+                        response.raise_for_status()
+                        
+                        for data_point in response.json()["data"]:
+                            embedding = data_point["embedding"]
+                            # Ensure consistent dimensions
+                            if len(embedding) > self.dimension:
+                                embedding = embedding[:self.dimension]
+                            elif len(embedding) < self.dimension:
+                                embedding.extend([0.0] * (self.dimension - len(embedding)))
+                            embeddings.append(embedding)
+                        
+                        provider_success += len(batch_texts)
+                        logger.info(f"   ✅ Batch {batch_num}/{total_batches} complete ({len(batch_texts)} embeddings)")
+                    
+                    # Add delay between batches to avoid rate limiting (except for last batch)
+                    if batch_idx + batch_size < total_texts:
+                        logger.debug(f"   ⏸️  Waiting {delay_between_batches}s before next batch...")
+                        await asyncio.sleep(delay_between_batches)
                 
-                for data_point in response.data:
-                    embedding = data_point.embedding
-                    # Ensure consistent dimensions
-                    if len(embedding) > self.dimension:
-                        embedding = embedding[:self.dimension]
-                    elif len(embedding) < self.dimension:
-                        embedding.extend([0.0] * (self.dimension - len(embedding)))
-                    embeddings.append(embedding)
-                
-                together_success = len(embeddings)
-                logger.info(f"✅ Generated {together_success} Together AI embeddings in batch")
+                logger.info(f"✅ Generated {provider_success} {self.provider_name} embeddings in {total_batches} batches")
                 return embeddings
                 
             except Exception as e:
-                logger.warning(f"⚠️  Together AI batch embedding failed: {e}")
+                logger.warning(f"⚠️  {self.provider_name} batch embedding failed: {e}")
                 logger.info("🔄 Falling back to individual processing")
         
         # Fallback: Process individually
-        for text in texts:
+        logger.info(f"🔄 Processing {len(texts)} texts individually...")
+        for idx, text in enumerate(texts):
+            if (idx + 1) % 10 == 0:
+                logger.info(f"   📊 Individual processing: {idx + 1}/{len(texts)}")
+            
             embedding = await self.generate_embedding(text)
             embeddings.append(embedding)
             
@@ -242,11 +328,11 @@ class EmbeddingService:
             if embedding and len(set(embedding[-10:])) <= 2:  # Hash embeddings often have repeated values
                 fallback_used += 1
             else:
-                together_success += 1
+                provider_success += 1
         
         logger.info(f"✅ Generated {len(embeddings)} embeddings")
-        if together_success > 0:
-            logger.info(f"   • Together AI: {together_success}")
+        if provider_success > 0:
+            logger.info(f"   • {self.provider_name.capitalize()}: {provider_success}")
         if fallback_used > 0:
             logger.info(f"   • Hash fallback: {fallback_used}")
         
@@ -268,30 +354,47 @@ class EmbeddingService:
         }
     
     async def health_check(self) -> dict:
-        """Check the health of the embedding service"""
+        """
+        Check the health of the embedding service by testing actual embedding generation
+        
+        Returns:
+            Status dictionary with connection and health information
+        """
         status = {
             "service": "embedding",
             "provider": self.provider_name,
             "model": self.embedding_model,
+            "dimension": self.dimension,
             "api_available": self.api_available,
-            "fallback_available": True
+            "fallback_available": True,
+            "connected": False
         }
         
-        # Test Together AI if available
+        # Test embedding generation with actual API call
         if self.api_available and self.client:
             try:
-                test_response = self.client.embeddings.create(
-                    model=self.embedding_model,
-                    input="health check"
-                )
-                status["together_ai_status"] = "healthy"
-                status["together_ai_dimension"] = len(test_response.data[0].embedding)
+                logger.info(f"🔍 Testing {self.provider_name} embedding service connection...")
+                test_embedding = await self.generate_embedding("health check test")
+                
+                if test_embedding and len(test_embedding) == self.dimension:
+                    status["status"] = "healthy"
+                    status["connected"] = True
+                    status["test_dimension"] = len(test_embedding)
+                    logger.info(f"✅ {self.provider_name.capitalize()} embedding service is healthy")
+                else:
+                    status["status"] = "unhealthy"
+                    status["error"] = f"Unexpected dimension: {len(test_embedding) if test_embedding else 0}"
+                    logger.warning(f"⚠️  {self.provider_name.capitalize()} returned unexpected dimension")
+                    
             except Exception as e:
-                status["together_ai_status"] = f"error: {str(e)}"
-                status["api_available"] = False
-                self.api_available = False
+                status["status"] = "error"
+                status["error"] = str(e)
+                status["connected"] = False
+                logger.error(f"❌ {self.provider_name.capitalize()} embedding service connection failed: {e}")
         else:
-            status["together_ai_status"] = "not_configured"
+            status["status"] = "not_configured"
+            status["connected"] = False
+            logger.warning(f"⚠️  {self.provider_name.capitalize()} embedding API not configured")
         
         # Test fallback
         try:

@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     azure_openai_deployment_name: Optional[str] = "gpt-4.1-mini"  # Default deployment
     azure_openai_api_version: Optional[str] = "2025-01-01-preview"  # Default API version
     azure_openai_embedding_deployment: Optional[str] = "text-embedding-ada-002"  # Default embedding
+    azure_openai_embedding_api_version: Optional[str] = "2023-05-15"  # Embedding API version
+    azure_openai_embedding_batch_size: Optional[int] = 20  # Batch size for embeddings (to avoid rate limits)
+    azure_openai_embedding_batch_delay: Optional[float] = 1.0  # Delay between batches in seconds
     
     # Azure Model Deployments (from Azure AI Foundry)
     azure_gpt4o_transcribe_deployment: Optional[str] = None
