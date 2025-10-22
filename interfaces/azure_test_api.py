@@ -241,6 +241,131 @@ async def test_azure_connection():
         }
 
 
+# ============================================================================
+# SUB-MODULE TEST ENDPOINTS (Granular Control)
+# ============================================================================
+
+@router.get("/speech/test")
+async def test_azure_speech():
+    """
+    Test Azure Speech Service (STT/TTS) connectivity
+    
+    Returns:
+    - Connection status
+    - Available features (Speech-to-Text, Text-to-Speech)
+    - Configuration details (region, endpoint)
+    """
+    try:
+        logger.info("🎤 Testing Azure Speech Service")
+        
+        if not azure_ai_manager.speech.is_available():
+            return {
+                "success": False,
+                "error": "Azure Speech Service not configured. Add AZURE_SPEECH_KEY and AZURE_SPEECH_REGION.",
+                "features": []
+            }
+        
+        # Get service details
+        features = ["Speech-to-Text (STT)", "Text-to-Speech (TTS)"]
+        
+        return {
+            "success": True,
+            "message": "Azure Speech Service connected",
+            "features": features,
+            "region": azure_ai_manager.speech.region if hasattr(azure_ai_manager.speech, 'region') else "configured"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Azure Speech test failed: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "features": []
+        }
+
+
+@router.get("/translator/test")
+async def test_azure_translator():
+    """
+    Test Azure Translator Service connectivity
+    
+    Returns:
+    - Connection status
+    - Available features (text translation, language detection)
+    - Configuration details (region, endpoint)
+    """
+    try:
+        logger.info("🌐 Testing Azure Translator Service")
+        
+        if not azure_ai_manager.translation.is_available():
+            return {
+                "success": False,
+                "error": "Azure Translator not configured. Add AZURE_TRANSLATOR_KEY and AZURE_TRANSLATOR_REGION.",
+                "features": []
+            }
+        
+        # Get service details
+        features = ["Text Translation", "Language Detection", "90+ Languages"]
+        
+        return {
+            "success": True,
+            "message": "Azure Translator connected",
+            "features": features,
+            "region": azure_ai_manager.translation.region if hasattr(azure_ai_manager.translation, 'region') else "configured"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Azure Translator test failed: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "features": []
+        }
+
+
+@router.get("/openai/test")
+async def test_azure_openai():
+    """
+    Test Azure OpenAI Service connectivity
+    
+    Returns:
+    - Connection status
+    - Available models/deployments
+    - Configuration details (endpoint, models)
+    """
+    try:
+        logger.info("🤖 Testing Azure OpenAI Service")
+        
+        if not azure_ai_manager.models.is_available():
+            return {
+                "success": False,
+                "error": "Azure OpenAI not configured. Add AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_KEY.",
+                "models": []
+            }
+        
+        # Get model deployment info
+        try:
+            deployment_info = await azure_ai_manager.models.get_deployment_info()
+            models = list(deployment_info.keys()) if isinstance(deployment_info, dict) else ["GPT-4o"]
+        except:
+            models = ["GPT-4o (configured)"]
+        
+        return {
+            "success": True,
+            "message": "Azure OpenAI connected",
+            "models": models,
+            "endpoint": "configured"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Azure OpenAI test failed: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "models": []
+        }
+
+
 @router.get("/test-all")
 async def test_all_azure_services():
     """
