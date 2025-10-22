@@ -525,6 +525,11 @@ async def query_code(request: QueryCodeRequest):
     - Metadata (language, file paths, symbols, etc.)
     """
     try:
+        logger.info(f"🔍 Querying code: '{request.query}'")
+        logger.info(f"   • Limit: {request.limit}")
+        logger.info(f"   • Embedding type: {request.embedding_type}")
+        logger.info(f"   • Filters: {request.filters}")
+        
         results = await orchestrator.query_code(
             query=request.query,
             limit=request.limit,
@@ -532,12 +537,20 @@ async def query_code(request: QueryCodeRequest):
             embedding_type=request.embedding_type
         )
         
-        return QueryCodeResponse(
+        logger.info(f"✅ Found {len(results)} results")
+        if results:
+            logger.info(f"   • Top result score: {results[0].get('score', 0):.4f}")
+            logger.info(f"   • Top result: {results[0].get('metadata', {}).get('file_path', 'N/A')}")
+        
+        response = QueryCodeResponse(
             success=True,
             results=results,
             query=request.query,
             total_results=len(results)
         )
+        
+        logger.info(f"📤 Returning response with {len(results)} results")
+        return response
         
     except Exception as e:
         logger.error(f"Query failed: {e}")

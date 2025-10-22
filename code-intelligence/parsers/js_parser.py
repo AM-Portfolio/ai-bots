@@ -71,8 +71,12 @@ class JavaScriptParser(BaseParser):
                 ]:
                     chunk = self._extract_chunk(node, source_code, file_path, chunk_index)
                     if chunk:
-                        chunks.append(chunk)
-                        chunk_index += 1
+                        # Filter out trivial chunks
+                        if not self.should_skip_chunk(chunk.content, chunk.metadata.chunk_type):
+                            chunks.append(chunk)
+                            chunk_index += 1
+                        else:
+                            logger.debug(f"Skipped trivial chunk: {chunk.metadata.symbol_name}")
             
             if not chunks:
                 chunks = self._fallback_parse(file_path, source_code.decode('utf-8'))

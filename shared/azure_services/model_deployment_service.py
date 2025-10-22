@@ -280,6 +280,43 @@ class AzureModelDeploymentService:
             logger.error(f"❌ Audio processing error: {e}")
             raise
     
+    async def create_embeddings(
+        self,
+        texts: List[str],
+        model: str = "text-embedding-3-large"
+    ) -> List[Dict[str, Any]]:
+        """
+        Create embeddings for a list of texts using Azure OpenAI.
+        
+        Args:
+            texts: List of text strings to embed
+            model: Embedding model to use (default: text-embedding-3-large)
+            
+        Returns:
+            List of embedding objects with 'embedding' field
+            
+        Raises:
+            Exception: If Azure OpenAI is not available or API call fails
+        """
+        if not self.is_available():
+            raise Exception("Azure OpenAI not configured")
+        
+        try:
+            # Use the embedding model deployment
+            embedding_deployment = settings.azure_openai_embedding_deployment or model
+            
+            response = await self.client.embeddings.create(
+                input=texts,
+                model=embedding_deployment
+            )
+            
+            # Return in expected format: list of dicts with 'embedding' field
+            return [{"embedding": item.embedding} for item in response.data]
+            
+        except Exception as e:
+            logger.error(f"❌ Embedding creation error: {e}")
+            raise
+    
     async def get_deployment_info(self) -> Dict[str, Any]:
         """Get information about available deployments"""
         return {

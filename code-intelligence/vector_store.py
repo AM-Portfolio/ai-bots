@@ -1,24 +1,25 @@
 """
-Vector Store Interface for Qdrant
+Vector Store Interface using Shared VectorDBProvider
 
 Handles bulk upsert, metadata schema, and embedding storage with retry logic.
+Now integrated with the shared vector_db system for consistency.
 """
 
 import asyncio
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 import logging
-import uuid
+import sys
+from pathlib import Path
+from datetime import datetime
+
+# Add parent directory to path to import shared modules
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from shared.vector_db.factory import VectorDBFactory
+from shared.vector_db.base import VectorDBProvider, DocumentMetadata, VectorSearchResult
 
 logger = logging.getLogger(__name__)
-
-try:
-    from qdrant_client import QdrantClient
-    from qdrant_client.models import Distance, VectorParams, PointStruct
-    HAS_QDRANT = True
-except ImportError:
-    HAS_QDRANT = False
-    logger.warning("Qdrant client not available")
 
 
 @dataclass
@@ -33,13 +34,14 @@ class EmbeddingPoint:
 
 class VectorStore:
     """
-    Qdrant vector database interface with bulk operations.
+    Vector database interface using shared VectorDBProvider.
     
     Features:
     - Bulk upsert with retry
     - Rich metadata schema
     - Async operations
     - Health verification
+    - Integration with shared vector_db system
     """
     
     def __init__(
@@ -51,59 +53,74 @@ class VectorStore:
         qdrant_path: Optional[str] = "./qdrant_data"
     ):
         """
-        Initialize vector store.
+        Initialize vector store using shared VectorDBProvider.
         
         Args:
-            collection_name: Qdrant collection name
+            collection_name: Collection name
             embedding_dim: Dimension of embeddings
             distance: Distance metric (Cosine, Euclidean, Dot)
-            qdrant_url: URL for Qdrant server (None = local)
-            qdrant_path: Path for local Qdrant storage
+            qdrant_url: URL for Qdrant server (if using remote)
+            qdrant_path: Path for local Qdrant storage (default: ./qdrant_data)
         """
         self.collection_name = collection_name
         self.embedding_dim = embedding_dim
         self.distance = distance
         
-        if not HAS_QDRANT:
-            raise ImportError("qdrant-client not installed")
+        # Create VectorDBProvider using factory
+        # Note: For local Qdrant, we use path-based connection (localhost:6333)
+        logger.info("🏭 Initializing VectorStore with shared VectorDBProvider...")
         
-        # Initialize client
         if qdrant_url:
-            self.client = QdrantClient(url=qdrant_url)
-            logger.info(f"Connected to Qdrant at {qdrant_url}")
+            # Parse URL to extract host and port
+            from urllib.parse import urlparse
+            parsed = urlparse(qdrant_url)
+            host = parsed.hostname or 'localhost'
+            port = parsed.port or 6333
+            self.provider: VectorDBProvider = VectorDBFactory.create(
+                provider_type="qdrant",
+                host=host,
+                port=port
+            )
+            logger.info(f"✅ Using remote Qdrant: {host}:{port}")
         else:
-            self.client = QdrantClient(path=qdrant_path)
-            logger.info(f"Using local Qdrant at {qdrant_path}")
+            # Use localhost:6333 for local Qdrant (assumes running or will use embedded)
+            self.provider = VectorDBFactory.create(
+                provider_type="qdrant",
+                host="localhost",
+                port=6333
+            )
+            logger.info(f"✅ Using local Qdrant at localhost:6333 (data: {qdrant_path})")
         
-        self._ensure_collection()
+        if not self.provider:
+            raise RuntimeError("Failed to create VectorDBProvider")
+        
+        # Initialize provider and ensure collection
+        asyncio.run(self._async_init())
     
-    def _ensure_collection(self):
-        """Create collection if it doesn't exist"""
-        try:
-            collections = self.client.get_collections().collections
-            exists = any(c.name == self.collection_name for c in collections)
-            
-            if not exists:
-                distance_map = {
-                    "Cosine": Distance.COSINE,
-                    "Euclidean": Distance.EUCLID,
-                    "Dot": Distance.DOT
-                }
-                
-                self.client.create_collection(
-                    collection_name=self.collection_name,
-                    vectors_config=VectorParams(
-                        size=self.embedding_dim,
-                        distance=distance_map.get(self.distance, Distance.COSINE)
-                    )
-                )
-                logger.info(f"✅ Created collection: {self.collection_name}")
-            else:
-                logger.info(f"Collection {self.collection_name} already exists")
-                
-        except Exception as e:
-            logger.error(f"Failed to ensure collection: {e}")
-            raise
+    async def _async_init(self):
+        """Async initialization"""
+        await self.provider.initialize()
+        await self.provider.create_collection(
+            name=self.collection_name,
+            dimension=self.embedding_dim
+        )
+        logger.info(f"✅ Vector store initialized with collection: {self.collection_name}")
+    
+    def _create_metadata(self, point: EmbeddingPoint) -> DocumentMetadata:
+        """Convert EmbeddingPoint metadata to DocumentMetadata"""
+        return DocumentMetadata(
+            doc_id=point.chunk_id,
+            source=point.metadata.get('source', 'code_intelligence'),
+            repo_name=point.metadata.get('repo_name'),
+            file_path=point.metadata.get('file_path'),
+            commit_sha=point.metadata.get('commit_sha'),
+            content_type=point.metadata.get('chunk_type', 'code'),
+            language=point.metadata.get('language'),
+            author=point.metadata.get('author'),
+            created_at=datetime.fromisoformat(point.metadata['created_at']) if point.metadata.get('created_at') else None,
+            updated_at=datetime.fromisoformat(point.metadata['updated_at']) if point.metadata.get('updated_at') else None,
+            tags=point.metadata.get('tags', [])
+        )
     
     async def upsert_batch(
         self,
@@ -126,7 +143,7 @@ class VectorStore:
         successful = 0
         failed = 0
         
-        logger.info(f"Upserting {total_points} points in batches of {batch_size}")
+        logger.info(f"📤 Upserting {total_points} points in batches of {batch_size}")
         
         # Process in batches
         for i in range(0, total_points, batch_size):
@@ -135,38 +152,43 @@ class VectorStore:
             retry_count = 0
             while retry_count < max_retries:
                 try:
-                    # Convert to Qdrant points
-                    qdrant_points = [
-                        PointStruct(
-                            id=str(uuid.uuid4()),  # Generate unique ID
-                            vector=point.embedding,
-                            payload={
-                                "chunk_id": point.chunk_id,
-                                "content": point.content,
-                                "summary": point.summary,
-                                **point.metadata
-                            }
-                        )
-                        for point in batch
-                    ]
+                    # Convert to format expected by VectorDBProvider
+                    documents = []
+                    embeddings = []
+                    metadatas = []
                     
-                    # Upsert to Qdrant
-                    self.client.upsert(
-                        collection_name=self.collection_name,
-                        points=qdrant_points
+                    for point in batch:
+                        # Combine content and summary into document text
+                        doc_text = f"{point.content}\n\nSummary: {point.summary}"
+                        documents.append(doc_text)
+                        embeddings.append(point.embedding)
+                        
+                        # Create DocumentMetadata with additional fields in payload
+                        metadata = self._create_metadata(point)
+                        metadatas.append(metadata)
+                    
+                    # Use shared provider's add_documents
+                    success = await self.provider.add_documents(
+                        collection=self.collection_name,
+                        documents=documents,
+                        embeddings=embeddings,
+                        metadatas=metadatas
                     )
                     
-                    successful += len(batch)
-                    logger.debug(f"Upserted batch {i//batch_size + 1}: {len(batch)} points")
-                    break
+                    if success:
+                        successful += len(batch)
+                        logger.debug(f"   ✅ Batch {i//batch_size + 1}: {len(batch)} points")
+                        break
+                    else:
+                        raise Exception("add_documents returned False")
                     
                 except Exception as e:
                     retry_count += 1
                     if retry_count >= max_retries:
-                        logger.error(f"Failed to upsert batch after {max_retries} retries: {e}")
+                        logger.error(f"   ❌ Failed batch after {max_retries} retries: {e}")
                         failed += len(batch)
                     else:
-                        logger.warning(f"Retry {retry_count}/{max_retries} for batch {i//batch_size + 1}")
+                        logger.warning(f"   ⚠️  Retry {retry_count}/{max_retries} for batch {i//batch_size + 1}")
                         await asyncio.sleep(1 * retry_count)  # Exponential backoff
         
         result = {
@@ -217,65 +239,123 @@ class VectorStore:
             query_embedding: Query vector
             limit: Maximum results to return
             score_threshold: Minimum similarity score
-            filter_dict: Metadata filters
+            filter_dict: Metadata filters (supports glob patterns for file_path_pattern)
             
         Returns:
             List of search results with scores
         """
         try:
-            results = self.client.search(
-                collection_name=self.collection_name,
-                query_vector=query_embedding,
-                limit=limit,
-                score_threshold=score_threshold,
-                query_filter=filter_dict
+            import fnmatch
+            
+            logger.info(f"🔍 Vector search with filter_dict: {filter_dict}")
+            
+            # Build filter for VectorDBProvider
+            provider_filter = {}
+            file_path_pattern = None
+            
+            if filter_dict:
+                for key, value in filter_dict.items():
+                    if key == "file_path_pattern":
+                        # Handle glob pattern separately (post-filter)
+                        file_path_pattern = value
+                        logger.info(f"   • Will post-filter by file_path_pattern: {value}")
+                    elif key == "chunk_type":
+                        # Map chunk_type to content_type for DocumentMetadata
+                        provider_filter["content_type"] = value
+                        logger.info(f"   • Added content_type filter: {value}")
+                    elif key in ["language", "source", "repo_name"]:
+                        provider_filter[key] = value
+                        logger.info(f"   • Added {key} filter: {value}")
+                    # Note: embedding_type is not in DocumentMetadata, will be ignored
+            
+            logger.info(f"   • Searching with provider_filter: {provider_filter}")
+            
+            # Search with higher limit if we need to post-filter by path pattern
+            search_limit = limit * 5 if file_path_pattern else limit
+            
+            # Use shared provider's search
+            results: List[VectorSearchResult] = asyncio.run(
+                self.provider.search(
+                    collection=self.collection_name,
+                    query_embedding=query_embedding,
+                    top_k=search_limit,
+                    filter_metadata=provider_filter if provider_filter else None
+                )
             )
             
-            return [
-                {
-                    "chunk_id": hit.payload.get("chunk_id"),
-                    "content": hit.payload.get("content"),
-                    "summary": hit.payload.get("summary"),
-                    "score": hit.score,
+            logger.info(f"   • Provider returned {len(results)} results")
+            
+            # Convert VectorSearchResult to dict format and apply filters
+            filtered_results = []
+            for result in results:
+                # Apply score threshold
+                if score_threshold and result.score < score_threshold:
+                    continue
+                
+                # Apply file path pattern filter
+                file_path = result.metadata.file_path or ""
+                if file_path_pattern:
+                    if not fnmatch.fnmatch(file_path.lower(), file_path_pattern.lower()):
+                        logger.debug(f"   • Skipped (pattern mismatch): {file_path}")
+                        continue
+                    else:
+                        logger.debug(f"   • Matched pattern: {file_path}")
+                
+                # Parse content and summary from combined document
+                content = result.content
+                summary = ""
+                if "\n\nSummary: " in content:
+                    content, summary = content.split("\n\nSummary: ", 1)
+                
+                filtered_results.append({
+                    "chunk_id": result.doc_id,
+                    "content": content,
+                    "summary": summary,
+                    "score": result.score,
                     "metadata": {
-                        k: v for k, v in hit.payload.items()
-                        if k not in ["chunk_id", "content", "summary"]
+                        "file_path": result.metadata.file_path,
+                        "language": result.metadata.language,
+                        "chunk_type": result.metadata.content_type,
+                        "repo_name": result.metadata.repo_name,
+                        "source": result.metadata.source,
+                        "commit_sha": result.metadata.commit_sha,
+                        "author": result.metadata.author,
+                        "tags": result.metadata.tags
                     }
-                }
-                for hit in results
-            ]
+                })
+                
+                # Stop when we have enough results
+                if len(filtered_results) >= limit:
+                    break
+            
+            logger.info(f"✅ Returning {len(filtered_results)} filtered results")
+            return filtered_results
             
         except Exception as e:
-            logger.error(f"Search failed: {e}")
+            logger.error(f"❌ Search failed: {e}")
+            logger.exception(e)
             return []
     
     def get_collection_info(self) -> Dict[str, Any]:
         """Get collection statistics"""
         try:
-            info = self.client.get_collection(self.collection_name)
-            return {
-                "name": self.collection_name,
-                "points_count": info.points_count,
-                "vectors_count": info.vectors_count,
-                "status": info.status
-            }
+            stats = asyncio.run(self.provider.get_collection_stats(self.collection_name))
+            return stats
         except Exception as e:
-            logger.error(f"Failed to get collection info: {e}")
+            logger.error(f"❌ Failed to get collection info: {e}")
             return {}
     
     def delete_collection(self):
         """Delete the collection (use with caution!)"""
-        try:
-            self.client.delete_collection(self.collection_name)
-            logger.warning(f"🗑️ Deleted collection: {self.collection_name}")
-        except Exception as e:
-            logger.error(f"Failed to delete collection: {e}")
+        logger.warning(f"⚠️  delete_collection not implemented with shared provider")
+        logger.warning(f"   Please use vector_db management tools instead")
     
     def health_check(self) -> bool:
-        """Check if Qdrant is healthy"""
+        """Check if vector database is healthy"""
         try:
-            collections = self.client.get_collections()
-            return True
+            health = asyncio.run(self.provider.health_check())
+            return health
         except Exception as e:
-            logger.error(f"Health check failed: {e}")
+            logger.error(f"❌ Health check failed: {e}")
             return False
+

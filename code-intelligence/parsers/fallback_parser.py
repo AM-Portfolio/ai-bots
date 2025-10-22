@@ -75,22 +75,26 @@ class FallbackParser(BaseParser):
             if should_break and current_chunk:
                 # Create chunk
                 chunk_content = '\n'.join(current_chunk)
-                chunk_id = self.create_chunk_id(file_path, chunk_index)
                 
-                metadata = ChunkMetadata(
-                    chunk_id=chunk_id,
-                    file_path=file_path,
-                    language=self._detect_language(file_path),
-                    start_line=start_line,
-                    end_line=i,
-                    chunk_type="code_block",
-                    token_count=current_tokens,
-                    content=chunk_content
-                )
-                
-                chunks.append(CodeChunk(metadata=metadata, content=chunk_content))
-                
-                # Start new chunk
+                # Skip trivial chunks
+                if not self.should_skip_chunk(chunk_content, "code_block"):
+                    chunk_id = self.create_chunk_id(file_path, chunk_index)
+                    
+                    metadata = ChunkMetadata(
+                        chunk_id=chunk_id,
+                        file_path=file_path,
+                        language=self._detect_language(file_path),
+                        start_line=start_line,
+                        end_line=i,
+                        chunk_type="code_block",
+                        token_count=current_tokens,
+                        content=chunk_content
+                    )
+                    
+                    chunks.append(CodeChunk(metadata=metadata, content=chunk_content))
+                    chunk_index += 1
+                else:
+                    logger.debug(f"Skipped trivial fallback chunk at line {start_line}")
                 current_chunk = [line]
                 current_tokens = line_tokens
                 chunk_index += 1
@@ -102,20 +106,25 @@ class FallbackParser(BaseParser):
         # Add final chunk
         if current_chunk:
             chunk_content = '\n'.join(current_chunk)
-            chunk_id = self.create_chunk_id(file_path, chunk_index)
             
-            metadata = ChunkMetadata(
-                chunk_id=chunk_id,
-                file_path=file_path,
-                language=self._detect_language(file_path),
-                start_line=start_line,
-                end_line=len(lines),
-                chunk_type="code_block",
-                token_count=current_tokens,
-                content=chunk_content
-            )
-            
-            chunks.append(CodeChunk(metadata=metadata, content=chunk_content))
+            # Skip trivial chunks
+            if not self.should_skip_chunk(chunk_content, "code_block"):
+                chunk_id = self.create_chunk_id(file_path, chunk_index)
+                
+                metadata = ChunkMetadata(
+                    chunk_id=chunk_id,
+                    file_path=file_path,
+                    language=self._detect_language(file_path),
+                    start_line=start_line,
+                    end_line=len(lines),
+                    chunk_type="code_block",
+                    token_count=current_tokens,
+                    content=chunk_content
+                )
+                
+                chunks.append(CodeChunk(metadata=metadata, content=chunk_content))
+            else:
+                logger.debug(f"Skipped trivial final chunk at line {start_line}")
         
         logger.debug(f"Fallback parser created {len(chunks)} chunks from {file_path}")
         return chunks

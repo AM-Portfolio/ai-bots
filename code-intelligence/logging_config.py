@@ -41,6 +41,7 @@ class CodeIntelligenceLogger:
             'embed_repo': logging.INFO,
             'enhanced_summarizer': logging.INFO,
             'rate_limiter': logging.INFO,
+            'shared.azure_services.model_deployment_service': logging.WARNING,
             'httpx': logging.WARNING,
         },
         'verbose': {
