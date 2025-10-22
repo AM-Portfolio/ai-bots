@@ -194,4 +194,15 @@ class JiraClient:
             return False
 
 
-jira_client = JiraClient()
+# Lazy initialization: create client only when needed
+_jira_client_instance: Optional[JiraClient] = None
+
+def get_jira_client() -> JiraClient:
+    """Get or create the Jira client instance (lazy initialization)"""
+    global _jira_client_instance
+    if _jira_client_instance is None:
+        _jira_client_instance = JiraClient()
+    return _jira_client_instance
+
+# For backward compatibility
+jira_client = property(lambda self: get_jira_client())

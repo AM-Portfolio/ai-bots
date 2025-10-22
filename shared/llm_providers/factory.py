@@ -88,7 +88,7 @@ def get_llm_client(
     azure_endpoint: Optional[str] = None,
     azure_api_key: Optional[str] = None,
     azure_deployment: str = "gpt-4.1-mini",
-    azure_api_version: str = "2025-04-14",
+    azure_api_version: str = "2025-01-01-preview",
     together_api_key: Optional[str] = None,
     together_model: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 ) -> BaseLLMProvider:

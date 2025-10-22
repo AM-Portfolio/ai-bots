@@ -3,7 +3,7 @@ import asyncio
 import logging
 from typing import Dict, Any
 from shared.config import settings
-from shared.clients.jira_client import jira_client
+from shared.clients.jira_client import get_jira_client
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,7 @@ async def test_jira_connection() -> Dict[str, Any]:
     
     try:
         # Test connection using our client
+        jira_client = get_jira_client()
         if jira_client.client:
             # Try to get current user info
             user = jira_client.client.current_user()
@@ -67,6 +68,7 @@ async def test_jira_projects() -> Dict[str, Any]:
         return result
     
     try:
+        jira_client = get_jira_client()
         if not jira_client.client:
             result["error"] = "Jira client not initialized"
             return result
@@ -102,6 +104,7 @@ async def test_jira_project_access() -> Dict[str, Any]:
         return result
     
     try:
+        jira_client = get_jira_client()
         if not jira_client.client:
             result["error"] = "Jira client not initialized"
             return result
@@ -149,6 +152,7 @@ async def test_jira_create_test_issue() -> Dict[str, Any]:
         return result
     
     try:
+        jira_client = get_jira_client()
         if not jira_client.client:
             result["error"] = "Jira client not initialized"
             return result

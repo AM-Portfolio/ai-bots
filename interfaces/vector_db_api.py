@@ -105,9 +105,12 @@ async def initialize_vector_db():
         if not init_success:
             raise Exception("Vector DB initialization returned False")
         
-        # Create embedding service
+        # Create embedding service - use Together AI for embeddings to match existing vectors
+        # Note: Existing vectors in Qdrant were created with Together AI embeddings
+        # To use Azure embeddings, you'll need to re-index all documents
         logger.info("   Creating embedding service...")
         embedding_service = EmbeddingService(provider="together")
+        logger.info(f"   Using embedding provider: together (matches existing vector data)")
         
         # Create collection
         logger.info("   Creating github_repos collection...")

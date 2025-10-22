@@ -17,7 +17,8 @@ class Settings(BaseSettings):
     
     # Primary LLM Provider (azure, together, or auto)
     # "auto" = Auto-detect based on configured credentials
-    llm_provider: Optional[str] = "auto"  # Smart auto-detection
+    # "azure" = Use Azure OpenAI (recommended)
+    llm_provider: Optional[str] = "azure"  # Default to Azure
     
     # Together AI Configuration (Fallback)
     together_api_key: Optional[str] = None
@@ -28,7 +29,7 @@ class Settings(BaseSettings):
     azure_openai_api_key: Optional[str] = None
     azure_openai_key: Optional[str] = None  # Alias for azure_openai_api_key
     azure_openai_deployment_name: Optional[str] = "gpt-4.1-mini"  # Default deployment
-    azure_openai_api_version: Optional[str] = "2025-04-14"  # Default API version
+    azure_openai_api_version: Optional[str] = "2025-01-01-preview"  # Default API version
     azure_openai_embedding_deployment: Optional[str] = "text-embedding-ada-002"  # Default embedding
     
     # Azure Model Deployments (from Azure AI Foundry)

@@ -74,7 +74,8 @@ class TogetherAIProvider(BaseLLMProvider):
         start_time = time.time()
         
         try:
-            response = self.client.completions.create(
+            # Together AI uses chat.completions for chat models
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 temperature=temperature,

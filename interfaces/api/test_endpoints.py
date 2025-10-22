@@ -41,9 +41,10 @@ async def test_github(repository: str):
 @router.post("/jira")
 async def test_jira(project_key: str):
     """Test Jira integration"""
-    from shared.clients.jira_client import jira_client
+    from shared.clients.jira_client import get_jira_client
     
     try:
+        jira_client = get_jira_client()
         issues = jira_client.search_issues(f"project = {project_key} AND status = Open", max_results=5)
         return {
             "success": True,

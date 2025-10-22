@@ -222,8 +222,9 @@ async def _handle_orchestration_pipeline(prompt: str, provider: str, show_thinki
         response = "Pipeline executed successfully."
         if result.get("task_results") and len(result["task_results"]) > 0:
             last_task = result["task_results"][-1]
-            if "response" in last_task:
-                response = last_task["response"]
+            # AgentTask is a dataclass, access result attribute
+            if last_task.result and isinstance(last_task.result, dict) and "response" in last_task.result:
+                response = last_task.result["response"]
         
         # Extract GitHub context from enriched_context object
         github_context = None

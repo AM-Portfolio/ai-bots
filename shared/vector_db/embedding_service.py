@@ -115,14 +115,28 @@ class EmbeddingService:
                         model=self.embedding_model,
                         input=text
                     )
+                    embedding = response.data[0].embedding
                 else:
-                    # Together AI embeddings
-                    response = self.client.embeddings.create(
-                        model=self.embedding_model,
-                        input=text
+                    # Together AI embeddings - use direct REST API as SDK has issues
+                    import requests
+                    api_key = os.environ.get("TOGETHER_API_KEY")
+                    headers = {
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json"
+                    }
+                    data = {
+                        "model": self.embedding_model,
+                        "input": text
+                    }
+                    response = requests.post(
+                        "https://api.together.xyz/v1/embeddings",
+                        headers=headers,
+                        json=data,
+                        timeout=30
                     )
+                    response.raise_for_status()
+                    embedding = response.json()["data"][0]["embedding"]
                 
-                embedding = response.data[0].embedding
                 logger.debug(f"✅ Generated {self.provider_name} embedding (dim: {len(embedding)})")
                 
                 # Ensure consistent dimensions

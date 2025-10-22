@@ -7,7 +7,7 @@ import uuid
 
 from features.doc_generator import generate_documentation
 from shared.clients.confluence_client import ConfluenceClient
-from shared.clients.jira_client import jira_client
+from shared.clients.jira_client import get_jira_client
 from shared.thinking_process import create_doc_orchestrator_thinking_process
 from shared.config import settings
 
@@ -213,6 +213,7 @@ Provide well-structured documentation in markdown format with sections, examples
                     thinking.add_step("create_jira", "Create Jira Ticket", "Creating documentation ticket in Jira")
                 thinking.start_step("create_jira")
                 
+                jira_client = get_jira_client()
                 jira_ticket = jira_client.create_documentation_ticket(
                     project_key=effective_project_key,
                     repository=doc_result.repository or "Unknown",
