@@ -31,6 +31,9 @@ from change_planner import ChangePlanner
 from enhanced_summarizer import EnhancedCodeSummarizer
 from vector_store import VectorStore, EmbeddingPoint
 
+# Import shared embedding service from vector_db module
+from shared.vector_db.embedding_service import EmbeddingService
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -57,7 +60,7 @@ class EmbeddingOrchestrator:
         manifest_path: str = ".code-intelligence-state.json",
         collection_name: str = "code_intelligence",
         qdrant_path: str = "./qdrant_data",
-        embedding_model: str = "text-embedding-3-large"
+        embedding_provider: str = "auto"
     ):
         """
         Initialize orchestrator.
@@ -67,10 +70,9 @@ class EmbeddingOrchestrator:
             manifest_path: Path to state manifest
             collection_name: Qdrant collection name
             qdrant_path: Path to Qdrant storage
-            embedding_model: Azure OpenAI embedding model
+            embedding_provider: Embedding provider ('auto', 'azure', 'together')
         """
         self.repo_path = Path(repo_path)
-        self.embedding_model = embedding_model
         
         # Initialize components
         logger.info("🚀 Initializing Code Intelligence Pipeline...")
@@ -79,28 +81,38 @@ class EmbeddingOrchestrator:
         self.repo_state = RepoState(manifest_path)
         self.change_planner = ChangePlanner(repo_path)
         self.summarizer = EnhancedCodeSummarizer(self.repo_state, self.rate_limiter)
+        
+        # Initialize shared embedding service (uses config from settings)
+        logger.info(f"📦 Initializing embedding service (provider: {embedding_provider})...")
+        self.embedding_service = EmbeddingService(provider=embedding_provider)
+        
+        # Get dimension from embedding service for vector store
+        embedding_dim = self.embedding_service.get_dimension()
+        logger.info(f"   Embedding dimension: {embedding_dim}")
+        
         self.vector_store = VectorStore(
             collection_name=collection_name,
-            qdrant_path=qdrant_path
+            qdrant_path=qdrant_path,
+            embedding_dim=embedding_dim
         )
-        
-        # Initialize Azure OpenAI for embeddings
-        self.embedding_client = None
-        self._init_embedding_client()
         
         logger.info("✅ Pipeline initialized")
     
-    def _init_embedding_client(self):
-        """Initialize Azure OpenAI embedding client"""
+    async def _verify_embedding_service(self):
+        """Verify embedding service is connected"""
         try:
-            from shared.azure_services.azure_ai_manager import azure_ai_manager
-            if azure_ai_manager.models.is_available():
-                self.embedding_client = azure_ai_manager.models
-                logger.info("✅ Using Azure OpenAI for embeddings")
+            health_status = await self.embedding_service.health_check()
+            if health_status.get('connected', False):
+                logger.info("✅ Embedding service connected and healthy")
+                logger.info(f"   Provider: {health_status.get('provider')}")
+                logger.info(f"   Model: {health_status.get('model')}")
+                return True
             else:
-                logger.error("❌ Azure OpenAI not configured!")
+                logger.error(f"❌ Embedding service not connected: {health_status.get('error', 'Unknown error')}")
+                return False
         except Exception as e:
-            logger.error(f"Failed to initialize embedding client: {e}")
+            logger.error(f"Failed to verify embedding service: {e}")
+            return False
     
     def discover_files(
         self,
@@ -157,6 +169,11 @@ class EmbeddingOrchestrator:
         logger.info("="* 60)
         logger.info("🎯 Starting Incremental Embedding Pipeline")
         logger.info("=" * 60)
+        
+        # Verify embedding service is connected
+        logger.info("🔌 Verifying embedding service...")
+        if not await self._verify_embedding_service():
+            raise Exception("Embedding service not available. Please check configuration.")
         
         # Start rate limiter workers
         await self.rate_limiter.start()
@@ -272,7 +289,7 @@ class EmbeddingOrchestrator:
         summaries: Dict[str, str]
     ) -> List[List[float]]:
         """
-        Generate embeddings for chunks with summaries.
+        Generate embeddings for chunks with summaries using shared embedding service.
         
         Args:
             chunks: List of code chunks
@@ -289,22 +306,16 @@ class EmbeddingOrchestrator:
         for i in tqdm(range(0, len(chunks), batch_size), desc="Embedding"):
             batch = chunks[i:i + batch_size]
             
-            # Prepare texts (code + summary)
+            # Prepare texts (summary + code)
             texts = [
                 f"{summaries.get(chunk.chunk_id, '')}\n\n{chunk.content[:2000]}"
                 for chunk in batch
             ]
             
-            # Embed with rate limiting
+            # Embed with rate limiting using shared embedding service
             async def embed_batch():
-                if not self.embedding_client:
-                    raise Exception("Embedding client not initialized")
-                
-                response = await self.embedding_client.create_embeddings(
-                    texts=texts,
-                    model=self.embedding_model
-                )
-                return [item["embedding"] for item in response]
+                # Use shared embedding service (handles Azure, Together AI, fallback)
+                return await self.embedding_service.generate_embeddings_batch(texts)
             
             try:
                 batch_embeddings = await self.rate_limiter.submit(
@@ -313,10 +324,14 @@ class EmbeddingOrchestrator:
                     priority=2
                 )
                 embeddings.extend(batch_embeddings)
+                logger.debug(f"✅ Batch {i//batch_size + 1} embedded: {len(batch_embeddings)} vectors")
             except Exception as e:
                 logger.error(f"Failed to embed batch {i//batch_size + 1}: {e}")
-                # Add placeholder embeddings for failed batch
-                embeddings.extend([[0.0] * 3072] * len(batch))
+                # Add placeholder embeddings for failed batch (use configured dimension)
+                placeholder_dim = self.embedding_service.get_dimension()
+                embeddings.extend([[0.0] * placeholder_dim] * len(batch))
+        
+        return embeddings
         
         return embeddings
 

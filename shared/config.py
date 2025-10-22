@@ -23,15 +23,17 @@ class Settings(BaseSettings):
     # Together AI Configuration (Fallback)
     together_api_key: Optional[str] = None
     together_model: Optional[str] = None
+    together_embedding_model: Optional[str] = "togethercomputer/m2-bert-80M-32k-retrieval"
+    together_embedding_dimension: Optional[int] = 768
     
     # Azure OpenAI Configuration
     azure_openai_endpoint: Optional[str] = None
     azure_openai_api_key: Optional[str] = None
     azure_openai_key: Optional[str] = None  # Alias for azure_openai_api_key
-    azure_openai_deployment_name: Optional[str] = "gpt-4.1-mini"  # Default deployment
-    azure_openai_api_version: Optional[str] = "2025-01-01-preview"  # Default API version
-    azure_openai_embedding_deployment: Optional[str] = "text-embedding-ada-002"  # Default embedding
-    azure_openai_embedding_api_version: Optional[str] = "2023-05-15"  # Embedding API version
+    azure_openai_deployment_name: Optional[str] = None  # Default deployment
+    azure_openai_api_version: Optional[str] = None  # Default API version
+    azure_openai_embedding_deployment: Optional[str] = None # Default embedding
+    azure_openai_embedding_api_version: Optional[str] = None # Embedding API version
     azure_openai_embedding_batch_size: Optional[int] = 20  # Batch size for embeddings (to avoid rate limits)
     azure_openai_embedding_batch_delay: Optional[float] = 1.0  # Delay between batches in seconds
     
@@ -42,8 +44,8 @@ class Settings(BaseSettings):
     
     # Azure Chat Completion Models (Common Configuration)
     # Default chat model (used by LLM factory and general chat)
-    azure_chat_model: Optional[str] = "gpt-4.1-mini"  # Default chat model
-    azure_chat_api_version: Optional[str] = "2025-01-01-preview"  # Chat API version
+    azure_chat_model: Optional[str] = None # Default chat model
+    azure_chat_api_version: Optional[str] = None # Chat API version
     
     # Role-Based Provider Assignment (which provider to use for specific tasks)
     # Options: 'azure', 'together', or 'auto' (uses llm_provider default)

@@ -14,7 +14,6 @@ import logging
 
 from shared.vector_db.factory import VectorDBFactory
 from shared.vector_db.embedding_service import EmbeddingService
-from shared.vector_db.services.repository_indexer import RepositoryIndexer
 from shared.vector_db.services.vector_query_service import VectorQueryService
 from orchestration.github_llm.query_orchestrator import GitHubLLMOrchestrator
 from orchestration.github_llm.models import QueryRequest, QueryType
@@ -29,10 +28,10 @@ router = APIRouter(prefix="/api/vector-db", tags=["vector-db"])
 
 # Pydantic models
 class IndexRepositoryRequest(BaseModel):
-    owner: str
-    repo: str
-    branch: str = "main"
-    collection: str = "github_repos"
+    repo_path: str
+    collection: str = "code_intelligence"
+    max_files: Optional[int] = None
+    force_reindex: bool = False
 
 
 class SemanticSearchRequest(BaseModel):
@@ -690,45 +689,80 @@ async def delete_repository_documents_full_path(collection_name: str, owner: str
 
 @router.post("/index-repository")
 async def index_repository(request: IndexRepositoryRequest):
-    """Index a GitHub repository into vector database
+    """Index a local repository into vector database using code-intelligence
+    
+    Uses advanced code-intelligence features:
+    - Tree-sitter parsing for semantic chunking
+    - Enhanced summarization with technical and business context
+    - Smart prioritization (changed files first)
+    - Incremental updates with caching
+    - Rate limiting to prevent API throttling
     
     Example request:
     ```json
     {
-        "owner": "facebook",
-        "repo": "react",
-        "branch": "main",
-        "collection": "github_repos"
+        "repo_path": ".",
+        "collection": "code_intelligence",
+        "max_files": 100,
+        "force_reindex": false
     }
     ```
     """
     try:
-        if not vector_db or not embedding_service:
-            raise HTTPException(status_code=503, detail="Vector DB not initialized")
+        import sys
+        from pathlib import Path
         
-        # Validate input
-        if not request.owner or not request.repo:
+        # Add code-intelligence to path
+        code_intel_path = Path(__file__).parent.parent / "code-intelligence"
+        if str(code_intel_path) not in sys.path:
+            sys.path.append(str(code_intel_path))
+        
+        from embed_repo import EmbeddingOrchestrator
+        
+        # Validate repo path
+        repo_path = Path(request.repo_path).resolve()
+        if not repo_path.exists():
             raise HTTPException(
                 status_code=400,
-                detail="Both 'owner' and 'repo' fields are required. Example: owner='facebook', repo='react'"
+                detail=f"Repository path does not exist: {request.repo_path}"
             )
         
-        # Create indexer with GitHub client
-        indexer = RepositoryIndexer(
-            vector_db=vector_db,
-            embedding_service=embedding_service,
-            github_client=github_client
-        )
+        logger.info(f"🚀 Starting repository embedding using code-intelligence")
+        logger.info(f"   📁 Repository: {repo_path}")
+        logger.info(f"   📦 Collection: {request.collection}")
+        logger.info(f"   📊 Max files: {request.max_files or 'unlimited'}")
+        logger.info(f"   🔄 Force reindex: {request.force_reindex}")
         
-        result = await indexer.index_repository(
-            owner=request.owner,
-            repo=request.repo,
-            branch=request.branch,
+        # Create embedding orchestrator
+        orchestrator = EmbeddingOrchestrator(
+            repo_path=str(repo_path),
             collection_name=request.collection
         )
         
-        return result
+        # Run incremental embedding
+        stats = await orchestrator.run_incremental(
+            max_files=request.max_files,
+            force_reindex=request.force_reindex
+        )
         
+        logger.info(f"✅ Repository embedding completed")
+        logger.info(f"   📄 Files processed: {stats['files_processed']}")
+        logger.info(f"   🎯 Chunks embedded: {stats['chunks_embedded']}")
+        logger.info(f"   ✅ Success rate: {stats['success_rate']:.1f}%")
+        
+        return {
+            'success': True,
+            'repository': str(repo_path),
+            'collection': request.collection,
+            'statistics': stats
+        }
+        
+    except ImportError as e:
+        logger.error(f"❌ Failed to import code-intelligence: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="Code-intelligence module not available. Please ensure it's properly configured."
+        )
     except Exception as e:
         logger.error(f"❌ Indexing failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))

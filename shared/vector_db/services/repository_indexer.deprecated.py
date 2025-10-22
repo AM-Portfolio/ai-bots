@@ -1,4 +1,44 @@
 """
+Repository Indexing Service - DEPRECATED
+
+⚠️ DEPRECATION NOTICE ⚠️
+
+This module is DEPRECATED and has been replaced by the code-intelligence module.
+
+The code-intelligence module provides superior functionality:
+- Tree-sitter parsing for semantic code chunking
+- Enhanced summarization with technical and business context
+- Multi-language support (Python, JS/TS, Java, Kotlin, C/C++, Dart)
+- Smart prioritization (changed files first)
+- Incremental updates with SHA256 hashing
+- Intelligent rate limiting with adaptive batching
+- Special file detection (Docker, Helm, API specs, configs)
+- Resilient error handling with DLQ
+
+Migration Path:
+  Instead of using RepositoryIndexer from this module,
+  use the code-intelligence orchestrator:
+  
+  OLD (deprecated):
+    from shared.vector_db.services.repository_indexer import RepositoryIndexer
+    indexer = RepositoryIndexer(vector_db, embedding_service)
+    await indexer.index_repository(owner, repo, branch)
+  
+  NEW (recommended):
+    from code-intelligence.embed_repo import EmbeddingOrchestrator
+    orchestrator = EmbeddingOrchestrator(repo_path=".", collection_name="code_intel")
+    stats = await orchestrator.run_incremental()
+  
+  Or use the unified orchestrator:
+    from code-intelligence.orchestrator import CodeIntelligenceOrchestrator
+    orchestrator = CodeIntelligenceOrchestrator(repo_path=".")
+    stats = await orchestrator.embed_repository(collection_name="code_intel")
+
+This file is kept for backward compatibility only and will be removed in a future version.
+
+Original documentation below:
+---
+
 Repository Indexing Service
 Indexes GitHub repository content into vector database
 """

@@ -19,12 +19,15 @@ Optimized multi-language code embedding system with intelligent rate limiting, c
 
 ```
 code-intelligence/
-├── embed_repo.py              # Main orchestrator
-├── rate_limiter.py            # Azure-aware rate limiting
+├── orchestrator.py            # ⭐ MAIN ENTRY POINT - Unified command interface
+├── embed_repo.py              # Embedding pipeline orchestrator
+├── enhanced_summarizer.py     # Rich technical summaries
+├── summary_templates.py       # Summary prompt templates
+├── change_planner.py          # Smart file prioritization
 ├── repo_state.py              # File hashing & caching
-├── change_planner.py          # Smart prioritization
-├── enhanced_summarizer.py     # ⭐ Rich technical summaries
+├── rate_limiter.py            # Azure-aware rate limiting
 ├── vector_store.py            # Qdrant interface
+├── test_pipeline.py           # Integration tests
 ├── examples/                  # Sample code & docs
 └── parsers/
     ├── __init__.py        # Parser registry
@@ -57,20 +60,41 @@ cp .env.example .env
 # AZURE_OPENAI_KEY=your-api-key
 ```
 
-### 3. Run Embedding Pipeline
+### 3. Run Code Intelligence
+
+**NEW: Use the unified orchestrator.py entry point for all operations**
 
 ```bash
-# Incremental mode (only changed files)
-python embed_repo.py
+# Check system health
+python orchestrator.py health
+
+# Embed repository (incremental - only changed files)
+python orchestrator.py embed
 
 # Force re-embed all files
-python embed_repo.py --force
+python orchestrator.py embed --force
 
 # Limit to 50 files
-python embed_repo.py --max-files 50
+python orchestrator.py embed --max-files 50
 
 # Custom collection name
-python embed_repo.py --collection my_project
+python orchestrator.py embed --collection my_project
+
+# Analyze repository changes and priorities
+python orchestrator.py analyze
+
+# Generate code summaries
+python orchestrator.py summarize
+
+# Run integration tests
+python orchestrator.py test
+```
+
+**Legacy: Direct script execution (still supported)**
+
+```bash
+# Direct embedding (legacy approach)
+python embed_repo.py --repo . --collection my_project
 ```
 
 ## 🔧 How It Works

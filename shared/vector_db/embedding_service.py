@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class EmbeddingService:
-    """Service for generating text embeddings with Together AI and hash fallback"""
+    """Service for generating text embeddings with Azure/Together AI and hash fallback"""
     
     def __init__(self, provider: str = "auto"):
         """
@@ -26,33 +26,39 @@ class EmbeddingService:
         from shared.config import settings
         from shared.llm_providers.resilient_orchestrator import get_resilient_orchestrator
         
+        # Store settings reference
+        self.settings = settings
+        
         # Get provider based on role
         if provider == "auto":
             orchestrator = get_resilient_orchestrator()
             provider = orchestrator.get_provider_for_role("embedding")
         
         self.provider_name = provider
-        self.fallback_dimension = 768
         self.client = None
         self.api_available = False
         
-        # Set model and dimension based on provider
+        # Set model and dimension based on provider from settings
         if provider == "azure":
-            self.embedding_model = settings.azure_openai_embedding_deployment
-            # Azure embedding dimensions:
+            self.embedding_model = self.settings.azure_openai_embedding_deployment
+            # Azure embedding dimensions - auto-detect from model name
             # - text-embedding-ada-002: 1536 dimensions
             # - text-embedding-3-small: 1536 dimensions
             # - text-embedding-3-large: 3072 dimensions
             # Optimized for technical documentation, code, and business content
-            if "3-large" in self.embedding_model:
+            if "3-large" in self.embedding_model.lower():
                 self.dimension = 3072
-            else:
+            elif "3-small" in self.embedding_model.lower():
                 self.dimension = 1536
+            else:
+                self.dimension = 1536  # Default for ada-002 and others
+            self.fallback_dimension = 768
             self._initialize_azure_client()
         else:
-            self.embedding_model = "togethercomputer/m2-bert-80M-32k-retrieval"
-            # Together AI m2-bert produces 768-dimensional embeddings
-            self.dimension = 768
+            # Together AI configuration from settings
+            self.embedding_model = self.settings.together_embedding_model
+            self.dimension = self.settings.together_embedding_dimension
+            self.fallback_dimension = self.settings.together_embedding_dimension
             self._initialize_together_client()
         
         logger.info(f"🎯 Initializing embedding service with provider: {provider}")
@@ -64,20 +70,19 @@ class EmbeddingService:
     def _initialize_azure_client(self):
         """Initialize Azure OpenAI client for embeddings"""
         try:
-            from shared.config import settings
             from openai import AzureOpenAI
             
-            if not settings.azure_openai_endpoint or not settings.azure_openai_api_key:
+            if not self.settings.azure_openai_endpoint or not self.settings.azure_openai_api_key:
                 logger.warning("⚠️  Azure OpenAI credentials not configured, using fallback embeddings")
                 return
             
-            # Use dedicated embedding API version if specified, otherwise fallback to general API version
-            embedding_api_version = getattr(settings, 'azure_openai_embedding_api_version', None) or settings.azure_openai_api_version
+            # Use dedicated embedding API version from settings
+            embedding_api_version = self.settings.azure_openai_embedding_api_version or self.settings.azure_openai_api_version
             
             self.client = AzureOpenAI(
-                api_key=settings.azure_openai_api_key,
+                api_key=self.settings.azure_openai_api_key,
                 api_version=embedding_api_version,
-                azure_endpoint=settings.azure_openai_endpoint
+                azure_endpoint=self.settings.azure_openai_endpoint
             )
             self.api_available = True
             logger.info(f"✅ Azure OpenAI embedding client initialized successfully")
@@ -92,9 +97,10 @@ class EmbeddingService:
     def _initialize_together_client(self):
         """Initialize Together AI client for embeddings"""
         try:
-            api_key = os.environ.get("TOGETHER_API_KEY")
+            # Get API key from settings
+            api_key = self.settings.together_api_key or os.environ.get("TOGETHER_API_KEY")
             if not api_key:
-                logger.warning("⚠️  TOGETHER_API_KEY not found, using fallback embeddings only")
+                logger.warning("⚠️  TOGETHER_API_KEY not found in settings or environment, using fallback embeddings only")
                 return
             
             # Set environment variable for Together client (it reads from env)
@@ -104,6 +110,8 @@ class EmbeddingService:
             self.client = Together()
             self.api_available = True
             logger.info("✅ Together AI embedding client initialized successfully")
+            logger.info(f"   • Model: {self.embedding_model}")
+            logger.info(f"   • Dimension: {self.dimension}")
             
         except Exception as e:
             logger.warning(f"⚠️  Failed to initialize Together AI client: {e}")
@@ -134,13 +142,13 @@ class EmbeddingService:
                 else:
                     # Together AI embeddings - use direct REST API as SDK has issues
                     import requests
-                    api_key = os.environ.get("TOGETHER_API_KEY")
+                    api_key = self.settings.together_api_key or os.environ.get("TOGETHER_API_KEY")
                     headers = {
                         "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json"
                     }
                     data = {
-                        "model": self.embedding_model,
+                        "model": self.embedding_model,  # From settings
                         "input": text
                     }
                     response = requests.post(
@@ -226,13 +234,12 @@ class EmbeddingService:
             return []
         
         import asyncio
-        from shared.config import settings
         
         # Use settings defaults if not specified
         if batch_size is None:
-            batch_size = getattr(settings, 'azure_openai_embedding_batch_size', 20)
+            batch_size = self.settings.azure_openai_embedding_batch_size
         if delay_between_batches is None:
-            delay_between_batches = getattr(settings, 'azure_openai_embedding_batch_delay', 1.0)
+            delay_between_batches = self.settings.azure_openai_embedding_batch_delay
         
         embeddings = []
         provider_success = 0
@@ -274,13 +281,13 @@ class EmbeddingService:
                     else:
                         # Together AI batch embeddings - use direct REST API
                         import requests
-                        api_key = os.environ.get("TOGETHER_API_KEY")
+                        api_key = self.settings.together_api_key or os.environ.get("TOGETHER_API_KEY")
                         headers = {
                             "Authorization": f"Bearer {api_key}",
                             "Content-Type": "application/json"
                         }
                         data = {
-                            "model": self.embedding_model,
+                            "model": self.embedding_model,  # From settings
                             "input": batch_texts
                         }
                         response = requests.post(
