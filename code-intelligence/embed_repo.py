@@ -129,26 +129,74 @@ class EmbeddingOrchestrator:
         """
         if exclude_patterns is None:
             exclude_patterns = [
-                '.git', 'node_modules', '__pycache__', 'venv',
-                '.venv', 'dist', 'build', '.next', '.nuxt',
-                'target', 'out', '.idea', '.vscode'
+                # Version control
+                '.git', '.svn', '.hg',
+                # Dependencies
+                'node_modules', 'bower_components', 'vendor', 'packages',
+                # Python
+                '__pycache__', 'venv', '.venv', 'env', '.env', 'virtualenv',
+                '.pytest_cache', '.mypy_cache', '.tox', 'eggs', '.eggs',
+                # Build outputs
+                'dist', 'build', 'out', 'target', 'bin', 'obj',
+                # Framework specific
+                '.next', '.nuxt', '.cache', '.parcel-cache',
+                # IDE
+                '.idea', '.vscode', '.vs', '.eclipse', '.project',
+                # Test/Coverage
+                'coverage', 'htmlcov', '.coverage', '.nyc_output',
+                # Logs
+                'logs', 'log',
+                # Other
+                'tmp', 'temp', '.tmp'
             ]
         
+        # File patterns to skip
+        skip_file_patterns = [
+            'test_', '_test.', '.test.', '.spec.',  # Test files
+            '.min.', '-min.',  # Minified files
+            'bundle.', 'chunk.',  # Bundled files
+        ]
+        
+        # Exact filenames to skip
+        skip_filenames = {
+            'package-lock.json', 'yarn.lock', 'poetry.lock',
+            'Pipfile.lock', 'pnpm-lock.yaml', 'bun.lockb'
+        }
+        
         files = []
+        skipped_dirs = 0
+        skipped_files = 0
         supported_extensions = parser_registry.get_supported_extensions()
+        
+        logger.info("🔍 Starting file discovery...")
+        logger.info(f"   Excluding directories: {', '.join(exclude_patterns[:10])}...")
         
         for root, dirs, filenames in os.walk(self.repo_path):
             # Filter out excluded directories
+            original_dir_count = len(dirs)
             dirs[:] = [d for d in dirs if d not in exclude_patterns]
+            skipped_dirs += (original_dir_count - len(dirs))
             
             for filename in filenames:
+                # Skip exact filenames
+                if filename in skip_filenames:
+                    skipped_files += 1
+                    continue
+                
+                # Skip file patterns
+                if any(pattern in filename.lower() for pattern in skip_file_patterns):
+                    skipped_files += 1
+                    continue
+                
                 file_path = Path(root) / filename
                 
-                # Check if supported
+                # Check if supported extension
                 if file_path.suffix.lower() in supported_extensions:
                     files.append(str(file_path.relative_to(self.repo_path)))
         
         logger.info(f"📁 Discovered {len(files)} code files")
+        logger.info(f"   Skipped {skipped_dirs} directories, {skipped_files} files")
+        logger.info(f"   Supported extensions: {', '.join(list(supported_extensions)[:10])}...")
         return files
     
     async def run_incremental(
@@ -204,18 +252,39 @@ class EmbeddingOrchestrator:
             # Step 4: Parse and chunk
             logger.info("📖 Phase 1: Parsing and Summarization")
             all_chunks = []
+            parse_errors = []
+            
             for file_path in tqdm(prioritized_files, desc="Parsing files"):
                 try:
                     chunks = parser_registry.parse_file(file_path)
                     all_chunks.extend(chunks)
+                    if len(chunks) > 0:
+                        logger.debug(f"   ✓ {file_path}: {len(chunks)} chunks")
                 except Exception as e:
-                    logger.error(f"Failed to parse {file_path}: {e}")
+                    logger.error(f"   ✗ Failed to parse {file_path}: {e}")
+                    parse_errors.append((file_path, str(e)))
             
-            logger.info(f"✂️ Generated {len(all_chunks)} code chunks")
+            logger.info(f"✂️ Generated {len(all_chunks)} code chunks from {len(prioritized_files)} files")
+            if parse_errors:
+                logger.warning(f"   ⚠️  {len(parse_errors)} files failed to parse")
+            
+            # Show chunk type distribution
+            chunk_types = {}
+            for chunk in all_chunks:
+                chunk_type = chunk.metadata.chunk_type
+                chunk_types[chunk_type] = chunk_types.get(chunk_type, 0) + 1
+            logger.info(f"   Chunk types: {dict(sorted(chunk_types.items(), key=lambda x: x[1], reverse=True))}")
             
             # Step 5: Summarize chunks (Phase 1)
-            logger.info("📝 Generating summaries...")
+            logger.info("📝 Generating enhanced summaries...")
+            logger.info(f"   Processing {len(all_chunks)} chunks with AI summarization")
             summaries = await self.summarizer.summarize_batch(all_chunks)
+            
+            # Log summarization stats
+            summary_lengths = [len(s) for s in summaries.values() if s]
+            if summary_lengths:
+                avg_length = sum(summary_lengths) / len(summary_lengths)
+                logger.info(f"   ✅ Generated {len(summaries)} summaries (avg length: {avg_length:.0f} chars)")
             
             # Step 6: Generate embeddings (Phase 2)
             logger.info("🔢 Phase 2: Embedding Generation")

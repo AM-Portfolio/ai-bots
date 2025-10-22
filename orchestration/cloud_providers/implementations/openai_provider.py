@@ -144,7 +144,7 @@ class OpenAIProvider(CloudProvider, STTProvider, TTSProvider, LLMProvider):
             client = AsyncOpenAI(api_key=self.config.api_key)
             
             response = await client.chat.completions.create(
-                model=self.config.model or "gpt-4o-mini",
+                model=self.config.model or "gpt-4.1-mini",
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
@@ -196,4 +196,4 @@ class OpenAIProvider(CloudProvider, STTProvider, TTSProvider, LLMProvider):
     @property
     def model_name(self) -> str:
         """Get current model name"""
-        return self.config.model or "gpt-4o-mini"
+        return self.config.model or "gpt-4.1-mini"

@@ -381,13 +381,28 @@ class EnhancedCodeSummarizer:
     ) -> str:
         """Generate summary using Azure GPT-4o mini"""
         if not self.azure_client:
+            logger.debug(f"No Azure client, using fallback for {chunk.chunk_id}")
             return self._fallback_summary(chunk, metadata)
         
         # Build enhanced prompt
         prompt = self.build_enhanced_prompt(chunk, metadata)
         
+        # Log summarization details
+        logger.debug(f"📝 Summarizing {chunk.chunk_id}")
+        logger.debug(f"   File: {chunk.metadata.file_path}")
+        logger.debug(f"   Type: {chunk.metadata.chunk_type}")
+        logger.debug(f"   Symbol: {chunk.metadata.symbol_name or 'N/A'}")
+        logger.debug(f"   Lines: {chunk.metadata.start_line}-{chunk.metadata.end_line}")
+        logger.debug(f"   Prompt length: {len(prompt)} chars")
+        logger.debug(f"   Metadata: imports={len(metadata.get('imports', []))}, "
+                    f"exceptions={len(metadata.get('exceptions', []))}, "
+                    f"annotations={len(metadata.get('annotations', []))}, "
+                    f"env_vars={len(metadata.get('env_vars', []))}, "
+                    f"endpoints={len(metadata.get('api_endpoints', []))}")
+        
         # Call API with rate limiting
         async def call_api():
+            logger.debug(f"   🔄 Calling Azure Chat Completion for {chunk.chunk_id}")
             response = await self.azure_client.chat_completion(
                 messages=[
                     {
@@ -399,11 +414,13 @@ class EnhancedCodeSummarizer:
                         "content": prompt
                     }
                 ],
-                model="gpt-4o-mini",
+                model="gpt-4.1-mini",
                 max_tokens=300,  # Increased for richer summaries
                 temperature=0.2  # Lower for more factual
             )
-            return response.get("content", "")
+            # Response is already a string, not a dict
+            logger.debug(f"   ✅ Received summary for {chunk.chunk_id} ({len(response)} chars)")
+            return response
         
         summary = await self.rate_limiter.submit(
             QuotaType.SUMMARIZATION,
@@ -448,20 +465,45 @@ class EnhancedCodeSummarizer:
         use_cache: bool = True
     ) -> Dict[str, str]:
         """Summarize multiple chunks in parallel"""
+        logger.info(f"📝 Starting batch summarization of {len(chunks)} chunks")
+        logger.info(f"   Cache enabled: {use_cache}")
+        
+        # Check cache hits
+        cache_hits = 0
+        if use_cache:
+            for chunk in chunks:
+                if self.repo_state.get_chunk_state(chunk.chunk_id):
+                    cache_hits += 1
+        
+        if cache_hits > 0:
+            logger.info(f"   💾 Cache: {cache_hits}/{len(chunks)} chunks already summarized")
+            logger.info(f"   🔄 Will generate {len(chunks) - cache_hits} new summaries")
+        
         tasks = [
             self.summarize_chunk(chunk, use_cache)
             for chunk in chunks
         ]
         
+        # Process with progress tracking
+        logger.info("   ⏳ Processing summaries (this may take a few minutes)...")
         summaries = await asyncio.gather(*tasks, return_exceptions=True)
         
         result = {}
+        error_count = 0
+        fallback_count = 0
+        
         for chunk, summary in zip(chunks, summaries):
             if isinstance(summary, Exception):
-                logger.error(f"Failed to summarize {chunk.chunk_id}: {summary}")
+                error_count += 1
+                logger.error(f"   ✗ Failed to summarize {chunk.chunk_id}: {summary}")
                 metadata = self.extract_metadata(chunk)
                 result[chunk.chunk_id] = self._fallback_summary(chunk, metadata)
+                fallback_count += 1
             else:
                 result[chunk.chunk_id] = summary
+        
+        logger.info(f"   ✅ Batch complete: {len(result)} summaries generated")
+        if error_count > 0:
+            logger.warning(f"   ⚠️  {error_count} errors, {fallback_count} fallback summaries used")
         
         return result

@@ -38,10 +38,9 @@ from vector_store import VectorStore
 from shared.vector_db.embedding_service import EmbeddingService
 from shared.config import settings
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Import logging configuration
+from logging_config import setup_logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -329,6 +328,12 @@ Examples:
   # Embed with limits
   python orchestrator.py embed --max-files 50 --collection my_project
 
+  # Debug mode with detailed logging
+  python orchestrator.py embed --log-level debug
+
+  # Verbose mode with file logging
+  python orchestrator.py embed --log-level verbose --log-file embedding.log
+
   # Generate summaries
   python orchestrator.py summarize
 
@@ -341,6 +346,18 @@ Examples:
   # Run tests
   python orchestrator.py test
         """
+    )
+    
+    # Global options
+    parser.add_argument(
+        "--log-level",
+        choices=["quiet", "normal", "verbose", "debug"],
+        default="normal",
+        help="Logging level preset"
+    )
+    parser.add_argument(
+        "--log-file",
+        help="Optional log file path"
     )
     
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -373,6 +390,9 @@ Examples:
     test_parser.add_argument("--repo", default=".", help="Repository path")
     
     args = parser.parse_args()
+    
+    # Configure logging based on arguments
+    setup_logging(level=args.log_level, log_file=args.log_file)
     
     # Show help if no command
     if not args.command:

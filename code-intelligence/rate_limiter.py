@@ -97,6 +97,7 @@ class RateLimitController:
         }
         
         self._running = False
+        self._task_counter = 0  # Unique counter to break ties in priority queue
     
     async def start(self):
         """Start background workers for processing queued tasks"""
@@ -160,11 +161,18 @@ class RateLimitController:
             Result from func
         """
         future = asyncio.Future()
-        task_id = time.time()
+        self._task_counter += 1
         
-        await self.task_queues[quota_type].put(
-            (priority, task_id, func, args, kwargs, future)
-        )
+        # Log submission
+        logger.debug(f"📤 Submitting task #{self._task_counter} to {quota_type.value} queue")
+        logger.debug(f"   Function: {func.__name__ if hasattr(func, '__name__') else 'lambda'}")
+        logger.debug(f"   Priority: {priority}")
+        logger.debug(f"   Queue size: {self.task_queues[quota_type].qsize()}")
+        
+        # Use counter to ensure unique comparison and avoid function comparison
+        task_item = (priority, self._task_counter, func, args, kwargs, future)
+        
+        await self.task_queues[quota_type].put(task_item)
         
         return await future
     
@@ -179,6 +187,10 @@ class RateLimitController:
         config = self.configs[quota_type]
         metrics = self.metrics[quota_type]
         
+        func_name = func.__name__ if hasattr(func, '__name__') else 'lambda'
+        logger.debug(f"⏳ Executing {func_name} with {quota_type.value} limit")
+        logger.debug(f"   Queue: {metrics.total_requests} total, {metrics.throttled_requests} throttled")
+        
         async with self._locks[quota_type]:
             # Check if we need to wait
             await self._wait_if_needed(quota_type)
@@ -191,11 +203,14 @@ class RateLimitController:
                 try:
                     start_time = time.time()
                     
+                    logger.debug(f"   🔄 Calling {func_name} (attempt {attempt + 1})")
+                    
                     # Execute the function
                     result = await func(*args, **kwargs)
                     
                     # Update metrics on success
                     elapsed = time.time() - start_time
+                    logger.debug(f"   ✅ {func_name} completed in {elapsed:.2f}s")
                     self._update_metrics(quota_type, elapsed, success=True)
                     
                     return result
