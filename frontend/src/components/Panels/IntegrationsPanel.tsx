@@ -14,11 +14,14 @@ const IntegrationsPanel = () => {
   const [jiraResult, setJiraResult] = useState<TestResult | null>(null);
   const [confluenceResult, setConfluenceResult] = useState<TestResult | null>(null);
   const [grafanaResult, setGrafanaResult] = useState<TestResult | null>(null);
+  const [azureResult, setAzureResult] = useState<TestResult | null>(null);
+  const [azureConnected, setAzureConnected] = useState(false);
   const [loadingStates, setLoadingStates] = useState({
     github: false,
     jira: false,
     confluence: false,
     grafana: false,
+    azure: false,
   });
 
   const testGitHub = async () => {
@@ -91,6 +94,37 @@ const IntegrationsPanel = () => {
     } finally {
       setLoadingStates((prev) => ({ ...prev, grafana: false }));
     }
+  };
+
+  const testAzure = async () => {
+    setLoadingStates((prev) => ({ ...prev, azure: true }));
+    setAzureResult(null);
+    try {
+      const response = await fetch('/api/azure/test-connection');
+      const data = await response.json();
+      setAzureResult({
+        success: data.success,
+        data: data,
+        error: data.error,
+      });
+      if (data.success) {
+        setAzureConnected(true);
+      }
+    } catch (error) {
+      setAzureResult({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to connect',
+      });
+    } finally {
+      setLoadingStates((prev) => ({ ...prev, azure: false }));
+    }
+  };
+
+  const skipAzure = () => {
+    setAzureResult({
+      success: true,
+      data: { skipped: true, message: 'Azure AI integration skipped' },
+    });
   };
 
   const IntegrationCard = ({
@@ -236,6 +270,96 @@ const IntegrationsPanel = () => {
         isLoading={loadingStates.grafana}
         result={grafanaResult}
       />
+      
+      <div className="card">
+        <div className="flex items-center space-x-3 mb-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center text-2xl">
+            ☁️
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Azure AI</h3>
+            <p className="text-sm text-gray-600">Connect Azure AI services (OpenAI, Speech, Translation)</p>
+          </div>
+        </div>
+
+        {!azureConnected && !azureResult && (
+          <div className="space-y-3">
+            <button
+              onClick={testAzure}
+              disabled={loadingStates.azure}
+              className="btn-primary w-full flex items-center justify-center space-x-2"
+            >
+              {loadingStates.azure ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Connecting...</span>
+                </>
+              ) : (
+                <span>Connect Azure AI</span>
+              )}
+            </button>
+            
+            <button
+              onClick={skipAzure}
+              className="w-full px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              Skip for now
+            </button>
+          </div>
+        )}
+
+        {azureResult && (
+          <div className="mt-4">
+            <div className="flex items-center space-x-2 mb-2">
+              {azureResult.success ? (
+                <CheckCircle className="w-5 h-5 text-green-600" />
+              ) : (
+                <XCircle className="w-5 h-5 text-red-600" />
+              )}
+              <span className="font-medium text-gray-900">
+                {azureResult.data?.skipped 
+                  ? 'Skipped' 
+                  : azureResult.success 
+                    ? 'Connected!' 
+                    : 'Connection Failed'}
+              </span>
+            </div>
+
+            {azureResult.success && azureResult.data && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                {azureResult.data.skipped ? (
+                  <p className="text-sm text-gray-700">
+                    You can connect Azure AI later from Provider Settings
+                  </p>
+                ) : (
+                  <div className="text-sm text-green-800">
+                    <p className="font-medium mb-1">Azure AI Services Available:</p>
+                    {azureResult.data.services && (
+                      <ul className="list-disc list-inside space-y-1">
+                        {azureResult.data.services.map((service: string, idx: number) => (
+                          <li key={idx}>{service}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!azureResult.success && azureResult.error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-sm text-red-800">{azureResult.error}</p>
+                <button
+                  onClick={skipAzure}
+                  className="mt-2 text-xs text-gray-600 hover:text-gray-900 underline"
+                >
+                  Skip and continue without Azure
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

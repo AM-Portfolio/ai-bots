@@ -196,6 +196,51 @@ async def get_azure_service_status():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/test-connection")
+async def test_azure_connection():
+    """
+    Test Azure AI connection and availability
+    
+    Simple endpoint to check if Azure AI services are configured and ready to use.
+    Returns list of available services.
+    """
+    try:
+        logger.info("🔌 Testing Azure AI connection")
+        
+        available_services = []
+        
+        # Check each service
+        if azure_ai_manager.speech.is_available():
+            available_services.append("Speech (STT/TTS)")
+        
+        if azure_ai_manager.translation.is_available():
+            available_services.append("Translation")
+        
+        if azure_ai_manager.models.is_available():
+            available_services.append("OpenAI Models (GPT-4o)")
+        
+        if not available_services:
+            return {
+                "success": False,
+                "error": "No Azure AI services are configured. Please add credentials in environment variables.",
+                "services": []
+            }
+        
+        return {
+            "success": True,
+            "message": f"Azure AI connected with {len(available_services)} service(s)",
+            "services": available_services
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Azure connection test failed: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "services": []
+        }
+
+
 @router.get("/test-all")
 async def test_all_azure_services():
     """
