@@ -291,57 +291,75 @@ export const SERVICE_REGISTRY: ServiceDefinition[] = [
   },
   {
     id: 'azure',
-    name: 'Azure',
+    name: 'Azure AI',
     type: 'azure',
-    category: 'cloud',
-    description: 'Microsoft Azure cloud services and resources',
+    category: 'ai_providers',
+    description: 'Azure AI services: OpenAI models, Speech (STT/TTS), and Translation',
     icon: 'Cloud',
-    authType: 'oauth',
+    authType: 'api_key',
     isConfigured: false,
     isActive: false,
     status: 'disconnected',
     configFields: [
       {
-        name: 'azure_tenant_id',
-        label: 'Tenant ID',
-        type: 'text',
-        required: true,
-        placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
-        description: 'Azure Active Directory tenant ID'
+        name: 'azure_openai_endpoint',
+        label: 'Azure OpenAI Endpoint',
+        type: 'url',
+        required: false,
+        placeholder: 'https://your-resource.openai.azure.com/',
+        description: 'Azure OpenAI service endpoint'
       },
       {
-        name: 'azure_client_id',
-        label: 'Client ID',
-        type: 'text',
-        required: true,
-        placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
-        description: 'Application (client) ID'
-      },
-      {
-        name: 'azure_client_secret',
-        label: 'Client Secret',
+        name: 'azure_openai_key',
+        label: 'Azure OpenAI Key',
         type: 'password',
-        required: true,
+        required: false,
         secret: true,
-        placeholder: 'Your client secret',
-        description: 'Application client secret'
+        placeholder: 'Your Azure OpenAI API key',
+        description: 'API key for Azure OpenAI'
       },
       {
-        name: 'azure_subscription_id',
-        label: 'Subscription ID',
+        name: 'azure_speech_key',
+        label: 'Azure Speech Key',
+        type: 'password',
+        required: false,
+        secret: true,
+        placeholder: 'Your Azure Speech API key',
+        description: 'API key for Azure Speech services'
+      },
+      {
+        name: 'azure_speech_region',
+        label: 'Speech Region',
         type: 'text',
         required: false,
-        placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
-        description: 'Azure subscription ID (optional)'
+        placeholder: 'eastus',
+        description: 'Azure region for Speech service'
+      },
+      {
+        name: 'azure_translator_key',
+        label: 'Azure Translator Key',
+        type: 'password',
+        required: false,
+        secret: true,
+        placeholder: 'Your Azure Translator API key',
+        description: 'API key for Azure Translator'
+      },
+      {
+        name: 'azure_translator_region',
+        label: 'Translator Region',
+        type: 'text',
+        required: false,
+        placeholder: 'global',
+        description: 'Azure region for Translator service'
       }
     ],
     testAction: {
-      endpoint: '/api/integrations/azure/test',
-      method: 'POST',
-      successMessage: 'Azure connection successful!',
-      errorMessage: 'Failed to connect to Azure'
+      endpoint: '/api/azure/test-connection',
+      method: 'GET',
+      successMessage: 'Azure AI services connected!',
+      errorMessage: 'No Azure AI services configured'
     },
-    capabilities: ['AKS Management', 'Resource Deployment', 'Service Management']
+    capabilities: ['OpenAI GPT-4', 'Speech-to-Text', 'Text-to-Speech', 'Translation', 'Voice Assistant']
   },
   {
     id: 'mongodb',
