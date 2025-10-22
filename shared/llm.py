@@ -18,26 +18,37 @@ class LLMClient:
         self._initialize_client()
     
     def _initialize_client(self):
-        """Initialize LLM client using factory pattern"""
+        """Initialize LLM client using factory pattern with auto-detection"""
         try:
+            # Use configured provider or auto-detect
+            provider_type = settings.llm_provider or "auto"
+            
+            logger.info("🔧 Initializing LLM client...")
+            logger.info(f"   • Provider preference: {provider_type}")
+            
             self.provider = get_llm_client(
-                provider_type=settings.llm_provider,
-                together_api_key=settings.together_api_key,
-                together_model=settings.together_model,
+                provider_type=provider_type,
                 azure_endpoint=settings.azure_openai_endpoint,
-                azure_api_key=settings.azure_openai_api_key,
-                azure_deployment=settings.azure_openai_deployment_name,
-                azure_api_version=settings.azure_openai_api_version
+                azure_api_key=settings.azure_openai_api_key or settings.azure_openai_key,
+                azure_deployment=settings.azure_openai_deployment_name or "gpt-4.1-mini",
+                azure_api_version=settings.azure_openai_api_version or "2025-04-14",
+                together_api_key=settings.together_api_key,
+                together_model=settings.together_model or "meta-llama/Llama-3.3-70B-Instruct-Turbo"
             )
             
-            if self.provider.is_available():
-                logger.info(f"LLM client initialized with provider: {settings.llm_provider}")
-            else:
-                logger.warning(f"LLM provider '{settings.llm_provider}' not available")
+            provider_name = type(self.provider).__name__.replace("Provider", "")
+            logger.info(f"✅ LLM client initialized successfully")
+            logger.info(f"   • Active provider: {provider_name}")
                 
-        except Exception as e:
-            logger.error(f"Failed to initialize LLM client: {e}")
+        except ValueError as e:
+            # Configuration error (no providers configured)
+            logger.error(f"❌ Configuration error: {e}")
             self.provider = None
+            raise
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize LLM client: {e}")
+            self.provider = None
+            raise
     
     async def chat_completion(
         self,

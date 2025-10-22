@@ -15,10 +15,11 @@ class Settings(BaseSettings):
     azure_client_secret: Optional[str] = None
     azure_key_vault_url: Optional[str] = None
     
-    # Primary LLM Provider (azure or together)
-    llm_provider: Optional[str] = None
+    # Primary LLM Provider (azure, together, or auto)
+    # "auto" = Auto-detect based on configured credentials
+    llm_provider: Optional[str] = "auto"  # Smart auto-detection
     
-    # Together AI Configuration
+    # Together AI Configuration (Fallback)
     together_api_key: Optional[str] = None
     together_model: Optional[str] = None
     
@@ -26,20 +27,25 @@ class Settings(BaseSettings):
     azure_openai_endpoint: Optional[str] = None
     azure_openai_api_key: Optional[str] = None
     azure_openai_key: Optional[str] = None  # Alias for azure_openai_api_key
-    azure_openai_deployment_name: Optional[str] = None
-    azure_openai_api_version: Optional[str] = None
-    azure_openai_embedding_deployment: Optional[str] = None
+    azure_openai_deployment_name: Optional[str] = "gpt-4.1-mini"  # Default deployment
+    azure_openai_api_version: Optional[str] = "2025-04-14"  # Default API version
+    azure_openai_embedding_deployment: Optional[str] = "text-embedding-ada-002"  # Default embedding
     
     # Azure Model Deployments (from Azure AI Foundry)
     azure_gpt4o_transcribe_deployment: Optional[str] = None
     azure_model_router_deployment: Optional[str] = None
     azure_gpt_audio_mini_deployment: Optional[str] = None
     
+    # Azure Chat Completion Models (Common Configuration)
+    # Default chat model (used by LLM factory and general chat)
+    azure_chat_model: Optional[str] = "gpt-4.1-mini"  # Default chat model
+    azure_chat_api_version: Optional[str] = "2025-01-01-preview"  # Chat API version
+    
     # Role-Based Provider Assignment (which provider to use for specific tasks)
     # Options: 'azure', 'together', or 'auto' (uses llm_provider default)
-    chat_provider: Optional[str] = None           # For chat/conversation
-    embedding_provider: Optional[str] = None      # For embeddings
-    beautify_provider: Optional[str] = None       # For response beautification
+    chat_provider: Optional[str] = "azure"           # For chat/conversation
+    embedding_provider: Optional[str] = "azure"      # For embeddings
+    beautify_provider: Optional[str] = "azure"       # For response beautification
     
     # Language Detection & Multilingual Support
     language_detection_enabled: Optional[bool] = None

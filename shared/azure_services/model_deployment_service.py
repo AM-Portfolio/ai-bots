@@ -33,6 +33,10 @@ class AzureModelDeploymentService:
         self.api_key = settings.azure_openai_api_key or settings.azure_openai_key
         self.api_version = settings.azure_openai_api_version or '2024-10-21'
         
+        # Chat completion configuration (common for all chat models)
+        self.chat_model = settings.azure_chat_model or settings.azure_openai_deployment_name or 'gpt-4.1-mini'
+        self.chat_api_version = settings.azure_chat_api_version or '2025-01-01-preview'
+        
         # Deployment names from .env configuration with fallbacks
         self.gpt4o_transcribe_deployment = (
             settings.azure_gpt4o_transcribe_deployment or
@@ -58,6 +62,7 @@ class AzureModelDeploymentService:
                 )
                 logger.info("✅ Azure Model Deployment Service initialized")
                 logger.info(f"   • Endpoint: {self.endpoint}")
+                logger.info(f"   • Chat Model: {self.chat_model} (API: {self.chat_api_version})")
                 logger.info(f"   • GPT-4o Transcribe: {self.gpt4o_transcribe_deployment}")
                 logger.info(f"   • Model Router: {self.model_router_deployment}")
                 logger.info(f"   • GPT Audio Mini: {self.gpt_audio_mini_deployment}")
@@ -138,21 +143,21 @@ class AzureModelDeploymentService:
             logger.error(f"❌ Transcription error: {e}")
             raise
     
-    async def chat_with_model_router(
+    async def chat_completion(
         self,
         messages: List[Dict[str, str]],
         temperature: float = 0.7,
-        max_tokens: Optional[int] = None
+        max_tokens: Optional[int] = None,
+        model: Optional[str] = None
     ) -> str:
         """
-        Chat using model-router deployment
-        
-        Automatically routes to the best GPT model based on the query.
+        Common chat completion method for all Azure chat models
         
         Args:
             messages: Chat messages in OpenAI format
             temperature: Sampling temperature (0-2)
             max_tokens: Maximum tokens to generate
+            model: Optional model override (uses self.chat_model if not provided)
             
         Returns:
             Assistant's response text
@@ -160,13 +165,17 @@ class AzureModelDeploymentService:
         if not self.is_available():
             raise ValueError("Azure Model Deployment service not available")
         
+        # Use provided model or default chat model
+        deployment = model or self.chat_model
+        
         try:
-            logger.info(f"💬 Routing chat to model-router")
+            logger.info(f"💬 Azure Chat Completion")
+            logger.info(f"   • Model: {deployment}")
             logger.info(f"   • Messages: {len(messages)}")
             logger.info(f"   • Temperature: {temperature}")
             
             response = await self.client.chat.completions.create(
-                model=self.model_router_deployment,
+                model=deployment,
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens
@@ -184,6 +193,33 @@ class AzureModelDeploymentService:
         except Exception as e:
             logger.error(f"❌ Chat error: {e}")
             raise
+    
+    async def chat_with_model_router(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float = 0.7,
+        max_tokens: Optional[int] = None
+    ) -> str:
+        """
+        Chat using model-router deployment (intelligent routing)
+        
+        Legacy method - routes to model-router deployment.
+        For standard chat, use chat_completion() instead.
+        
+        Args:
+            messages: Chat messages in OpenAI format
+            temperature: Sampling temperature (0-2)
+            max_tokens: Maximum tokens to generate
+            
+        Returns:
+            Assistant's response text
+        """
+        return await self.chat_completion(
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            model=self.model_router_deployment
+        )
     
     async def process_audio_mini(
         self,
@@ -239,6 +275,12 @@ class AzureModelDeploymentService:
             "endpoint": self.endpoint,
             "api_version": self.api_version,
             "deployments": {
+                "chat_model": {
+                    "name": self.chat_model,
+                    "api_version": self.chat_api_version,
+                    "capabilities": ["chat_completion", "multi_turn", "function_calling"],
+                    "url": f"{self.endpoint}/openai/deployments/{self.chat_model}/chat/completions?api-version={self.chat_api_version}"
+                },
                 "gpt4o_transcribe": {
                     "name": self.gpt4o_transcribe_deployment,
                     "capabilities": ["transcription", "diarization", "timestamps"]
