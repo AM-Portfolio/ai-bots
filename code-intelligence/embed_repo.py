@@ -1,40 +1,37 @@
 """
-Embedding Pipeline - Pure Embedding Logic
+Embedding Pipeline - Simplified Orchestrator
 
-Responsibilities:
-- File discovery and filtering
-- Parsing and chunking code
-- Enhanced summarization
-- Batch embedding generation
+This module coordinates the embedding generation workflow by using specialized modules:
+- pipeline.file_discovery: File discovery and filtering
+- pipeline.code_parser: Code parsing and chunking
+- pipeline.batch_embedder: Batch embedding generation
+- enhanced_summarizer: Code summarization
 
-Does NOT handle:
-- Vector DB operations (done in orchestrator)
-- GitHub LLM analysis (done in orchestrator)
-- API requests (done in API layer)
-- CLI commands (done in orchestrator)
-
-This module focuses purely on generating embeddings from code.
+The pipeline orchestrates these modules to generate embeddings from code.
 """
 
 import asyncio
 import os
 import sys
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Set
 import logging
-from tqdm import tqdm
 
 # Add parent directory to path for imports
 sys.path.append(str(Path(__file__).parent.parent))
 
-from rate_limiter import RateLimitController, QuotaType
-from repo_state import RepoState
-from parsers import parser_registry
-from change_planner import ChangePlanner
+from utils.rate_limiter import RateLimitController
+from storage.repo_state import RepoState
+from utils.change_planner import ChangePlanner
 from enhanced_summarizer import EnhancedCodeSummarizer
 
-# Import shared embedding service from vector_db module
+# Import shared embedding service
 from shared.vector_db.embedding_service import EmbeddingService
+
+# Import pipeline modules
+from pipeline.file_discovery import FileDiscovery
+from pipeline.code_parser import CodeParser
+from pipeline.batch_embedder import BatchEmbeddingGenerator
 
 logging.basicConfig(
     level=logging.INFO,
@@ -45,13 +42,13 @@ logger = logging.getLogger(__name__)
 
 class EmbeddingPipeline:
     """
-    Pure embedding pipeline - generates embeddings from code.
+    Simplified embedding pipeline orchestrator.
     
-    Stages:
-    1. File discovery and filtering
-    2. Parsing and chunking
-    3. Enhanced summarization
-    4. Batch embedding generation
+    Delegates to specialized modules:
+    - FileDiscovery: Finds code files
+    - CodeParser: Parses and chunks code
+    - BatchEmbeddingGenerator: Generates embeddings
+    - EnhancedCodeSummarizer: Generates summaries
     
     Returns structured data ready for vector DB storage.
     """
@@ -72,21 +69,27 @@ class EmbeddingPipeline:
         """
         self.repo_path = Path(repo_path)
         
-        # Initialize components
         logger.info("🚀 Initializing Embedding Pipeline...")
         
+        # Initialize core components
         self.rate_limiter = RateLimitController()
         self.repo_state = RepoState(manifest_path)
         self.change_planner = ChangePlanner(repo_path)
         self.summarizer = EnhancedCodeSummarizer(self.repo_state, self.rate_limiter)
         
-        # Initialize shared embedding service (uses config from settings)
+        # Initialize embedding service
         logger.info(f"📦 Initializing embedding service (provider: {embedding_provider})...")
         self.embedding_service = EmbeddingService(provider=embedding_provider)
-        
-        # Get dimension from embedding service
         embedding_dim = self.embedding_service.get_dimension()
         logger.info(f"   Embedding dimension: {embedding_dim}")
+        
+        # Initialize pipeline modules
+        self.file_discovery = FileDiscovery(self.repo_path)
+        self.code_parser = CodeParser(self.repo_path)
+        self.batch_embedder = BatchEmbeddingGenerator(
+            self.embedding_service,
+            self.rate_limiter
+        )
         
         logger.info("✅ Pipeline initialized")
     
@@ -191,21 +194,21 @@ class EmbeddingPipeline:
         logger.info(f"   Supported extensions: {', '.join(list(supported_extensions)[:10])}...")
         return files
     
+    
     async def generate_embeddings(
         self,
         max_files: Optional[int] = None,
         force_reindex: bool = False,
-        file_filter: Optional[set] = None
+        file_filter: Optional[Set[str]] = None
     ) -> Dict[str, Any]:
         """
-        Generate embeddings for code files.
+        Generate embeddings for code files using modular pipeline.
         
         Workflow:
-        1. Discover local files
-        2. Filter by file_filter (if provided) or change detection
-        3. Parse and chunk
-        4. Summarize
-        5. Generate embeddings
+        1. FileDiscovery: Discover and filter files
+        2. CodeParser: Parse and chunk files
+        3. EnhancedCodeSummarizer: Generate summaries
+        4. BatchEmbeddingGenerator: Generate embeddings
         
         Args:
             max_files: Limit number of files to process (None = all)
@@ -219,15 +222,15 @@ class EmbeddingPipeline:
             - files_processed: List of processed files
         """
         logger.info("="* 60)
-        logger.info("🎯 Starting Incremental Embedding Pipeline")
+        logger.info("🎯 Starting Embedding Pipeline")
         logger.info("=" * 60)
         
-        # Verify embedding service is connected
+        # Verify embedding service
         logger.info("🔌 Verifying embedding service...")
         if not await self._verify_embedding_service():
             raise Exception("Embedding service not available. Please check configuration.")
         
-        # Start rate limiter workers
+        # Start rate limiter
         await self.rate_limiter.start()
         
         try:
@@ -241,28 +244,19 @@ class EmbeddingPipeline:
                 "success_rate": 0.0
             }
             
-            # Step 1: Discover files
-            all_files = self.discover_files()
+            # Step 1: Discover files using FileDiscovery module
+            logger.info("\n📁 Step 1: File Discovery")
+            all_files = self.file_discovery.discover_files()
             stats["files_discovered"] = len(all_files)
             
             # Step 2: Filter files
+            logger.info("\n🎯 Step 2: File Filtering")
             if file_filter and not force_reindex:
                 # Use provided file filter (e.g., from GitHub LLM)
-                logger.info(f"🎯 Filtering files using provided filter ({len(file_filter)} files)")
-                prioritized_files = []
-                
-                for file_path in all_files:
-                    # Check if file_path matches any filter path
-                    if any(filter_path in file_path for filter_path in file_filter):
-                        prioritized_files.append(file_path)
-                
-                logger.info(f"   Filtered to {len(prioritized_files)} files")
-                
-                if max_files and len(prioritized_files) > max_files:
-                    prioritized_files = prioritized_files[:max_files]
-                    logger.info(f"   Limited to {max_files} files")
+                filtered_files = self.file_discovery.filter_by_paths(all_files, file_filter)
+                prioritized_files = self.file_discovery.apply_limit(filtered_files, max_files)
             else:
-                # Normal prioritization using change detection
+                # Use change detection
                 if force_reindex:
                     logger.info("🔄 Force reindex enabled - processing all files")
                     changed_files = set(all_files)
@@ -282,25 +276,9 @@ class EmbeddingPipeline:
             
             stats["files_processed"] = len(prioritized_files)
             
-            # Step 3: Parse and chunk
-            logger.info("📖 Phase 1: Parsing and Summarization")
-            all_chunks = []
-            parse_errors = []
-            
-            for file_path in tqdm(prioritized_files, desc="Parsing files"):
-                try:
-                    chunks = parser_registry.parse_file(file_path)
-                    all_chunks.extend(chunks)
-                    if len(chunks) > 0:
-                        logger.debug(f"   ✓ {file_path}: {len(chunks)} chunks")
-                except Exception as e:
-                    logger.error(f"   ✗ Failed to parse {file_path}: {e}")
-                    parse_errors.append((file_path, str(e)))
-            
-            logger.info(f"✂️ Generated {len(all_chunks)} code chunks from {len(prioritized_files)} files")
-            if parse_errors:
-                logger.warning(f"   ⚠️  {len(parse_errors)} files failed to parse")
-            
+            # Step 3: Parse and chunk using CodeParser module
+            logger.info("\n📖 Step 3: Parsing and Chunking")
+            all_chunks = self.code_parser.parse_files(prioritized_files)
             stats["chunks_generated"] = len(all_chunks)
             
             # Show chunk type distribution
@@ -308,10 +286,12 @@ class EmbeddingPipeline:
             for chunk in all_chunks:
                 chunk_type = chunk.metadata.chunk_type
                 chunk_types[chunk_type] = chunk_types.get(chunk_type, 0) + 1
-            logger.info(f"   Chunk types: {dict(sorted(chunk_types.items(), key=lambda x: x[1], reverse=True))}")
+            
+            if chunk_types:
+                logger.info(f"   Chunk types: {dict(sorted(chunk_types.items(), key=lambda x: x[1], reverse=True))}")
             
             # Step 4: Summarize chunks
-            logger.info("📝 Generating enhanced summaries...")
+            logger.info("\n📝 Step 4: Generating Summaries")
             logger.info(f"   Processing {len(all_chunks)} chunks with AI summarization")
             summaries = await self.summarizer.summarize_batch(all_chunks)
             
@@ -321,18 +301,18 @@ class EmbeddingPipeline:
                 avg_length = sum(summary_lengths) / len(summary_lengths)
                 logger.info(f"   ✅ Generated {len(summaries)} summaries (avg length: {avg_length:.0f} chars)")
             
-            # Step 5: Generate embeddings
-            logger.info("🔢 Generating embeddings...")
-            logger.info(f"   Processing {len(all_chunks)} chunks in batches")
-            embedding_data = await self._generate_embeddings_batch(all_chunks, summaries)
+            # Step 5: Generate embeddings using BatchEmbeddingGenerator module
+            logger.info("\n🔢 Step 5: Generating Embeddings")
+            embedding_data = await self.batch_embedder.generate_batch(all_chunks, summaries)
             
             stats["chunks_embedded"] = len(embedding_data)
             stats["failed_chunks"] = len(all_chunks) - len(embedding_data)
             stats["success_rate"] = (len(embedding_data) / len(all_chunks) * 100) if all_chunks else 0
             
-            logger.info("=" * 60)
+            logger.info("\n" + "=" * 60)
             logger.info("✅ Embedding Generation Complete!")
             logger.info(f"📊 Generated: {len(embedding_data)}/{len(all_chunks)} embeddings")
+            logger.info(f"📈 Success Rate: {stats['success_rate']:.1f}%")
             logger.info("=" * 60)
             
             # Return embedding data for orchestrator to store
@@ -344,158 +324,7 @@ class EmbeddingPipeline:
                 "prioritized_files": prioritized_files,
                 "stats": stats
             }
-            logger.info("✅ Pipeline Complete!")
-            logger.info(f"📊 Processed: {stats['chunks_embedded']}/{stats['chunks_generated']} chunks")
-            if stats.get("github_analysis"):
-                logger.info(f"🔍 GitHub: {stats['github_analysis']['files_found']} files, confidence: {stats['github_analysis']['confidence']:.2f}")
-            logger.info(f"📈 Success Rate: {stats['success_rate']:.1f}%")
-            logger.info("=" * 60)
-            
-            return stats
             
         finally:
             await self.rate_limiter.stop()
-    
-    async def _generate_embeddings_batch(
-        self,
-        chunks: List,
-        summaries: Dict[str, str]
-    ) -> List[Dict]:
-        """
-        Generate embeddings in small batches WITHOUT storing them.
-        Returns embedding data for the orchestrator to handle storage.
-        
-        Args:
-            chunks: List of code chunks
-            summaries: Dict of chunk_id -> summary
-            
-        Returns:
-            List of dicts containing embedding data with structure:
-            {
-                "chunk_id": str,
-                "embedding": List[float],
-                "content": str,
-                "summary": str,
-                "metadata": dict
-            }
-        """
-        batch_size = self.rate_limiter.get_adaptive_batch_size(QuotaType.EMBEDDING)
-        # Keep batch size reasonable (max 50 at a time)
-        batch_size = min(batch_size, 50)
-        
-        total_chunks = len(chunks)
-        embedding_data = []
-        num_batches = (total_chunks + batch_size - 1) // batch_size
-        
-        logger.info(f"   Batch size: {batch_size} chunks")
-        logger.info(f"   Total batches: {num_batches}")
-        
-        for batch_num in range(num_batches):
-            start_idx = batch_num * batch_size
-            end_idx = min(start_idx + batch_size, total_chunks)
-            batch = chunks[start_idx:end_idx]
-            
-            # Calculate progress
-            progress = ((batch_num + 1) / num_batches) * 100
-            
-            logger.info(f"\n📦 Batch {batch_num + 1}/{num_batches} ({progress:.1f}% complete)")
-            logger.info(f"   Processing chunks {start_idx + 1}-{end_idx} of {total_chunks}")
-            
-            # Prepare texts (summary + code)
-            texts = [
-                f"{summaries.get(chunk.chunk_id, '')}\n\n{chunk.content[:2000]}"
-                for chunk in batch
-            ]
-            
-            # Embed with rate limiting using shared embedding service
-            async def embed_batch():
-                return await self.embedding_service.generate_embeddings_batch(texts)
-            
-            try:
-                # Generate embeddings
-                logger.debug(f"   🔢 Generating embeddings...")
-                batch_embeddings = await self.rate_limiter.submit(
-                    QuotaType.EMBEDDING,
-                    embed_batch,
-                    priority=2
-                )
-                
-                # Create embedding data structures (no storage)
-                for i, chunk in enumerate(batch):
-                    if i < len(batch_embeddings):
-                        embedding_data.append({
-                            "chunk_id": chunk.chunk_id,
-                            "embedding": batch_embeddings[i],
-                            "content": chunk.content,
-                            "summary": summaries.get(chunk.chunk_id, ""),
-                            "metadata": {
-                                "file_path": chunk.metadata.file_path,
-                                "language": chunk.metadata.language,
-                                "chunk_type": chunk.metadata.chunk_type,
-                                "symbol_name": chunk.metadata.symbol_name,
-                                "start_line": chunk.metadata.start_line,
-                                "end_line": chunk.metadata.end_line,
-                                "token_count": chunk.metadata.token_count
-                            }
-                        })
-                
-                logger.info(f"   ✅ Batch complete: {len(batch_embeddings)} embeddings generated")
-                logger.info(f"   📊 Total progress: {len(embedding_data)}/{total_chunks} chunks ({(len(embedding_data)/total_chunks)*100:.1f}%)")
-                
-            except Exception as e:
-                logger.error(f"   ❌ Batch {batch_num + 1} failed: {e}")
-                # Continue with next batch even if this one fails
-        
-        logger.info(f"\n✅ Embedding generation complete: {len(embedding_data)} embeddings generated")
-        return embedding_data
 
-
-async def main():
-    """
-    Main entry point for standalone embedding pipeline execution.
-    Note: For production use, call this through orchestrator.py instead.
-    """
-    import argparse
-    
-    parser = argparse.ArgumentParser(description="Code Intelligence Embedding Pipeline")
-    parser.add_argument(
-        "--repo",
-        default=".",
-        help="Path to repository"
-    )
-    parser.add_argument(
-        "--max-files",
-        type=int,
-        default=None,
-        help="Maximum number of files to process"
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Force re-embedding of all files"
-    )
-    
-    args = parser.parse_args()
-    
-    # Create pipeline (no collection needed - that's orchestrator's job)
-    pipeline = EmbeddingPipeline(
-        repo_path=args.repo
-    )
-    
-    # Generate embeddings (returns data, doesn't store)
-    result = await pipeline.generate_embeddings(
-        file_filter=None,  # Process all files
-        max_files=args.max_files,
-        force_reindex=args.force
-    )
-    
-    print("\n📊 Embedding Generation Results:")
-    print(f"  Files processed: {result['stats']['files_processed']}")
-    print(f"  Chunks generated: {len(result['embedding_data'])}")
-    print(f"  Success rate: {result['stats']['success_rate']:.1f}%")
-    print("\n⚠️  Note: Embeddings generated but NOT stored.")
-    print("   Use orchestrator.py to store embeddings in vector DB.")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())

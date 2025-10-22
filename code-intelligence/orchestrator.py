@@ -1,26 +1,16 @@
 """
-Code Intelligence Orchestrator - Unified Entry Point
+Code Intelligence Orchestrator
 
-This is the main entry point for the code-intelligence module.
-Organizes all functionality into a clean, command-based interface.
+Core orchestration logic for code intelligence operations.
+Provides high-level workflows for:
+- Repository embedding with optional GitHub LLM analysis
+- Code summarization
+- Change analysis
+- Health checks
 
-Available Commands:
-  embed       - Embed repository code into vector database
-  summarize   - Generate summaries for code files
-  analyze     - Analyze repository changes and priorities
-  health      - Check system health and connectivity
-  test        - Run integration tests
-
-Features:
-  - Incremental embedding (only changed files)
-  - Rich technical summaries with business context
-  - Smart prioritization (changed files first)
-  - Rate-limit aware processing
-  - Progress tracking and reporting
+This is the coordination layer that the API/CLI should call.
 """
 
-import asyncio
-import argparse
 import sys
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -29,22 +19,16 @@ import logging
 # Add parent directory to path for shared imports
 sys.path.append(str(Path(__file__).parent.parent))
 
-from embed_repo import EmbeddingOrchestrator
+from embed_repo import EmbeddingPipeline
 from enhanced_summarizer import EnhancedCodeSummarizer
-from change_planner import ChangePlanner
-from repo_state import RepoState
-from rate_limiter import RateLimitController, QuotaType
-from vector_store import VectorStore
+from utils.change_planner import ChangePlanner
+from storage.repo_state import RepoState
+from utils.rate_limiter import RateLimitController
+from storage.vector_store import VectorStore
 from shared.vector_db.embedding_service import EmbeddingService
-from shared.llm_providers.github_llm_provider import (
-    GitHubLLMProvider,
-    RepoAnalysisRequest,
-    QueryType
-)
 from shared.config import settings
-
-# Import logging configuration
-from logging_config import setup_logging
+from analysis.github_analyzer import GitHubAnalyzer
+from pipeline.embedding_workflow import EmbeddingWorkflow
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +56,7 @@ class CodeIntelligenceOrchestrator:
         """
         self.repo_path = Path(repo_path).resolve()
         self.settings = settings
-        self.github_llm = None
+        self.github_analyzer = GitHubAnalyzer()
         logger.info(f"📁 Repository: {self.repo_path}")
     
     async def embed_repository(
@@ -117,111 +101,26 @@ class CodeIntelligenceOrchestrator:
         }
         
         # STEP 1: Optional GitHub LLM Analysis
-        github_file_paths = set()
-        if github_repository:
-            logger.info(f"\n🔍 STEP 1: GitHub LLM Repository Analysis")
-            logger.info(f"   Repository: {github_repository}")
-            
-            try:
-                # Initialize GitHub LLM provider
-                if not self.github_llm:
-                    self.github_llm = GitHubLLMProvider()
-                
-                # Analyze repository
-                analysis_request = RepoAnalysisRequest(
-                    repository=github_repository,
-                    query=query,
-                    query_type=QueryType.SEMANTIC_SEARCH if query else QueryType.REPO_SUMMARY,
-                    max_results=max_files or 50,
-                    filters={"language": language} if language else None
-                )
-                
-                analysis_result = await self.github_llm.analyze_repository(analysis_request)
-                
-                if analysis_result.files:
-                    github_file_paths = {f.file_path for f in analysis_result.files}
-                    
-                    stats["github_analysis"] = {
-                        "repository": github_repository,
-                        "files_found": len(analysis_result.files),
-                        "confidence": analysis_result.confidence,
-                        "summary": analysis_result.summary
-                    }
-                    
-                    logger.info(f"✅ Found {len(analysis_result.files)} relevant files")
-                    logger.info(f"   Confidence: {analysis_result.confidence:.2f}")
-                else:
-                    logger.warning("⚠️ No files found from GitHub analysis")
-                    
-            except Exception as e:
-                logger.warning(f"⚠️ GitHub LLM analysis failed: {e}")
-                logger.info("   Continuing with local discovery...")
-        else:
-            logger.info("\n📂 STEP 1: Using local file discovery (no GitHub repository specified)")
-        
-        # STEP 2: Delegate to EmbeddingPipeline to generate embeddings
-        logger.info("\n📖 STEP 2: Repository Embedding Pipeline")
-        
-        from .embed_repo import EmbeddingPipeline
-        embedding_pipeline = EmbeddingPipeline(
-            repo_path=str(self.repo_path)
+        github_file_paths = await self._analyze_github_repository(
+            github_repository=github_repository,
+            query=query,
+            max_files=max_files,
+            language=language,
+            stats=stats
         )
         
-        # Pass GitHub file paths as a filter hint
-        embedding_result = await embedding_pipeline.generate_embeddings(
-            file_filter=github_file_paths if github_file_paths else None,
+        # STEP 2: Generate embeddings
+        embedding_result = await self._generate_embeddings(
+            github_file_paths=github_file_paths,
             max_files=max_files,
             force_reindex=force_reindex
         )
         
-        # STEP 3: Store embeddings in vector DB
-        logger.info("\n💾 STEP 3: Storing embeddings in vector database")
-        
-        from .vector_store import VectorStore, EmbeddingPoint
-        vector_store = VectorStore(
+        # STEP 3: Store embeddings using workflow
+        total_stored, total_failed = await self._store_embeddings(
             collection_name=collection_name,
-            qdrant_path=str(self.repo_path / ".qdrant")
+            embedding_result=embedding_result
         )
-        
-        embedding_data = embedding_result["embedding_data"]
-        logger.info(f"   Storing {len(embedding_data)} embeddings...")
-        
-        # Convert embedding data to EmbeddingPoint objects
-        embedding_points = [
-            EmbeddingPoint(
-                chunk_id=data["chunk_id"],
-                embedding=data["embedding"],
-                content=data["content"],
-                summary=data["summary"],
-                metadata=data["metadata"]
-            )
-            for data in embedding_data
-        ]
-        
-        # Store in batches
-        batch_size = 50
-        total_stored = 0
-        total_failed = 0
-        
-        for i in range(0, len(embedding_points), batch_size):
-            batch = embedding_points[i:i + batch_size]
-            try:
-                upsert_result = await vector_store.upsert_batch(batch)
-                total_stored += upsert_result["successful"]
-                total_failed += upsert_result["failed"]
-            except Exception as e:
-                logger.error(f"❌ Failed to store batch {i//batch_size + 1}: {e}")
-                total_failed += len(batch)
-        
-        # STEP 4: Update repository state
-        from .repo_state import RepoState
-        repo_state = RepoState(self.repo_path)
-        processed_files = set(chunk["metadata"]["file_path"] for chunk in embedding_result["chunks"])
-        for file_path in processed_files:
-            repo_state.mark_file_processed(
-                file_path=file_path,
-                chunks_count=len([c for c in embedding_result["chunks"] if c["metadata"]["file_path"] == file_path])
-            )
         
         # Merge stats
         stats.update(embedding_result["stats"])
@@ -231,10 +130,98 @@ class CodeIntelligenceOrchestrator:
         logger.info("\n✅ Repository embedding orchestration complete!")
         if stats.get("github_analysis"):
             logger.info(f"   GitHub: {stats['github_analysis']['files_found']} files analyzed")
-        logger.info(f"   Stored: {total_stored}/{len(embedding_data)} embeddings")
+        logger.info(f"   Stored: {total_stored} embeddings")
 
         
         return stats
+    
+    async def _analyze_github_repository(
+        self,
+        github_repository: Optional[str],
+        query: Optional[str],
+        max_files: Optional[int],
+        language: Optional[str],
+        stats: Dict[str, Any]
+    ) -> set:
+        """
+        Analyze GitHub repository using GitHub LLM.
+        
+        Returns:
+            Set of relevant file paths
+        """
+        if not github_repository:
+            logger.info("\n📂 STEP 1: Using local file discovery (no GitHub repository specified)")
+            return set()
+        
+        logger.info(f"\n🔍 STEP 1: GitHub LLM Repository Analysis")
+        
+        analysis_result = await self.github_analyzer.analyze_repository(
+            repository=github_repository,
+            query=query,
+            max_results=max_files or 50,
+            language=language
+        )
+        
+        if analysis_result.get("error"):
+            logger.info("   Continuing with local discovery...")
+            return set()
+        
+        if analysis_result["files_found"] > 0:
+            stats["github_analysis"] = {
+                "repository": github_repository,
+                "files_found": analysis_result["files_found"],
+                "confidence": analysis_result["confidence"],
+                "summary": analysis_result["summary"]
+            }
+        
+        return analysis_result["file_paths"]
+    
+    async def _generate_embeddings(
+        self,
+        github_file_paths: set,
+        max_files: Optional[int],
+        force_reindex: bool
+    ) -> Dict[str, Any]:
+        """
+        Generate embeddings using EmbeddingPipeline.
+        
+        Returns:
+            Embedding result dictionary
+        """
+        logger.info("\n📖 STEP 2: Repository Embedding Pipeline")
+        
+        embedding_pipeline = EmbeddingPipeline(
+            repo_path=str(self.repo_path)
+        )
+        
+        return await embedding_pipeline.generate_embeddings(
+            file_filter=github_file_paths if github_file_paths else None,
+            max_files=max_files,
+            force_reindex=force_reindex
+        )
+    
+    async def _store_embeddings(
+        self,
+        collection_name: str,
+        embedding_result: Dict[str, Any]
+    ) -> tuple[int, int]:
+        """
+        Store embeddings in vector database and update repo state.
+        
+        Returns:
+            Tuple of (total_stored, total_failed)
+        """
+        logger.info("\n💾 STEP 3: Storing embeddings in vector database")
+        
+        # Use EmbeddingWorkflow for storage
+        workflow = EmbeddingWorkflow(
+            repo_path=str(self.repo_path),
+            collection_name=collection_name
+        )
+        
+        result = await workflow.execute(embedding_result)
+        
+        return result["total_stored"], result["total_failed"]
     
     async def generate_summaries(
         self,
@@ -309,51 +296,6 @@ class CodeIntelligenceOrchestrator:
             "priorities": priorities
         }
     
-    async def analyze_repository_with_github_llm(
-        self,
-        repository: str,
-        query: Optional[str] = None,
-        max_results: int = 10,
-        language: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Analyze a GitHub repository using GitHub LLM provider.
-        
-        Args:
-            repository: Repository name (owner/repo)
-            query: Optional search query
-            max_results: Maximum number of files to return
-            language: Optional language filter (e.g., 'python', 'java')
-            
-        Returns:
-            Analysis results with files, summaries, and confidence scores
-        """
-        logger.info(f"🔍 Analyzing repository: {repository}")
-        if query:
-            logger.info(f"   Query: {query}")
-        
-        # Use EmbeddingOrchestrator to analyze repository
-        results = await self.embedding_orchestrator.analyze_repository_structure(
-            repository=repository,
-            query=query,
-            max_results=max_results,
-            language=language
-        )
-        
-        if results.get("error"):
-            logger.error(f"❌ Analysis failed: {results['error']}")
-            return results
-        
-        # Display results
-        files = results.get("files", [])
-        summary = results.get("summary", "")
-        confidence = results.get("confidence", 0.0)
-        
-        logger.info(f"✅ Found {len(files)} relevant files")
-        logger.info(f"   Confidence: {confidence:.2f}")
-        
-        return results
-    
     async def health_check(self) -> Dict[str, Any]:
         """
         Check health of all services.
@@ -422,262 +364,3 @@ class CodeIntelligenceOrchestrator:
                 print(f"  {status} {entry} {f.file_path}")
                 print(f"    Reason: {f.reason}")
 
-
-async def cmd_embed(args):
-    """Handle embed command"""
-    orchestrator = CodeIntelligenceOrchestrator(repo_path=args.repo)
-    stats = await orchestrator.embed_repository(
-        collection_name=args.collection,
-        max_files=args.max_files,
-        force_reindex=args.force
-    )
-    
-    print("\n📊 Embedding Statistics:")
-    print("=" * 60)
-    print(f"  Files processed:  {stats['files_processed']}")
-    print(f"  Chunks embedded:  {stats['chunks_embedded']}")
-    print(f"  Success rate:     {stats['success_rate']:.1f}%")
-    print(f"  Failed chunks:    {stats.get('failed_chunks', 0)}")
-
-
-async def cmd_summarize(args):
-    """Handle summarize command"""
-    orchestrator = CodeIntelligenceOrchestrator(repo_path=args.repo)
-    results = await orchestrator.generate_summaries(
-        files=args.files,
-        force=args.force
-    )
-    
-    print("\n📝 Summary Results:")
-    print("=" * 60)
-    print(f"  Files processed:      {results['files_processed']}")
-    print(f"  Summaries generated:  {results['summaries_generated']}")
-    print(f"  Cached summaries:     {results['cached_summaries']}")
-
-
-async def cmd_analyze(args):
-    """Handle analyze command (git-based change analysis)"""
-    orchestrator = CodeIntelligenceOrchestrator(repo_path=args.repo)
-    results = await orchestrator.analyze_changes(
-        base_ref=args.base,
-        show_priorities=not args.no_display
-    )
-    
-    print(f"\n🔍 Analysis Complete:")
-    print(f"  Changed files: {results['changed_files']}")
-    print(f"  Total files:   {results['total_files']}")
-
-
-async def cmd_repo_analyze(args):
-    """Handle repo-analyze command (GitHub LLM-based repository analysis)"""
-    orchestrator = CodeIntelligenceOrchestrator(repo_path=args.repo)
-    results = await orchestrator.analyze_repository_with_github_llm(
-        repository=args.repository,
-        query=args.query,
-        max_results=args.max_results,
-        language=args.language
-    )
-    
-    if results.get("error"):
-        print(f"\n❌ Error: {results['error']}")
-        return
-    
-    print("\n📊 Repository Analysis Results:")
-    print("=" * 80)
-    print(f"Repository: {args.repository}")
-    if args.query:
-        print(f"Query: {args.query}")
-    print(f"Confidence: {results.get('confidence', 0):.2f}")
-    print()
-    
-    # Display files
-    files = results.get("files", [])
-    print(f"Found {len(files)} relevant files:")
-    print("-" * 80)
-    
-    for i, file_info in enumerate(files[:args.max_results], 1):
-        file_path = file_info.get("file_path", "unknown")
-        language = file_info.get("language", "unknown")
-        relevance = file_info.get("relevance_score", 0)
-        summary = file_info.get("summary", "No summary available")
-        
-        print(f"\n{i}. {file_path}")
-        print(f"   Language: {language} | Relevance: {relevance:.2f}")
-        print(f"   Summary: {summary}")
-    
-    # Display overall summary
-    if summary := results.get("summary"):
-        print("\n" + "=" * 80)
-        print("Repository Summary:")
-        print(summary)
-
-
-async def cmd_health(args):
-    """Handle health command"""
-    orchestrator = CodeIntelligenceOrchestrator(repo_path=args.repo)
-    health = await orchestrator.health_check()
-    
-    print("\n🏥 Health Check Results:")
-    print("=" * 60)
-    all_healthy = all(health.values())
-    status_icon = "✅" if all_healthy else "⚠️"
-    print(f"{status_icon} Overall Status: {'Healthy' if all_healthy else 'Issues Detected'}")
-    print()
-    for service, status in health.items():
-        icon = "✅" if status else "❌"
-        print(f"  {icon} {service.replace('_', ' ').title()}: {'OK' if status else 'FAILED'}")
-
-
-async def cmd_test(args):
-    """Handle test command"""
-    print("🧪 Running integration tests...")
-    # Import and run test pipeline
-    try:
-        from test_pipeline import main as test_main
-        await test_main()
-    except Exception as e:
-        logger.error(f"Test failed: {e}")
-        sys.exit(1)
-
-
-def main():
-    """Main entry point with command routing"""
-    parser = argparse.ArgumentParser(
-        description="Code Intelligence - Unified orchestration for code embedding and analysis",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Embed repository (incremental)
-  python orchestrator.py embed
-
-  # Force re-embed all files
-  python orchestrator.py embed --force
-
-  # Embed with limits
-  python orchestrator.py embed --max-files 50 --collection my_project
-
-  # Debug mode with detailed logging
-  python orchestrator.py embed --log-level debug
-
-  # Verbose mode with file logging
-  python orchestrator.py embed --log-level verbose --log-file embedding.log
-
-  # Generate summaries
-  python orchestrator.py summarize
-
-  # Analyze changes (git-based)
-  python orchestrator.py analyze --base origin/main
-
-  # Analyze GitHub repository with GitHub LLM
-  python orchestrator.py repo-analyze --repository AM-Portfolio/ai-bots
-
-  # Analyze with query
-  python orchestrator.py repo-analyze --repository owner/repo --query "vector database integration"
-
-  # Filter by language
-  python orchestrator.py repo-analyze --repository owner/repo --language python --max-results 5
-
-  # Health check
-  python orchestrator.py health
-
-  # Run tests
-  python orchestrator.py test
-        """
-    )
-    
-    # Global options
-    parser.add_argument(
-        "--log-level",
-        choices=["quiet", "normal", "verbose", "debug"],
-        default="normal",
-        help="Logging level preset"
-    )
-    parser.add_argument(
-        "--log-file",
-        help="Optional log file path"
-    )
-    
-    subparsers = parser.add_subparsers(dest="command", help="Available commands")
-    
-    # Embed command
-    embed_parser = subparsers.add_parser("embed", help="Embed repository into vector database")
-    embed_parser.add_argument("--repo", default=".", help="Repository path")
-    embed_parser.add_argument("--collection", default="code_intelligence", help="Qdrant collection name")
-    embed_parser.add_argument("--max-files", type=int, help="Maximum files to process")
-    embed_parser.add_argument("--force", action="store_true", help="Force re-embedding")
-    
-    # Summarize command
-    summarize_parser = subparsers.add_parser("summarize", help="Generate code summaries")
-    summarize_parser.add_argument("--repo", default=".", help="Repository path")
-    summarize_parser.add_argument("--files", nargs="+", help="Specific files to summarize")
-    summarize_parser.add_argument("--force", action="store_true", help="Force regeneration")
-    
-    # Analyze command
-    analyze_parser = subparsers.add_parser("analyze", help="Analyze repository changes (git-based)")
-    analyze_parser.add_argument("--repo", default=".", help="Repository path")
-    analyze_parser.add_argument("--base", default="HEAD", help="Base git reference")
-    analyze_parser.add_argument("--no-display", action="store_true", help="Skip priority display")
-    
-    # Repo-analyze command (GitHub LLM)
-    repo_analyze_parser = subparsers.add_parser(
-        "repo-analyze",
-        help="Analyze GitHub repository using GitHub LLM"
-    )
-    repo_analyze_parser.add_argument("--repo", default=".", help="Local repository path")
-    repo_analyze_parser.add_argument(
-        "--repository",
-        required=True,
-        help="GitHub repository (owner/repo)"
-    )
-    repo_analyze_parser.add_argument(
-        "--query",
-        help="Optional search query"
-    )
-    repo_analyze_parser.add_argument(
-        "--max-results",
-        type=int,
-        default=10,
-        help="Maximum number of files to return (default: 10)"
-    )
-    repo_analyze_parser.add_argument(
-        "--language",
-        help="Filter by programming language (e.g., python, java)"
-    )
-    
-    # Health command
-    health_parser = subparsers.add_parser("health", help="Check system health")
-    health_parser.add_argument("--repo", default=".", help="Repository path")
-    
-    # Test command
-    test_parser = subparsers.add_parser("test", help="Run integration tests")
-    test_parser.add_argument("--repo", default=".", help="Repository path")
-    
-    args = parser.parse_args()
-    
-    # Configure logging based on arguments
-    setup_logging(level=args.log_level, log_file=args.log_file)
-    
-    # Show help if no command
-    if not args.command:
-        parser.print_help()
-        sys.exit(0)
-    
-    # Route to command handler
-    command_map = {
-        "embed": cmd_embed,
-        "summarize": cmd_summarize,
-        "analyze": cmd_analyze,
-        "repo-analyze": cmd_repo_analyze,
-        "health": cmd_health,
-        "test": cmd_test
-    }
-    
-    if args.command in command_map:
-        asyncio.run(command_map[args.command](args))
-    else:
-        parser.print_help()
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()

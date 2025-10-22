@@ -25,17 +25,18 @@ if current_dir.name == "code-intelligence":
     print()
     print("✅ Instead, run from the repository root:")
     print(f"   cd ..")
-    print(f"   python code-intelligence/orchestrator.py embed")
+    print(f"   python code-intelligence/main.py embed")
     print()
     print("Or specify the repository path:")
-    print(f"   python orchestrator.py embed --repo ..")
+    print(f"   python main.py embed --repo ..")
     sys.exit(1)
 
 # Add parent directory to path
 sys.path.insert(0, str(script_dir.parent))
 
-# Import and run the orchestrator
-from code_intelligence.orchestrator import main
+# Import and run the main CLI
+from code_intelligence.main import main
 
 if __name__ == "__main__":
     main()
+
