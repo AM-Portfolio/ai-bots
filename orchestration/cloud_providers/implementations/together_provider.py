@@ -13,7 +13,9 @@ from ..templates.base import (
     LLMResult
 )
 from shared.llm_providers.together_provider import TogetherAIProvider as LegacyTogetherProvider
-from shared.logger import logger
+from shared.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class TogetherProvider(CloudProvider, LLMProvider):

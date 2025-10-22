@@ -17,7 +17,9 @@ from ..templates.base import (
     TTSResult,
     LLMResult
 )
-from shared.logger import logger
+from shared.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class OpenAIProvider(CloudProvider, STTProvider, TTSProvider, LLMProvider):

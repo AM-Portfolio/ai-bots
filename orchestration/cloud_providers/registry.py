@@ -9,7 +9,9 @@ from .factory import ProviderFactory
 from .implementations.azure_provider import AzureProvider
 from .implementations.together_provider import TogetherProvider
 from .implementations.openai_provider import OpenAIProvider
-from shared.logger import logger
+from shared.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def register_all_providers():

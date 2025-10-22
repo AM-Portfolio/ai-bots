@@ -12,7 +12,9 @@ import base64
 
 from orchestration.cloud_providers.registry import register_all_providers
 from orchestration.cloud_providers.orchestrator import orchestrator
-from shared.logger import logger
+from shared.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 router = APIRouter(prefix="/api/ai", tags=["Unified AI"])

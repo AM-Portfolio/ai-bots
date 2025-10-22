@@ -19,7 +19,9 @@ from .templates.base import (
     TranslationResult,
     LLMResult
 )
-from shared.logger import logger
+from shared.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class CloudOrchestrator:

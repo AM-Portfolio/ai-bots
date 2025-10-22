@@ -16,7 +16,9 @@ from .templates.base import (
     ProviderCapability
 )
 from shared.config import settings
-from shared.logger import logger
+from shared.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class ProviderFactory:

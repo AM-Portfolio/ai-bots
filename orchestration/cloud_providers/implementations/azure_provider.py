@@ -23,7 +23,9 @@ from ..templates.base import (
 from shared.azure_services.speech_service import AzureSpeechService
 from shared.azure_services.translation_service import AzureTranslationService
 from shared.azure_services.model_deployment_service import AzureModelDeploymentService
-from shared.logger import logger
+from shared.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class AzureProvider(CloudProvider, STTProvider, TTSProvider, TranslationProvider, LLMProvider):
