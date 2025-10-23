@@ -21,11 +21,6 @@ services:
       - ./db:/app/db
       - ./qdrant_data:/app/qdrant_data
       - ./.code-intelligence-state.json:/app/.code-intelligence-state.json
-    depends_on:
-      qdrant:
-        condition: service_healthy
-      mongodb:
-        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -48,6 +43,9 @@ services:
     container_name: ai-bots-frontend
     ports:
       - "${FRONTEND_PORT:-4000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
@@ -56,3 +54,8 @@ services:
       retries: 3
     networks:
       - ai-bots-network
+
+networks:
+  ai-bots-network:
+    name: ai-bots-network
+    external: true
