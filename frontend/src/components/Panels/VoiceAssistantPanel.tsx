@@ -375,21 +375,24 @@ const VoiceAssistantPanel = () => {
         console.log('[Voice] Transcript:', transcript);
         console.log('[Voice] Intent:', intent, `(${(confidence * 100).toFixed(1)}%)`);
         
-        const userMessage: Message = {
-          role: 'user',
-          content: transcript || '(no speech detected)',
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, userMessage]);
-        
-        const aiMessage: Message = {
-          role: 'assistant',
-          content: response_text,
-          timestamp: new Date(),
-          intent,
-          confidence
-        };
-        setMessages(prev => [...prev, aiMessage]);
+        // Only add messages if we got a transcript
+        if (transcript && transcript.trim()) {
+          const userMessage: Message = {
+            role: 'user',
+            content: transcript,
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, userMessage]);
+          
+          const aiMessage: Message = {
+            role: 'assistant',
+            content: response_text,
+            timestamp: new Date(),
+            intent,
+            confidence
+          };
+          setMessages(prev => [...prev, aiMessage]);
+        }
         
         if (!isMuted) {
           if (response_audio) {

@@ -199,6 +199,9 @@ class AzureSpeechService:
             
             elif result.reason == speechsdk.ResultReason.NoMatch:
                 logger.warning("⚠️  No speech could be recognized")
+                logger.info(f"   • Audio duration: ~{len(audio_bytes) / 32000:.2f}s")
+                logger.info(f"   • Audio size: {len(audio_bytes)} bytes")
+                logger.info("   • Try speaking louder or closer to the microphone")
                 return "", None
             
             elif result.reason == speechsdk.ResultReason.Canceled:
