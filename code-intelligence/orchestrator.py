@@ -239,8 +239,8 @@ class CodeIntelligenceOrchestrator:
             query_embedding = await embedding_service.generate_embedding(query_text)
             
             # Search vector store
-            results = vector_store.search(
-                query_vector=query_embedding,
+            results = await vector_store.search(
+                query_embedding=query_embedding,
                 limit=limit
             )
             

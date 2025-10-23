@@ -175,20 +175,22 @@ async def query_code(request: QueryCodeRequest):
     try:
         logger.info(f"🔍 Querying code: '{request.query}'")
         logger.info(f"   • Limit: {request.limit}")
-        logger.info(f"   • Min score: {request.min_score}")
         logger.info(f"   • Collection: {request.collection_name}")
         if request.filters:
             logger.info(f"   • Filters: {request.filters}")
         
         orchestrator = get_orchestrator()
         
-        results = await orchestrator.query(
+        # Note: orchestrator.query() only accepts query_text, collection_name, and limit
+        # min_score and filters are not yet supported
+        response = await orchestrator.query(
             query_text=request.query,
             collection_name=request.collection_name,
-            limit=request.limit,
-            min_score=request.min_score,
-            filters=request.filters
+            limit=request.limit
         )
+        
+        # Extract results from orchestrator response
+        results = response.get("results", [])
         
         logger.info(f"✅ Found {len(results)} results")
         if results:

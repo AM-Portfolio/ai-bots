@@ -249,7 +249,7 @@ class VectorStore:
         result = await self.upsert_batch([point])
         return result["successful"] > 0
     
-    def search(
+    async def search(
         self,
         query_embedding: List[float],
         limit: int = 10,
@@ -298,13 +298,11 @@ class VectorStore:
             search_limit = limit * 5 if file_path_pattern else limit
             
             # Use shared provider's search
-            results: List[VectorSearchResult] = asyncio.run(
-                self.provider.search(
-                    collection=self.collection_name,
-                    query_embedding=query_embedding,
-                    top_k=search_limit,
-                    filter_metadata=provider_filter if provider_filter else None
-                )
+            results: List[VectorSearchResult] = await self.provider.search(
+                collection=self.collection_name,
+                query_embedding=query_embedding,
+                top_k=search_limit,
+                filter_metadata=provider_filter if provider_filter else None
             )
             
             logger.info(f"   • Provider returned {len(results)} results")
