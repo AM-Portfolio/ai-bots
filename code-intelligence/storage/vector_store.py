@@ -94,17 +94,41 @@ class VectorStore:
         if not self.provider:
             raise RuntimeError("Failed to create VectorDBProvider")
         
-        # Initialize provider and ensure collection
-        asyncio.run(self._async_init())
+        # Mark as not initialized - caller must call initialize()
+        self._initialized = False
     
-    async def _async_init(self):
-        """Async initialization"""
+    async def initialize(self):
+        """Initialize the vector store (must be called after construction)"""
+        if self._initialized:
+            return
+        
         await self.provider.initialize()
         await self.provider.create_collection(
             name=self.collection_name,
             dimension=self.embedding_dim
         )
+        self._initialized = True
         logger.info(f"✅ Vector store initialized with collection: {self.collection_name}")
+    
+    @classmethod
+    async def create(
+        cls,
+        collection_name: str = "code_intelligence",
+        embedding_dim: int = 3072,
+        distance: str = "Cosine",
+        qdrant_url: Optional[str] = None,
+        qdrant_path: Optional[str] = "./qdrant_data"
+    ) -> "VectorStore":
+        """Async factory method to create and initialize VectorStore"""
+        instance = cls(
+            collection_name=collection_name,
+            embedding_dim=embedding_dim,
+            distance=distance,
+            qdrant_url=qdrant_url,
+            qdrant_path=qdrant_path
+        )
+        await instance.initialize()
+        return instance
     
     def _create_metadata(self, point: EmbeddingPoint) -> DocumentMetadata:
         """Convert EmbeddingPoint metadata to DocumentMetadata"""

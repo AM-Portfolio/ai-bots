@@ -42,8 +42,10 @@ async def cmd_query(args):
         for line in code_lines:
             print(f"      {line}")
         
-        if len(result['code'].split('\n')) > 5:
-            print(f"      ... ({len(result['code'].split('\n')) - 5} more lines)")
+        total_lines = len(result['code'].split('\n'))
+        if total_lines > 5:
+            remaining_lines = total_lines - 5
+            print(f"      ... ({remaining_lines} more lines)")
         
         # Show metadata if available
         metadata = result.get('metadata', {})

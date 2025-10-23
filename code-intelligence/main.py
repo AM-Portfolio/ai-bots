@@ -95,7 +95,8 @@ Examples:
     
     # Embed command
     embed_parser = subparsers.add_parser("embed", help="Embed repository into vector database")
-    embed_parser.add_argument("--repo", default=".", help="Repository path")
+    embed_parser.add_argument("--repo", default=".", help="Local repository path")
+    embed_parser.add_argument("--github-repo", help="GitHub repository (owner/repo) - alternative to --repo")
     embed_parser.add_argument("--collection", default="code_intelligence", help="Qdrant collection name")
     embed_parser.add_argument("--max-files", type=int, help="Maximum files to process")
     embed_parser.add_argument("--force", action="store_true", help="Force re-embedding")

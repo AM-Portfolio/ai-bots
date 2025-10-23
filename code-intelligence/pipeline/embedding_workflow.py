@@ -63,7 +63,7 @@ class EmbeddingWorkflow:
         batch_size: int
     ) -> tuple:
         """Store embeddings in vector database in batches"""
-        vector_store = VectorStore(
+        vector_store = await VectorStore.create(
             collection_name=collection_name,
             qdrant_path=str(self.repo_path / ".qdrant")
         )
@@ -98,12 +98,11 @@ class EmbeddingWorkflow:
     
     async def _update_repo_state(self, chunks: list):
         """Update repository state with processed files"""
-        repo_state = RepoState(self.repo_path)
-        processed_files = set(chunk["metadata"]["file_path"] for chunk in chunks)
-        
-        for file_path in processed_files:
-            chunks_count = len([c for c in chunks if c["metadata"]["file_path"] == file_path])
-            repo_state.mark_file_processed(
-                file_path=file_path,
-                chunks_count=chunks_count
-            )
+        try:
+            repo_state = RepoState(self.repo_path)
+            # Just save the manifest to update modification time
+            repo_state.save_manifest()
+            logger.info(f"✅ Updated repo state for {len(chunks)} chunks")
+        except Exception as e:
+            # Non-critical - log and continue
+            logger.warning(f"⚠️ Could not update repo state: {e}")

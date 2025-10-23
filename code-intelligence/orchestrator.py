@@ -230,7 +230,7 @@ class CodeIntelligenceOrchestrator:
             dimension = embedding_service.get_dimension()
             
             # Initialize vector store
-            vector_store = VectorStore(
+            vector_store = await VectorStore.create(
                 collection_name=collection_name,
                 embedding_dim=dimension
             )
@@ -267,13 +267,13 @@ class CodeIntelligenceOrchestrator:
         Returns:
             Statistics dictionary
         """
-        logger.info("� Getting vector database statistics...")
+        logger.info("📊 Getting vector database statistics...")
         
         try:
             embedding_service = EmbeddingService(provider="auto")
             dimension = embedding_service.get_dimension()
             
-            vector_store = VectorStore(
+            vector_store = await VectorStore.create(
                 collection_name=collection_name,
                 embedding_dim=dimension
             )
@@ -337,7 +337,7 @@ class CodeIntelligenceOrchestrator:
             embedding_service = EmbeddingService(provider="auto")
             dimension = embedding_service.get_dimension()
             
-            vector_store = VectorStore(
+            vector_store = await VectorStore.create(
                 collection_name=collection_name,
                 embedding_dim=dimension
             )
@@ -398,7 +398,7 @@ class CodeIntelligenceOrchestrator:
             embedding_service = EmbeddingService(provider="auto")
             dimension = embedding_service.get_dimension()
             
-            vector_store = VectorStore(
+            vector_store = await VectorStore.create(
                 collection_name="health_check_test",
                 embedding_dim=dimension
             )
