@@ -23,11 +23,21 @@ Preferred communication style: Simple, everyday language.
 **Port**: 5000 (development), exposed via proxy to backend API  
 **Key Features**:
 - Real-time chat interface with markdown rendering
-- Voice input/output capabilities
+- **Floating Voice Assistant Panel**: Separate UI overlay with minimize/close controls
+- Voice input/output with automatic speech detection and 3-second silence detection
+- 20-bar audio visualizer with real-time level monitoring
 - Service connection management UI
 - LLM testing playground with multilingual support
 
-**Design Decision**: Separated frontend build process allows independent development and deployment. Vite provides fast HMR and optimized production builds.
+**Voice Assistant Architecture**:
+- **Auto-listening**: Continuously monitors audio without manual intervention
+- **Auto-send**: Automatically sends after 3 seconds of silence
+- **Continuous mode**: Keeps listening after each AI response
+- **Visual feedback**: Real-time audio level bar (green) and wave animations
+- **Panel controls**: Minimize, mute, and close buttons for flexible UX
+- **Separation from chat**: Floating overlay panel independent of tab navigation
+
+**Design Decision**: Separated frontend build process allows independent development and deployment. Vite provides fast HMR and optimized production builds. Voice assistant as floating panel ensures it's accessible from any tab while maintaining clean UI separation.
 
 ### 2. Backend Architecture
 **Technology**: FastAPI (Python)  
