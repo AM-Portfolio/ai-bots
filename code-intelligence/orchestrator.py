@@ -274,16 +274,27 @@ class CodeIntelligenceOrchestrator:
                 logger.info(f"   📋 Top result details:")
                 top = results[0]
                 logger.info(f"      • Score: {top.get('score', 0):.4f}")
-                logger.info(f"      • ID: {top.get('id', 'N/A')}")
-                payload = top.get('payload', {})
-                logger.info(f"      • File: {payload.get('file_path', 'N/A')}")
-                logger.info(f"      • Repo: {payload.get('repo_name', 'N/A')}")
+                logger.info(f"      • ID: {top.get('chunk_id', 'N/A')}")
+                # Results from vector_store use 'metadata' not 'payload'
+                metadata = top.get('metadata', {})
+                logger.info(f"      • File: {metadata.get('file_path', 'N/A')}")
+                logger.info(f"      • Repo: {metadata.get('repo_name', 'N/A')}")
+            
+            # Convert results to expected format with 'payload' for backward compatibility
+            formatted_results = []
+            for result in results:
+                formatted_results.append({
+                    "id": result.get("chunk_id"),
+                    "score": result.get("score", 0),
+                    "payload": result.get("metadata", {}),  # Map metadata to payload
+                    "content": result.get("content", "")
+                })
             
             return {
                 "success": True,
                 "query": query_text,
-                "results_count": len(results),
-                "results": results
+                "results_count": len(formatted_results),
+                "results": formatted_results
             }
         except Exception as e:
             logger.error(f"❌ Query failed: {e}", exc_info=True)

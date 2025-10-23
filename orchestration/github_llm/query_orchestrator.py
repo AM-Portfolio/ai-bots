@@ -224,7 +224,7 @@ class GitHubLLMOrchestrator:
             }
             
             logger.info(f"🌐 Calling Code Intelligence API: POST {self.code_intel_api_url}/query")
-            logger.info(f"   📦 Payload: query_length={len(request.query)}, limit={request.max_results}, collection={collection_name}")
+            logger.info(f"   📦 Payload: query='{request.query[:100]}...', limit={request.max_results}, collection={collection_name}")
             
             # Call Code Intelligence API
             response = await self.http_client.post(
@@ -253,7 +253,7 @@ class GitHubLLMOrchestrator:
                 payload = result.get('payload', {})
                 
                 # Extract repo and file info with fallbacks
-                repo_name = payload.get('repo_name') or payload.get('repository') or 'unknown'
+                repo_name = payload.get('repo_name') or payload.get('repository') or payload.get('source') or 'local-repo'
                 file_path = payload.get('file_path') or payload.get('path') or 'unknown'
                 
                 source = SourceResult(
