@@ -88,6 +88,11 @@ class VectorDBProvider(ABC):
         pass
     
     @abstractmethod
+    async def list_collections(self) -> List[str]:
+        """List all collection names"""
+        pass
+    
+    @abstractmethod
     async def health_check(self) -> bool:
         """Check if the vector DB is healthy"""
         pass

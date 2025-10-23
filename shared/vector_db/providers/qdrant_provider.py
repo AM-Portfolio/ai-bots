@@ -312,6 +312,21 @@ class QdrantProvider(VectorDBProvider):
             logger.error(f"❌ Failed to get stats for '{collection}': {e}")
             return {}
     
+    async def list_collections(self) -> List[str]:
+        """List all collection names in Qdrant"""
+        try:
+            if not self.client:
+                logger.error("❌ Qdrant client not initialized")
+                return []
+            
+            collections = self.client.get_collections()
+            collection_names = [c.name for c in collections.collections]
+            logger.info(f"📋 Found {len(collection_names)} collections")
+            return collection_names
+        except Exception as e:
+            logger.error(f"❌ Failed to list collections: {e}")
+            return []
+    
     async def health_check(self) -> bool:
         """Check Qdrant health"""
         try:

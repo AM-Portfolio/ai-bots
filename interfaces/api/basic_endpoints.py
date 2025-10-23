@@ -61,7 +61,11 @@ async def serve_frontend():
 
 @router.get("/{full_path:path}", response_class=FileResponse)
 async def serve_spa_routes(full_path: str):
-    """Catch-all route to serve React SPA for client-side routing"""
+    """Catch-all route to serve React SPA for client-side routing (excludes /api paths)"""
+    # Don't serve SPA for API routes
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+    
     frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
     index_file = frontend_dist / "index.html"
     

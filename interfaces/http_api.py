@@ -53,8 +53,7 @@ async def startup_vector_db():
         logger.error(f"❌ Vector DB startup error: {e}", exc_info=True)
 
 
-# Include all modular routers
-app.include_router(basic_endpoints.router)
+# Include all modular routers (IMPORTANT: basic_endpoints MUST be last due to catch-all route)
 app.include_router(llm_endpoints.router)
 app.include_router(test_endpoints.router)
 app.include_router(doc_endpoints.router)
@@ -70,6 +69,9 @@ app.include_router(translation_router)
 app.include_router(azure_test_router)
 app.include_router(unified_ai_router)
 app.include_router(code_intelligence_router)
+
+# Register basic_endpoints LAST because it has a catch-all route for SPA
+app.include_router(basic_endpoints.router)
 
 logger.info("✅ Modular HTTP API application initialized")
 logger.info("📋 Registered endpoints:")
