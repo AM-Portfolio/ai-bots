@@ -39,6 +39,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Suppress verbose Azure and HTTP logs - only show errors
+logging.getLogger('shared.azure_services.model_deployment_service').setLevel(logging.ERROR)
+logging.getLogger('shared.azure_services').setLevel(logging.WARNING)
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('shared.vector_db.embedding_service').setLevel(logging.WARNING)
+logging.getLogger('shared.vector_db').setLevel(logging.WARNING)
+
 
 class EmbeddingPipeline:
     """

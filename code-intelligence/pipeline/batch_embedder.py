@@ -2,6 +2,7 @@
 Batch embedding generator - handles embedding generation in batches
 """
 import logging
+import sys
 from typing import List, Dict
 
 from utils.rate_limiter import RateLimitController, QuotaType
@@ -9,6 +10,25 @@ from shared.vector_db.embedding_service import EmbeddingService
 from pipeline.code_parser import CodeChunk
 
 logger = logging.getLogger(__name__)
+
+
+def _print_progress_bar(current: int, total: int, prefix: str = '', bar_length: int = 50):
+    """Print a progress bar to stdout (overwrites previous line)"""
+    if total == 0:
+        return
+    
+    progress = current / total
+    filled = int(bar_length * progress)
+    bar = '█' * filled + '░' * (bar_length - filled)
+    
+    # Print with carriage return to overwrite
+    sys.stdout.write(f'\r{prefix} [{bar}] {current}/{total} ({progress*100:.1f}%)')
+    sys.stdout.flush()
+    
+    # New line when complete
+    if current == total:
+        sys.stdout.write('\n')
+        sys.stdout.flush()
 
 
 class BatchEmbeddingGenerator:
@@ -51,32 +71,26 @@ class BatchEmbeddingGenerator:
         embedding_data = []
         num_batches = (total_chunks + batch_size - 1) // batch_size
         
-        logger.info(f"\n🔢 Generating embeddings in batches")
-        logger.info(f"   Batch size: {batch_size} chunks")
-        logger.info(f"   Total batches: {num_batches}")
+        print(f"\n🔢 Generating embeddings for {total_chunks} chunks (batch size: {batch_size})")
+        _print_progress_bar(0, total_chunks, prefix='   Progress')
         
         for batch_num in range(num_batches):
             start_idx = batch_num * batch_size
             end_idx = min(start_idx + batch_size, total_chunks)
             batch = chunks[start_idx:end_idx]
             
-            progress = ((batch_num + 1) / num_batches) * 100
-            
-            logger.info(f"\n📦 Batch {batch_num + 1}/{num_batches} ({progress:.1f}% complete)")
-            logger.info(f"   Processing chunks {start_idx + 1}-{end_idx} of {total_chunks}")
-            
             try:
                 batch_data = await self._process_batch(batch, summaries)
                 embedding_data.extend(batch_data)
                 
-                logger.info(f"   ✅ Batch complete: {len(batch_data)} embeddings generated")
-                logger.info(f"   📊 Total progress: {len(embedding_data)}/{total_chunks} chunks")
+                # Update progress bar
+                _print_progress_bar(len(embedding_data), total_chunks, prefix='   Progress')
                 
             except Exception as e:
-                logger.error(f"   ❌ Batch {batch_num + 1} failed: {e}")
+                logger.error(f"\n   ❌ Batch {batch_num + 1} failed: {e}")
                 # Continue with next batch
         
-        logger.info(f"\n✅ Embedding generation complete: {len(embedding_data)} embeddings")
+        print(f"✅ Complete: {len(embedding_data)} embeddings generated")
         return embedding_data
     
     async def _process_batch(

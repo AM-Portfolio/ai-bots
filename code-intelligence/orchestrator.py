@@ -29,6 +29,16 @@ from utils.enhanced_query import EnhancedQueryService
 
 logger = logging.getLogger(__name__)
 
+# Suppress verbose Azure and HTTP logs - only show errors
+logging.getLogger('shared.azure_services.model_deployment_service').setLevel(logging.ERROR)
+logging.getLogger('shared.azure_services').setLevel(logging.WARNING)
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('shared.vector_db.embedding_service').setLevel(logging.WARNING)
+logging.getLogger('shared.vector_db').setLevel(logging.WARNING)
+logging.getLogger('storage.vector_store').setLevel(logging.WARNING)
+logging.getLogger('shared.vector_db.factory').setLevel(logging.WARNING)
+logging.getLogger('shared.vector_db.providers').setLevel(logging.WARNING)
+
 
 class CodeIntelligenceOrchestrator:
     """
@@ -184,11 +194,14 @@ class CodeIntelligenceOrchestrator:
         
         # Use EmbeddingWorkflow for storage
         workflow = EmbeddingWorkflow(
-            repo_path=str(self.repo_path),
-            collection_name=collection_name
+            repo_path=self.repo_path
         )
         
-        result = await workflow.execute(embedding_result)
+        result = await workflow.execute(
+            embedding_data=embedding_result["embedding_data"],
+            chunks=embedding_result["chunks"],
+            collection_name=collection_name
+        )
         
         return result["total_stored"], result["total_failed"]
     

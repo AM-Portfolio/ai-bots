@@ -32,6 +32,22 @@ class FallbackParser(BaseParser):
         # Fallback handles everything
         return ['.txt', '.md', '.json', '.yaml', '.yml', '.xml', '.html', '.css']
     
+    def parse(self, content: str, file_path: str) -> List[dict]:
+        """Parse content and return list of symbol dictionaries"""
+        chunks = self._chunk_by_lines(file_path, content)
+        
+        # Convert chunks to symbol format expected by code_parser
+        symbols = []
+        for chunk in chunks:
+            symbols.append({
+                'type': chunk.metadata.chunk_type,
+                'name': f'chunk_{chunk.metadata.start_line}',
+                'code': chunk.content,
+                'start_line': chunk.metadata.start_line,
+                'end_line': chunk.metadata.end_line
+            })
+        return symbols
+    
     def parse_file(self, file_path: str) -> List[CodeChunk]:
         """Parse file using line-based chunking"""
         try:

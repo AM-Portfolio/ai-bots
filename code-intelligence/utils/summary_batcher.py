@@ -3,9 +3,29 @@ Summary Batcher - Handles batch processing of summaries with caching
 """
 import asyncio
 import logging
+import sys
 from typing import List, Dict, Callable, Any
 
 logger = logging.getLogger(__name__)
+
+
+def _print_progress_bar(current: int, total: int, prefix: str = '', bar_length: int = 50):
+    """Print a progress bar to stdout (overwrites previous line)"""
+    if total == 0:
+        return
+    
+    progress = current / total
+    filled = int(bar_length * progress)
+    bar = '█' * filled + '░' * (bar_length - filled)
+    
+    # Print with carriage return to overwrite
+    sys.stdout.write(f'\r{prefix} [{bar}] {current}/{total} ({progress*100:.1f}%)')
+    sys.stdout.flush()
+    
+    # New line when complete
+    if current == total:
+        sys.stdout.write('\n')
+        sys.stdout.flush()
 
 
 class SummaryBatcher:
@@ -76,12 +96,16 @@ class SummaryBatcher:
         fallback_count = 0
         total_processed = total_count - len(items)  # Already cached
         
-        logger.info(f"   ⏳ Processing {len(items)} items in batches of {self.batch_size}...")
-        logger.info(f"   📊 Starting: {total_processed}/{total_count} complete ({(total_processed/total_count)*100:.1f}%)")
+        # Show initial progress (cached items)
+        if total_count > 0:
+            print(f"\n� Summarizing {total_count} chunks ({len(items)} new, {total_processed} cached)")
+            _print_progress_bar(total_processed, total_count, prefix='   Progress')
+        else:
+            print("\n� No items to process")
+            return results, error_count, fallback_count
         
         for i in range(0, len(items), self.batch_size):
             batch = items[i:i + self.batch_size]
-            batch_start_time = asyncio.get_event_loop().time()
             
             # Process batch in parallel
             tasks = [processor(item) for item in batch]
@@ -93,7 +117,6 @@ class SummaryBatcher:
                 
                 if isinstance(result, Exception):
                     error_count += 1
-                    logger.debug(f"   ✗ Failed to process {item_id}: {result}")
                     # Result should be fallback from processor
                     results[item_id] = str(result)
                     fallback_count += 1
@@ -101,20 +124,11 @@ class SummaryBatcher:
                     results[item_id] = result
                 
                 total_processed += 1
-            
-            # Calculate progress and ETA
-            progress_pct = (total_processed / total_count) * 100
-            batch_time = asyncio.get_event_loop().time() - batch_start_time
-            avg_time_per_item = batch_time / len(batch)
-            remaining_items = total_count - total_processed
-            eta_seconds = remaining_items * avg_time_per_item
-            eta_minutes = eta_seconds / 60
-            
-            # Log progress with ETA
-            logger.info(
-                f"   📊 Progress: {total_processed}/{total_count} items "
-                f"({progress_pct:.1f}% complete) - "
-                f"ETA: {eta_minutes:.1f} min"
-            )
+                
+                # Update progress bar after each item
+                _print_progress_bar(total_processed, total_count, prefix='   Progress')
+        
+        # Print summary
+        print(f"✅ Complete: {total_count} summaries ({error_count} errors, {fallback_count} fallbacks)")
         
         return results, error_count, fallback_count
