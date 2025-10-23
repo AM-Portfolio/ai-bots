@@ -185,6 +185,9 @@ class AzureSpeechService:
                     logger.error(f"   Error details: {cancellation.error_details}")
                 raise Exception(f"Speech recognition failed: {cancellation.error_details}")
             
+            # If we get here, return empty result
+            return "", None
+            
         except Exception as e:
             logger.error(f"❌ Azure STT error: {e}")
             raise
