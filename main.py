@@ -1,14 +1,9 @@
 import uvicorn
 import logging
 import os
-from contextlib import asynccontextmanager
-from sqlalchemy import create_engine
 from pathlib import Path
 
-from interfaces.http_api import app
-from interfaces.vector_db_api import initialize_vector_db
-from observability.metrics import metrics
-from db.models import Base
+# Import config first
 from shared.config import settings
 
 logging.basicConfig(
@@ -54,54 +49,16 @@ def verify_env_loaded():
         logger.info("✅ All critical configuration values present")
 
 
-def init_database():
-    logger.info("Initializing database...")
-    try:
-        engine = create_engine(settings.database_url, echo=False)
-        Base.metadata.create_all(bind=engine)
-        logger.info("Database initialized successfully")
-        return engine
-    except Exception as e:
-        logger.warning(f"Database initialization skipped: {e}")
-        return None
-
-
-@asynccontextmanager
-async def lifespan(app):
-    logger.info("Starting AI Dev Agent...")
-    
-    # Verify environment configuration is loaded
-    verify_env_loaded()
-    
-    # Initialize database
-    init_database()
-    
-    # Initialize Vector DB system
-    logger.info("Initializing Vector DB...")
-    await initialize_vector_db()
-    
-    port = settings.port
-    logger.info(f"AI Dev Agent ready on {settings.app_host}:{port}")
-    yield
-    logger.info("Shutting down AI Dev Agent...")
-
-
-app.router.lifespan_context = lifespan
-
-
-@app.get("/metrics")
-async def get_metrics():
-    return metrics.get_metrics()
-
-
 if __name__ == "__main__":
     # Load and verify configuration
     verify_env_loaded()
     
     port = settings.port
     logger.info(f"Starting server on {settings.app_host}:{port}")
+    
+    # Use interfaces.http_api:app as the import path to avoid main.py import issues
     uvicorn.run(
-        "main:app",
+        "interfaces.http_api:app",
         host=settings.app_host,
         port=port,
         reload=settings.is_development,

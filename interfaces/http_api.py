@@ -5,6 +5,8 @@ Modular FastAPI application that combines all endpoint modules.
 This replaces the original monolithic http_api.py file.
 """
 
+import sys
+from pathlib import Path
 from fastapi import FastAPI
 
 from interfaces.api.core import create_app
@@ -23,7 +25,11 @@ from interfaces.vector_db_api import router as vector_db_router, initialize_vect
 from interfaces.translation_api import router as translation_router
 from interfaces.azure_test_api import router as azure_test_router
 from interfaces.unified_ai_api import router as unified_ai_router
-from interfaces.code_intelligence_api import router as code_intelligence_router
+
+# Import code intelligence API from code-intelligence module
+sys.path.insert(0, str(Path(__file__).parent.parent / "code-intelligence"))
+from api import router as code_intelligence_router
+
 from shared.logger import get_logger
 
 logger = get_logger(__name__)
