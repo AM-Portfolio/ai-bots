@@ -253,12 +253,21 @@ class GitHubLLMOrchestrator:
                 payload = result.get('payload', {})
                 
                 # Extract repo and file info with fallbacks
+                # Try multiple sources: repo_name -> repository -> source -> default
                 repo_name = payload.get('repo_name') or payload.get('repository') or payload.get('source') or 'local-repo'
                 file_path = payload.get('file_path') or payload.get('path') or 'unknown'
                 
+                # Debug log first result
+                if len(source_results) == 0:
+                    logger.info(f"   🔍 First result extraction:")
+                    logger.info(f"      repo_name from payload: {payload.get('repo_name')}")
+                    logger.info(f"      source from payload: {payload.get('source')}")
+                    logger.info(f"      final repo_name: {repo_name}")
+                    logger.info(f"      file_path: {file_path}")
+                
                 source = SourceResult(
                     source_type='code_intelligence',
-                    content=payload.get('content', ''),
+                    content=result.get('content', ''),  # Content is at result level, not in payload
                     metadata={
                         'doc_id': result.get('id'),
                         'repo': repo_name,  # Use 'repo' key for consistency
