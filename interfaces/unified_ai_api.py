@@ -20,10 +20,11 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/api/ai", tags=["Unified AI"])
 
 # In-memory provider configuration (in production, this would be in a database)
+# Default: Azure ONLY (Together AI and OpenAI disabled by default)
 _provider_config = {
     "stt_provider": "azure",
-    "chat_provider": "together",
-    "tts_provider": "openai"
+    "chat_provider": "azure",
+    "tts_provider": "azure"
 }
 
 
