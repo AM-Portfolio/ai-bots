@@ -31,7 +31,7 @@ const VoiceAssistantPanel = () => {
   const [hasGreeted, setHasGreeted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audioLevel, setAudioLevel] = useState<number>(0);
-  const [isMinimized, setIsMinimized] = useState(true);
+  const [isMinimized, setIsMinimized] = useState(false); // Start expanded (full screen)
   const [isMuted, setIsMuted] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   
@@ -296,7 +296,6 @@ const VoiceAssistantPanel = () => {
     if (audioChunksRef.current.length === 0) {
       console.warn('[Voice] No audio chunks to process');
       setVoiceState('idle');
-      setTimeout(() => startRecording(), 1000);
       return;
     }
     
@@ -311,16 +310,16 @@ const VoiceAssistantPanel = () => {
     if (audioBlob.size < 5000) {
       console.warn('[Voice] Audio too small, likely no speech');
       setVoiceState('idle');
-      setTimeout(() => startRecording(), 1000);
+      setError('Recording too short - please speak longer');
+      setTimeout(() => setError(null), 2000);
       return;
     }
     
-    // If muted, store the audio and restart recording
+    // If muted, store the audio
     if (isMuted) {
       console.log('[Voice] 🔇 Muted - storing last command');
       lastAudioWhileMutedRef.current = audioBlob;
       setVoiceState('idle');
-      setTimeout(() => startRecording(), 1000);
       return;
     }
 
@@ -373,11 +372,9 @@ const VoiceAssistantPanel = () => {
           } else {
             speakText(response_text);
           }
+        } else {
+          setVoiceState('idle');
         }
-        
-        setTimeout(() => {
-          startRecording();
-        }, 1000);
       };
       
     } catch (err: any) {
@@ -387,8 +384,7 @@ const VoiceAssistantPanel = () => {
       
       setTimeout(() => {
         setError(null);
-        startRecording();
-      }, 2000);
+      }, 3000);
     }
   };
 
@@ -470,11 +466,13 @@ const VoiceAssistantPanel = () => {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col">
-      {/* Floating Voice Assistant */}
+    <div className={`fixed z-50 transition-all duration-300 ${
+      isMinimized ? 'bottom-6 right-6' : 'inset-4'
+    }`}>
+      {/* Voice Assistant */}
       <div 
-        className={`bg-white rounded-2xl shadow-2xl border-2 transition-all duration-300 ${
-          isMinimized ? 'w-20 h-20' : 'w-96 h-[600px]'
+        className={`bg-white shadow-2xl border-2 transition-all duration-300 flex flex-col ${
+          isMinimized ? 'w-20 h-20 rounded-full' : 'w-full h-full rounded-2xl'
         } ${
           voiceState === 'recording' ? 'border-green-500' :
           voiceState === 'processing' ? 'border-blue-500' :
@@ -609,14 +607,14 @@ const VoiceAssistantPanel = () => {
             <div className="p-4 border-t bg-white rounded-b-2xl">
               {/* Audio Level Visualizer */}
               {voiceState === 'recording' && (
-                <div className="mb-3">
-                  <div className="flex items-center justify-center space-x-1 h-12">
-                    {[...Array(20)].map((_, i) => {
+                <div className="mb-4">
+                  <div className="flex items-center justify-center space-x-1.5 h-16">
+                    {[...Array(30)].map((_, i) => {
                       const height = Math.max(10, audioLevel * (Math.random() * 0.5 + 0.75));
                       return (
                         <div
                           key={i}
-                          className="w-1 bg-gradient-to-t from-green-500 to-green-400 rounded-full transition-all duration-100"
+                          className="w-1.5 bg-gradient-to-t from-green-500 to-green-400 rounded-full transition-all duration-100"
                           style={{
                             height: `${height}%`,
                             opacity: audioLevel > 5 ? 0.8 : 0.3
@@ -625,49 +623,56 @@ const VoiceAssistantPanel = () => {
                       );
                     })}
                   </div>
-                  <div className="flex items-center justify-center gap-3 mt-2">
-                    <p className="text-xs text-gray-600">
-                      Speak now • Click "Send Now" when done
-                    </p>
+                  <p className="text-sm text-gray-600 text-center mt-3">
+                    🎤 Speak now... Audio level: {audioLevel.toFixed(0)}%
+                  </p>
+                </div>
+              )}
+
+              {/* Main Control Button - Toggle Recording/Send */}
+              <div className="flex flex-col items-center justify-center gap-3">
+                {voiceState === 'idle' && (
+                  <>
+                    <button
+                      onClick={startRecording}
+                      className="w-24 h-24 rounded-full bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 flex items-center justify-center shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                    >
+                      <Mic className="w-12 h-12 text-white" />
+                    </button>
+                    <p className="text-base font-medium text-gray-700">Click to Record</p>
+                  </>
+                )}
+
+                {voiceState === 'recording' && (
+                  <>
                     <button
                       onClick={stopRecording}
-                      className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-xs rounded-full transition-colors"
-                      title="Send immediately"
+                      className="w-24 h-24 rounded-full bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 flex items-center justify-center shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-pulse"
                     >
-                      Send Now
+                      <Mic className="w-12 h-12 text-white" />
                     </button>
-                  </div>
-                </div>
-              )}
+                    <p className="text-base font-medium text-red-600">Click to Send</p>
+                  </>
+                )}
 
-              {/* Main Control Button */}
-              {voiceState === 'idle' && (
-                <div className="flex flex-col items-center justify-center gap-3">
-                  <button
-                    onClick={startRecording}
-                    className="w-20 h-20 rounded-full bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 flex items-center justify-center shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
-                  >
-                    <Mic className="w-10 h-10 text-white" />
-                  </button>
-                  <p className="text-sm text-gray-600">Click mic to record</p>
-                </div>
-              )}
+                {voiceState === 'processing' && (
+                  <>
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg animate-pulse">
+                      <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                    <p className="text-base font-medium text-blue-600">Processing...</p>
+                  </>
+                )}
 
-              {/* Status Indicator (when not idle) */}
-              {voiceState !== 'idle' && (
-                <div className="flex items-center justify-center">
-                  <div className={`px-4 py-2 rounded-full text-sm font-medium ${
-                    voiceState === 'recording' ? 'bg-green-100 text-green-700' :
-                    voiceState === 'processing' ? 'bg-blue-100 text-blue-700' :
-                    voiceState === 'speaking' ? 'bg-purple-100 text-purple-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
-                    {voiceState === 'recording' && '🎤 Recording... Click "Send Now" when done'}
-                    {voiceState === 'processing' && '⚡ Processing your request...'}
-                    {voiceState === 'speaking' && '🔊 AI is responding...'}
-                  </div>
-                </div>
-              )}
+                {voiceState === 'speaking' && (
+                  <>
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg animate-pulse">
+                      <Volume2 className="w-12 h-12 text-white" />
+                    </div>
+                    <p className="text-base font-medium text-purple-600">AI Speaking...</p>
+                  </>
+                )}
+              </div>
 
               {/* Error Display */}
               {error && (
