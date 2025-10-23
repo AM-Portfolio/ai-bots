@@ -72,13 +72,13 @@ class GitHubAnalyzer:
                 file_paths = {f.file_path for f in result.files}
                 
                 logger.info(f"✅ Found {len(result.files)} relevant files")
-                logger.info(f"   Confidence: {result.confidence:.2f}")
+                logger.info(f"   Confidence: {result.confidence_score:.2f}")
                 
                 return {
                     "success": True,
                     "file_paths": file_paths,
                     "files_found": len(result.files),
-                    "confidence": result.confidence,
+                    "confidence": result.confidence_score,
                     "summary": result.summary,
                     "files": result.files
                 }

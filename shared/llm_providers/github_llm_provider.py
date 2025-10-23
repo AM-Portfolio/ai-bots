@@ -220,12 +220,12 @@ class GitHubLLMProvider:
             List of file results from GitHub
         """
         try:
-            owner, repo = request.repository.split('/')
+            repo_name = request.repository
             
             # Get repository tree
-            tree = await self.github_client.get_repo_tree(
-                owner=owner,
-                repo=repo,
+            tree = await self.github_client.get_repository_tree(
+                repo_name=repo_name,
+                branch="main",
                 recursive=True
             )
             

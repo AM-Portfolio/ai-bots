@@ -113,6 +113,7 @@ class CodeIntelligenceOrchestrator:
         
         # STEP 1: Optional GitHub LLM Analysis
         github_file_paths = set()
+        github_file_contents = {}
         if github_repository:
             logger.info(f"\n🔍 STEP 1: GitHub LLM Repository Analysis")
             analysis_result = await self.github_analyzer.analyze_repository(
@@ -130,12 +131,22 @@ class CodeIntelligenceOrchestrator:
                     "summary": analysis_result["summary"]
                 }
                 github_file_paths = analysis_result["file_paths"]
+                
+                # Fetch file contents from GitHub
+                if github_file_paths:
+                    logger.info(f"📥 Fetching {len(github_file_paths)} files from GitHub...")
+                    github_file_contents = await self._fetch_github_contents(
+                        github_repository,
+                        github_file_paths
+                    )
+                    logger.info(f"✅ Fetched {len(github_file_contents)} file contents")
         else:
             logger.info("\n📂 STEP 1: Using local file discovery")
         
         # STEP 2: Generate embeddings
         embedding_result = await self._generate_embeddings(
             github_file_paths=github_file_paths,
+            github_file_contents=github_file_contents,
             max_files=max_files,
             force_reindex=force_reindex
         )
@@ -162,6 +173,7 @@ class CodeIntelligenceOrchestrator:
     async def _generate_embeddings(
         self,
         github_file_paths: set,
+        github_file_contents: dict,
         max_files: Optional[int],
         force_reindex: bool
     ) -> Dict[str, Any]:
@@ -179,9 +191,49 @@ class CodeIntelligenceOrchestrator:
         
         return await embedding_pipeline.generate_embeddings(
             file_filter=github_file_paths if github_file_paths else None,
+            file_contents=github_file_contents if github_file_contents else None,
             max_files=max_files,
             force_reindex=force_reindex
         )
+    
+    async def _fetch_github_contents(
+        self,
+        repository: str,
+        file_paths: set
+    ) -> dict:
+        """
+        Fetch file contents from GitHub.
+        
+        Args:
+            repository: Repository name (owner/repo)
+            file_paths: Set of file paths to fetch
+            
+        Returns:
+            Dictionary mapping file paths to contents
+        """
+        from shared.clients.wrappers.github_wrapper import GitHubWrapper
+        
+        github_client = GitHubWrapper()
+        if not github_client.is_configured:
+            logger.error("GitHub client not configured")
+            return {}
+        
+        file_contents = {}
+        for file_path in file_paths:
+            try:
+                content = await github_client.get_file_content(
+                    repo_name=repository,
+                    file_path=file_path,
+                    branch="main"  # Will auto-fallback to default branch
+                )
+                if content:
+                    file_contents[file_path] = content
+                else:
+                    logger.warning(f"⚠️  Could not fetch content for {file_path}")
+            except Exception as e:
+                logger.error(f"❌ Error fetching {file_path}: {e}")
+        
+        return file_contents
     
     async def _store_embeddings(
         self,

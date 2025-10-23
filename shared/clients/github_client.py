@@ -99,7 +99,18 @@ class GitHubClient:
         
         try:
             repo = self.client.get_repo(repo_name)
-            file = repo.get_contents(file_path, ref=branch)
+            
+            # Try to get file with specified branch, fallback to default branch
+            try:
+                file = repo.get_contents(file_path, ref=branch)
+            except GithubException as e:
+                if e.status == 404 and "No commit found" in str(e):
+                    # Branch doesn't exist, try default branch
+                    default_branch = repo.default_branch
+                    logger.info(f"Branch '{branch}' not found, using default branch '{default_branch}'")
+                    file = repo.get_contents(file_path, ref=default_branch)
+                else:
+                    raise
             
             if file.type == "file":
                 return file.decoded_content.decode('utf-8')

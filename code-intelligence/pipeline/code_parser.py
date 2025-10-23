@@ -3,7 +3,7 @@ Code parsing and chunking module
 """
 import logging
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
 from parsers import parser_registry
@@ -37,12 +37,17 @@ class CodeParser:
     def __init__(self, repo_path: Path):
         self.repo_path = repo_path
     
-    def parse_files(self, file_paths: List[str]) -> List[CodeChunk]:
+    def parse_files(
+        self,
+        file_paths: List[str],
+        file_contents: Optional[Dict[str, str]] = None
+    ) -> List[CodeChunk]:
         """
         Parse files and generate chunks.
         
         Args:
             file_paths: List of file paths to parse
+            file_contents: Optional dict of file_path -> content (for GitHub files)
             
         Returns:
             List of CodeChunk objects
@@ -54,7 +59,12 @@ class CodeParser:
         
         for file_path in file_paths:
             try:
-                chunks = self._parse_file(file_path)
+                # Get content from dict if available, otherwise read from file
+                content = None
+                if file_contents and file_path in file_contents:
+                    content = file_contents[file_path]
+                
+                chunks = self._parse_file(file_path, content=content)
                 all_chunks.extend(chunks)
             except Exception as e:
                 logger.error(f"❌ Failed to parse {file_path}: {e}")
@@ -67,7 +77,7 @@ class CodeParser:
         
         return all_chunks
     
-    def _parse_file(self, file_path: str) -> List[CodeChunk]:
+    def _parse_file(self, file_path: str, content: Optional[str] = None) -> List[CodeChunk]:
         """Parse a single file into chunks"""
         # Detect language
         ext = Path(file_path).suffix.lower()
@@ -76,20 +86,26 @@ class CodeParser:
         # Get appropriate parser
         parser = parser_registry.get_parser(language)
         
-        # Read file content
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-        except UnicodeDecodeError:
-            # Try with different encoding
-            with open(file_path, 'r', encoding='latin-1') as f:
-                content = f.read()
+        # Read file content if not provided
+        if content is None:
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            except UnicodeDecodeError:
+                # Try with different encoding
+                with open(file_path, 'r', encoding='latin-1') as f:
+                    content = f.read()
         
         # Parse and create chunks
         parsed_symbols = parser.parse(content, str(file_path))
         
         chunks = []
-        rel_path = str(Path(file_path).relative_to(self.repo_path))
+        # For GitHub files, file_path is already relative; for local files, make it relative
+        try:
+            rel_path = str(Path(file_path).relative_to(self.repo_path))
+        except ValueError:
+            # file_path is not relative to repo_path (e.g., GitHub file), use as-is
+            rel_path = file_path
         
         for idx, symbol in enumerate(parsed_symbols):
             chunk_id = f"{rel_path}:{symbol.get('name', f'chunk_{idx}')}"

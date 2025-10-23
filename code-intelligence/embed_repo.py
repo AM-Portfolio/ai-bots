@@ -206,7 +206,8 @@ class EmbeddingPipeline:
         self,
         max_files: Optional[int] = None,
         force_reindex: bool = False,
-        file_filter: Optional[Set[str]] = None
+        file_filter: Optional[Set[str]] = None,
+        file_contents: Optional[Dict[str, str]] = None
     ) -> Dict[str, Any]:
         """
         Generate embeddings for code files using modular pipeline.
@@ -221,6 +222,7 @@ class EmbeddingPipeline:
             max_files: Limit number of files to process (None = all)
             force_reindex: Force re-embedding of all files
             file_filter: Optional set of file paths to filter (from GitHub LLM)
+            file_contents: Optional dict of file path -> content (from GitHub API)
             
         Returns:
             Dict with:
@@ -253,17 +255,26 @@ class EmbeddingPipeline:
             
             # Step 1: Discover files using FileDiscovery module
             logger.info("\n📁 Step 1: File Discovery")
-            all_files = self.file_discovery.discover_files()
-            stats["files_discovered"] = len(all_files)
+            if file_filter:
+                # When using GitHub file filter, use those paths directly
+                logger.info(f"📡 Using GitHub repository files: {len(file_filter)} files")
+                all_files = list(file_filter)
+                stats["files_discovered"] = len(all_files)
+            else:
+                # Local file discovery
+                all_files = self.file_discovery.discover_files()
+                stats["files_discovered"] = len(all_files)
             
             # Step 2: Filter files
             logger.info("\n🎯 Step 2: File Filtering")
-            if file_filter and not force_reindex:
-                # Use provided file filter (e.g., from GitHub LLM)
-                filtered_files = self.file_discovery.filter_by_paths(all_files, file_filter)
-                prioritized_files = self.file_discovery.apply_limit(filtered_files, max_files)
+            if file_filter:
+                # Use provided file filter from GitHub LLM
+                logger.info(f"🔍 Using GitHub analysis results: {len(file_filter)} files")
+                # For GitHub repos, all_files is already the filtered set
+                prioritized_files = self.file_discovery.apply_limit(all_files, max_files)
+                logger.info(f"📊 Processing {len(prioritized_files)} files from GitHub repository")
             else:
-                # Use change detection
+                # Use change detection for local files
                 if force_reindex:
                     logger.info("🔄 Force reindex enabled - processing all files")
                     changed_files = set(all_files)
@@ -285,7 +296,10 @@ class EmbeddingPipeline:
             
             # Step 3: Parse and chunk using CodeParser module
             logger.info("\n📖 Step 3: Parsing and Chunking")
-            all_chunks = self.code_parser.parse_files(prioritized_files)
+            all_chunks = self.code_parser.parse_files(
+                prioritized_files,
+                file_contents=file_contents
+            )
             stats["chunks_generated"] = len(all_chunks)
             
             # Show chunk type distribution
