@@ -23,6 +23,11 @@ const VoiceAssistantPanel = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [sessionId, setSessionId] = useState<string | null>(null);
+  
+  // Keep ref in sync with state for use in closures
+  useEffect(() => {
+    voiceStateRef.current = voiceState;
+  }, [voiceState]);
   const [hasGreeted, setHasGreeted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audioLevel, setAudioLevel] = useState<number>(0);
@@ -40,6 +45,7 @@ const VoiceAssistantPanel = () => {
   const animationFrameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const lastAudioWhileMutedRef = useRef<Blob | null>(null);
+  const voiceStateRef = useRef<VoiceState>('idle');
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -236,7 +242,8 @@ const VoiceAssistantPanel = () => {
       
       setAudioLevel(normalizedLevel);
       
-      if (voiceState === 'recording' && normalizedLevel > 10) {
+      // Use ref to avoid stale closure
+      if (voiceStateRef.current === 'recording' && normalizedLevel > 10) {
         resetSilenceTimer();
       }
       
@@ -256,7 +263,8 @@ const VoiceAssistantPanel = () => {
     }
     
     silenceTimerRef.current = window.setTimeout(() => {
-      if (voiceState === 'recording' && audioChunksRef.current.length > 0) {
+      // Use ref to avoid stale closure
+      if (voiceStateRef.current === 'recording' && audioChunksRef.current.length > 0) {
         console.log('[Voice] Silence detected after speech - auto-sending');
         stopRecording();
       }
@@ -264,7 +272,7 @@ const VoiceAssistantPanel = () => {
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && voiceState === 'recording') {
+    if (mediaRecorderRef.current && voiceStateRef.current === 'recording') {
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current);
         silenceTimerRef.current = null;
