@@ -70,11 +70,24 @@ class AzureSpeechService:
         """
         import os
         try:
+            # Verify we have audio data
+            if not audio_bytes or len(audio_bytes) == 0:
+                raise Exception("No audio data provided")
+            
+            # Log the first few bytes to verify it's WebM format
+            header_bytes = audio_bytes[:20] if len(audio_bytes) >= 20 else audio_bytes
+            logger.info(f"🔍 Audio data header (first 20 bytes): {header_bytes.hex()}")
+            
             # Create temporary input file and write WebM data
-            with tempfile.NamedTemporaryFile(suffix='.webm', delete=False) as webm_file:
+            with tempfile.NamedTemporaryFile(suffix='.webm', delete=False, mode='wb') as webm_file:
                 webm_file.write(audio_bytes)
                 webm_file.flush()  # Ensure data is written to disk
+                os.fsync(webm_file.fileno())  # Force write to disk
                 webm_path = webm_file.name
+            
+            # Verify the file was written correctly
+            written_size = os.path.getsize(webm_path)
+            logger.info(f"📝 Wrote {written_size} bytes to temp file: {webm_path}")
             
             # Create temporary output file path (empty file for FFmpeg to write to)
             wav_fd, wav_path = tempfile.mkstemp(suffix='.wav')
