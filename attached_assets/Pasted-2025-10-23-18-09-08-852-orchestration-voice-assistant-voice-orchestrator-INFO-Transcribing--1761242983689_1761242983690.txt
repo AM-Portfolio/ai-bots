@@ -1,0 +1,22 @@
+2025-10-23 18:09:08,852 - orchestration.voice_assistant.voice_orchestrator - INFO - 🎧 Transcribing audio (format: webm)...
+2025-10-23 18:09:08,853 - orchestration.voice_assistant.azure_voice_adapter - INFO - 🔄 Processing audio through Azure pipeline...
+2025-10-23 18:09:08,853 - orchestration.voice_assistant.azure_voice_adapter - INFO - 📝 Step 1: Azure STT (Auto language detection)
+2025-10-23 18:09:08,853 - shared.azure_services.speech_service - INFO - 📥 Received audio: 96721 bytes, format: webm
+2025-10-23 18:09:08,854 - shared.azure_services.speech_service - INFO - 🔄 Converting WebM to WAV for Azure STT...
+2025-10-23 18:09:08,941 - shared.azure_services.speech_service - INFO - ✅ Converted WebM (96721 bytes) to WAV (0 bytes)
+2025-10-23 18:09:08,943 - shared.azure_services.speech_service - INFO - 🎤 Starting Azure speech recognition...
+2025-10-23 18:09:09,457 - shared.azure_services.speech_service - ERROR - ❌ Speech recognition canceled: CancellationReason.Error
+2025-10-23 18:09:09,457 - shared.azure_services.speech_service - ERROR -    Error details: Timeout: no recognition result received SessionId: a472a8e41d0848c3ae7e5ddf20537091
+2025-10-23 18:09:09,457 - shared.azure_services.speech_service - ERROR - ❌ Azure STT error: Speech recognition failed: Timeout: no recognition result received SessionId: a472a8e41d0848c3ae7e5ddf20537091
+2025-10-23 18:09:09,457 - orchestration.voice_assistant.azure_voice_adapter - ERROR - ❌ Azure voice processing error: Speech recognition failed: Timeout: no recognition result received SessionId: a472a8e41d0848c3ae7e5ddf20537091
+2025-10-23 18:09:09,457 - orchestration.voice_assistant.voice_orchestrator - ERROR - ❌ STT failed: Speech recognition failed: Timeout: no recognition result received SessionId: a472a8e41d0848c3ae7e5ddf20537091
+2025-10-23 18:09:09,694 - orchestration.voice_assistant.voice_orchestrator - INFO - 📝 Transcript: [Transcription error: Speech recognition failed: Timeout: no recognition result received SessionId: a472a8e41d0848c3ae7e5ddf20537091]
+2025-10-23 18:09:09,695 - orchestration.voice_assistant.session_manager - INFO - 💬 Added user turn to session 4589a4e5-02e5-473a-9e40-d5e19cb1bc29: [Transcription error: Speech recognition failed: T...
+2025-10-23 18:09:09,695 - orchestration.voice_assistant.intent_classifier - INFO - 🔍 Classifying intent for: '[Transcription error: Speech recognition failed: Timeout: no recognition result received SessionId: ...'
+2025-10-23 18:09:09,695 - shared.llm_providers.resilient_orchestrator - INFO - 🔄 Starting resilient LLM request with 1 providers
+2025-10-23 18:09:09,695 - shared.llm_providers.resilient_orchestrator - INFO -    Provider order: azure
+2025-10-23 18:09:09,695 - shared.llm_providers.resilient_orchestrator - INFO - 🤖 Attempting azure (attempt 1/1)
+2025-10-23 18:09:09,695 - shared.llm_providers.factory - INFO - Creating Azure OpenAI provider
+2025-10-23 18:09:09,695 - shared.llm_providers.azure_provider - INFO - 🔧 Azure Provider Configuration:
+2025-10-23 18:09:09,695 - shared.llm_providers.azure_provider - INFO -    Endpoint: https://munis-mgzdcoho-eastus2.cognitiveservices.a...
+2025-10-23 18:09:09,695 - shared.llm_providers.azure_provider - INFO -    API Key: SET

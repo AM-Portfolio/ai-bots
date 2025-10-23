@@ -68,18 +68,23 @@ class AzureSpeechService:
         Returns:
             WAV audio bytes
         """
+        import os
         try:
-            # Create temporary files
+            # Create temporary input file and write WebM data
             with tempfile.NamedTemporaryFile(suffix='.webm', delete=False) as webm_file:
                 webm_file.write(audio_bytes)
+                webm_file.flush()  # Ensure data is written to disk
                 webm_path = webm_file.name
             
-            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as wav_file:
-                wav_path = wav_file.name
+            # Create temporary output file path (empty file for FFmpeg to write to)
+            wav_fd, wav_path = tempfile.mkstemp(suffix='.wav')
+            os.close(wav_fd)  # Close the file descriptor, FFmpeg will write to it
             
             # Convert using ffmpeg: WebM -> WAV (16kHz mono PCM)
             result = subprocess.run([
-                'ffmpeg', '-i', webm_path,
+                'ffmpeg',
+                '-y',            # Overwrite output file without asking
+                '-i', webm_path,
                 '-ar', '16000',  # 16kHz sample rate
                 '-ac', '1',      # Mono
                 '-f', 'wav',     # WAV format
@@ -94,8 +99,7 @@ class AzureSpeechService:
             with open(wav_path, 'rb') as f:
                 wav_bytes = f.read()
             
-            # Cleanup
-            import os
+            # Cleanup temporary files
             os.unlink(webm_path)
             os.unlink(wav_path)
             
