@@ -127,7 +127,7 @@ async def _handle_github_orchestration(prompt: str, github_context: Dict, show_t
         logger.info(f"📋 GitHub-LLM Request: type={query_request.query_type}, repo={query_request.repository}")
         
         # Instantiate GitHub-LLM orchestrator with config
-        from orchestration.github_llm.config import GitHubLLMConfig
+        from orchestration.github_llm.orchestrator_config import GitHubLLMConfig
         from orchestration.github_llm.query_orchestrator import GitHubLLMOrchestrator
         
         config = GitHubLLMConfig.from_settings()
