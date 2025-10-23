@@ -62,6 +62,8 @@ The code-intelligence module is now cleanly separated into:
 # Run from repository root
 python code-intelligence/main.py embed
 python code-intelligence/main.py embed --force --max-files 50
+python code-intelligence/main.py query "vector database" --collection my_repo
+python code-intelligence/main.py cleanup --collection old_data --force
 python code-intelligence/main.py repo-analyze --repository owner/repo
 python code-intelligence/main.py health
 ```
@@ -80,11 +82,25 @@ stats = await orchestrator.embed_repository(
     force_reindex=False
 )
 
+# Query for code
+results = await orchestrator.query(
+    query_text="vector database integration",
+    collection_name="my_code",
+    limit=5,
+    score_threshold=0.7
+)
+
+# Get statistics
+stats = await orchestrator.get_stats(collection_name="my_code")
+
+# Cleanup/delete collection
+result = await orchestrator.cleanup(
+    collection_name="old_data",
+    confirm=True
+)
+
 # Health check
 health = await orchestrator.health_check()
-
-# Analyze changes
-results = await orchestrator.analyze_changes(base_ref="origin/main")
 ```
 
 ### Direct Analyzer Usage

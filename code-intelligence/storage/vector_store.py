@@ -346,9 +346,22 @@ class VectorStore:
             return {}
     
     def delete_collection(self):
-        """Delete the collection (use with caution!)"""
-        logger.warning(f"⚠️  delete_collection not implemented with shared provider")
-        logger.warning(f"   Please use vector_db management tools instead")
+        """Delete the entire collection (use with caution!)"""
+        try:
+            logger.warning(f"⚠️  Deleting collection '{self.collection_name}'...")
+            
+            # Use the underlying Qdrant client to delete collection
+            if hasattr(self.provider, 'client') and self.provider.client:
+                self.provider.client.delete_collection(collection_name=self.collection_name)
+                logger.info(f"✅ Collection '{self.collection_name}' deleted successfully")
+                return True
+            else:
+                logger.error(f"❌ Cannot delete collection: provider client not available")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to delete collection '{self.collection_name}': {e}")
+            return False
     
     def health_check(self) -> bool:
         """Check if vector database is healthy"""

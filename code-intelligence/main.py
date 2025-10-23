@@ -17,6 +17,8 @@ sys.path.append(str(Path(__file__).parent.parent))
 from utils.logging_config import setup_logging
 from commands import (
     cmd_embed,
+    cmd_query,
+    cmd_cleanup,
     cmd_summarize,
     cmd_analyze,
     cmd_repo_analyze,
@@ -40,6 +42,13 @@ Examples:
 
   # Embed with limits
   python main.py embed --max-files 50 --collection my_project
+
+  # Query for code
+  python main.py query "vector database integration" --collection my_project
+
+  # Cleanup/delete indexed data
+  python main.py cleanup --collection my_project --force
+  python main.py cleanup --repository owner/repo --force
 
   # Debug mode with detailed logging
   python main.py embed --log-level debug
@@ -90,6 +99,20 @@ Examples:
     embed_parser.add_argument("--collection", default="code_intelligence", help="Qdrant collection name")
     embed_parser.add_argument("--max-files", type=int, help="Maximum files to process")
     embed_parser.add_argument("--force", action="store_true", help="Force re-embedding")
+    
+    # Query command
+    query_parser = subparsers.add_parser("query", help="Search vector database for relevant code")
+    query_parser.add_argument("query", help="Search query (natural language or code)")
+    query_parser.add_argument("--collection", default="code_intelligence", help="Qdrant collection name")
+    query_parser.add_argument("--limit", type=int, default=5, help="Maximum results (default: 5)")
+    query_parser.add_argument("--threshold", type=float, default=0.7, help="Minimum score (default: 0.7)")
+    
+    # Cleanup command
+    cleanup_parser = subparsers.add_parser("cleanup", help="Delete indexed data from vector database")
+    cleanup_parser.add_argument("--repo", default=".", help="Repository path")
+    cleanup_parser.add_argument("--collection", help="Collection name to delete")
+    cleanup_parser.add_argument("--repository", help="GitHub repository (owner/repo) to delete")
+    cleanup_parser.add_argument("--force", action="store_true", help="Confirm deletion (required)")
     
     # Summarize command
     summarize_parser = subparsers.add_parser("summarize", help="Generate code summaries")
@@ -150,6 +173,8 @@ Examples:
     # Route to command handler
     command_map = {
         "embed": cmd_embed,
+        "query": cmd_query,
+        "cleanup": cmd_cleanup,
         "summarize": cmd_summarize,
         "analyze": cmd_analyze,
         "repo-analyze": cmd_repo_analyze,
