@@ -20,6 +20,7 @@ from orchestrator import CodeIntelligenceOrchestrator
 from storage.vector_store import VectorStore
 from shared.vector_db.embedding_service import EmbeddingService
 from shared.logger import get_logger
+from shared.config import settings
 
 logger = get_logger(__name__)
 
@@ -35,7 +36,7 @@ class EmbedRepoRequest(BaseModel):
     # Processing options
     max_files: Optional[int] = None  # None = process all files
     force_reindex: bool = False
-    collection_name: str = "code_intelligence"
+    collection_name: Optional[str] = None  # Defaults to settings.vector_db_collection_name
     
     # GitHub LLM filters (only used with github_repository)
     query: Optional[str] = None  # Filter files by query
@@ -53,7 +54,7 @@ class QueryCodeRequest(BaseModel):
     """Request model for code querying"""
     query: str
     limit: int = 10
-    collection_name: str = "code_intelligence"
+    collection_name: Optional[str] = None  # Defaults to settings.vector_db_collection_name
     filters: Optional[Dict[str, Any]] = None
     min_score: float = 0.7
 
@@ -267,7 +268,7 @@ async def health_check():
 
 @router.delete("/cleanup")
 async def cleanup(
-    collection_name: str = "code_intelligence",
+    collection_name: Optional[str] = None,  # Defaults to settings
     confirm: bool = False
 ):
     """
@@ -276,6 +277,10 @@ async def cleanup(
     Endpoint: DELETE /api/code-intelligence/cleanup?collection_name=xxx&confirm=true
     """
     try:
+        # Use collection name from settings if not provided
+        if collection_name is None:
+            collection_name = settings.vector_db_collection_name
+        
         if not confirm:
             raise HTTPException(
                 status_code=400,

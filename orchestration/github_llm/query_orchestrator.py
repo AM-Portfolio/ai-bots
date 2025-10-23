@@ -1,19 +1,23 @@
 """
 GitHub-LLM Query Orchestrator
 
-Uses LangGraph to orchestrate queries across vector DB and GitHub API,
+Uses LangGraph to orchestrate queries across code intelligence and GitHub API,
 then formats responses using the summary/beautify layer.
 """
 
+from __future__ import annotations
+
 import logging
 import time
+import httpx
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 from .models import QueryRequest, QueryResponse, SourceResult, QueryType
-from shared.vector_db.services.vector_query_service import VectorQueryService
-from shared.clients.wrappers.github_wrapper import GitHubWrapper
 from orchestration.summary_layer.beautifier import ResponseBeautifier
+from shared.clients.wrappers.github_wrapper import GitHubWrapper
+from shared.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -23,22 +27,28 @@ class GitHubLLMOrchestrator:
     
     def __init__(
         self,
-        vector_query_service: Optional[VectorQueryService] = None,
+        code_intelligence_api_url: str = "http://localhost:8000/api/code-intelligence",
         github_client: Optional[GitHubWrapper] = None,
-        beautifier: Optional[ResponseBeautifier] = None
+        beautifier: Optional[ResponseBeautifier] = None,
+        collection_name: Optional[str] = None
     ):
         """
         Initialize GitHub-LLM orchestrator
         
         Args:
-            vector_query_service: Vector database query service
+            code_intelligence_api_url: Base URL for Code Intelligence API
             github_client: GitHub API client
             beautifier: Response beautification service
+            collection_name: Vector database collection name (defaults to settings)
         """
-        self.vector_service = vector_query_service
+        self.code_intel_api_url = code_intelligence_api_url
         self.github_client = github_client
         self.beautifier = beautifier
+        self.collection_name = collection_name or settings.vector_db_collection_name
+        self.http_client = httpx.AsyncClient(timeout=30.0)
         logger.info("🤖 GitHub-LLM Orchestrator initialized")
+        logger.info(f"   🌐 Code Intelligence API: {code_intelligence_api_url}")
+        logger.info(f"   📂 Default Collection: {self.collection_name}")
     
     async def process_query(self, request: QueryRequest) -> QueryResponse:
         """
@@ -55,8 +65,9 @@ class GitHubLLMOrchestrator:
         logger.info(f"🚀 GITHUB-LLM ORCHESTRATION START")
         logger.info(f"📝 Query: '{request.query[:100]}...'")
         logger.info(f"🎯 Query Type: {request.query_type.value}")
-        logger.info(f"📂 Repository Filter: {request.repository or 'All repositories'}")
+        logger.info(f"� Repository Filter: {request.repository or 'All repositories'}")
         logger.info(f"🔍 Vector Search: {request.include_vector_search}, GitHub Direct: {request.include_github_direct}")
+        logger.info(f"🌐 Code Intel API: {self.code_intel_api_url}")
         logger.info("=" * 80)
         
         # Step 1: Query Planning - determine which sources to use
@@ -154,8 +165,8 @@ class GitHubLLMOrchestrator:
         """
         sources = []
         
-        if request.include_vector_search and self.vector_service:
-            sources.append('vector_db')
+        if request.include_vector_search:
+            sources.append('code_intelligence')
         
         if request.include_github_direct and self.github_client:
             sources.append('github_api')
@@ -179,10 +190,10 @@ class GitHubLLMOrchestrator:
         """
         results = []
         
-        # Query Vector DB
-        if 'vector_db' in sources and self.vector_service:
-            vector_results = await self._query_vector_db(request)
-            results.extend(vector_results)
+        # Query Code Intelligence API
+        if 'code_intelligence' in sources:
+            code_intel_results = await self._query_code_intelligence(request)
+            results.extend(code_intel_results)
         
         # Query GitHub API directly
         if 'github_api' in sources and self.github_client:
@@ -191,43 +202,76 @@ class GitHubLLMOrchestrator:
         
         return results
     
-    async def _query_vector_db(self, request: QueryRequest) -> List[SourceResult]:
-        """Query vector database"""
+    async def _query_code_intelligence(self, request: QueryRequest) -> List[SourceResult]:
+        """Query using Code Intelligence API"""
         try:
-            # Apply filters based on request
-            filters = {}
-            if request.repository:
-                filters['repo_name'] = request.repository
-            if request.language:
-                filters['language'] = request.language
+            logger.info(f"🔍 Querying Code Intelligence API: '{request.query[:100]}...'")
             
-            vector_results = await self.vector_service.semantic_search(
-                query=request.query,
-                top_k=request.max_results,
-                filters=filters if filters else None
+            # Determine collection name - use repository-specific if provided
+            collection_name = self.collection_name
+            if request.repository:
+                # Convert repository name to collection name format (owner/repo -> owner_repo)
+                collection_name = request.repository.replace("/", "_").replace("-", "_").lower()
+                logger.info(f"📂 Using repository-specific collection: {collection_name}")
+            
+            # Prepare API request
+            api_payload = {
+                "query": request.query,
+                "limit": request.max_results,
+                "collection_name": collection_name
+            }
+            
+            logger.info(f"🌐 Calling Code Intelligence API: POST {self.code_intel_api_url}/query")
+            logger.info(f"   📦 Payload: query_length={len(request.query)}, limit={request.max_results}, collection={collection_name}")
+            
+            # Call Code Intelligence API
+            response = await self.http_client.post(
+                f"{self.code_intel_api_url}/query",
+                json=api_payload
             )
             
-            # Convert to SourceResult
+            logger.info(f"📡 API Response: status_code={response.status_code}")
+            
+            if response.status_code != 200:
+                logger.error(f"❌ Code Intelligence API failed: {response.status_code} - {response.text}")
+                return []
+            
+            api_response = response.json()
+            
+            if not api_response.get('success'):
+                logger.error(f"❌ Code Intelligence query failed: {api_response.get('error')}")
+                return []
+            
+            logger.info(f"✅ Code Intelligence API returned {api_response.get('total_results', 0)} results")
+            
+            # Convert API results to SourceResult format
             source_results = []
-            for vr in vector_results:
+            for result in api_response.get('results', []):
+                # Extract metadata from result
+                payload = result.get('payload', {})
+                
                 source = SourceResult(
-                    source_type='vector_db',
-                    content=vr.content,
+                    source_type='code_intelligence',
+                    content=payload.get('content', ''),
                     metadata={
-                        'doc_id': vr.doc_id,
-                        'repo': vr.metadata.repo_name,
-                        'file_path': vr.metadata.file_path,
-                        'language': vr.metadata.language
+                        'doc_id': result.get('id'),
+                        'repo': payload.get('repo_name', 'unknown'),
+                        'file_path': payload.get('file_path', 'unknown'),
+                        'language': payload.get('language', 'unknown'),
+                        'chunk_index': payload.get('chunk_index', 0)
                     },
-                    relevance_score=vr.score
+                    relevance_score=result.get('score', 0.0)
                 )
                 source_results.append(source)
             
-            logger.info(f"🔍 Vector DB returned {len(source_results)} results")
+            logger.info(f"✅ Converted {len(source_results)} API results to SourceResult format")
             return source_results
             
+        except httpx.HTTPError as e:
+            logger.error(f"❌ HTTP error calling Code Intelligence API: {e}", exc_info=True)
+            return []
         except Exception as e:
-            logger.error(f"❌ Vector DB query failed: {e}")
+            logger.error(f"❌ Code Intelligence query failed: {e}", exc_info=True)
             return []
     
     async def _query_github_api(self, request: QueryRequest) -> List[SourceResult]:

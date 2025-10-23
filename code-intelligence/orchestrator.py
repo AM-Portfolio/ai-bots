@@ -68,7 +68,7 @@ class CodeIntelligenceOrchestrator:
     
     async def embed_repository(
         self,
-        collection_name: str = "code_intelligence",
+        collection_name: Optional[str] = None,
         max_files: Optional[int] = None,
         force_reindex: bool = False,
         github_repository: Optional[str] = None,
@@ -84,7 +84,7 @@ class CodeIntelligenceOrchestrator:
         3. Delegate to EmbeddingOrchestrator for embedding pipeline
         
         Args:
-            collection_name: Qdrant collection name
+            collection_name: Qdrant collection name (defaults to settings)
             max_files: Maximum number of files to process
             force_reindex: Force re-embedding of all files
             github_repository: Optional GitHub repository (owner/repo)
@@ -94,6 +94,10 @@ class CodeIntelligenceOrchestrator:
         Returns:
             Statistics dictionary with processing results
         """
+        # Use collection name from settings if not provided
+        if collection_name is None:
+            collection_name = self.settings.vector_db_collection_name
+        
         logger.info("🚀 Starting repository embedding orchestration...")
         
         stats = {
@@ -208,7 +212,7 @@ class CodeIntelligenceOrchestrator:
     async def query(
         self,
         query_text: str,
-        collection_name: str = "code_intelligence",
+        collection_name: Optional[str] = None,
         limit: int = 5
     ) -> Dict[str, Any]:
         """
@@ -216,33 +220,64 @@ class CodeIntelligenceOrchestrator:
         
         Args:
             query_text: Query string
-            collection_name: Qdrant collection name
+            collection_name: Qdrant collection name (defaults to settings)
             limit: Maximum number of results
             
         Returns:
             Search results with relevant code chunks
         """
-        logger.info(f"� Querying vector database: {query_text}")
+        # Use collection name from settings if not provided
+        if collection_name is None:
+            collection_name = self.settings.vector_db_collection_name
+        
+        logger.info(f"🔍 Querying vector database: {query_text}")
+        logger.info(f"   📦 Parameters:")
+        logger.info(f"      • collection_name: {collection_name}")
+        logger.info(f"      • limit: {limit}")
+        logger.info(f"      • query_text length: {len(query_text)} chars")
         
         try:
             # Get embedding dimension
             embedding_service = EmbeddingService(provider="auto")
             dimension = embedding_service.get_dimension()
+            logger.info(f"   🔢 Embedding dimension: {dimension}")
             
             # Initialize vector store
             vector_store = await VectorStore.create(
                 collection_name=collection_name,
                 embedding_dim=dimension
             )
+            logger.info(f"   ✅ Vector store initialized for collection: {collection_name}")
+            
+            # Check collection stats
+            try:
+                collection_info = vector_store.get_collection_info()
+                vectors_count = collection_info.get("vectors_count", 0)
+                logger.info(f"   📊 Collection stats: {vectors_count} vectors in '{collection_name}'")
+            except Exception as stats_error:
+                logger.warning(f"   ⚠️  Could not get collection stats: {stats_error}")
             
             # Generate query embedding
+            logger.info(f"   🧬 Generating query embedding...")
             query_embedding = await embedding_service.generate_embedding(query_text)
+            logger.info(f"   ✅ Query embedding generated: {len(query_embedding)} dimensions")
             
             # Search vector store
+            logger.info(f"   🔎 Searching vector store (limit={limit})...")
             results = await vector_store.search(
                 query_embedding=query_embedding,
                 limit=limit
             )
+            logger.info(f"   ✅ Search complete: {len(results)} results found")
+            
+            if results:
+                logger.info(f"   📋 Top result details:")
+                top = results[0]
+                logger.info(f"      • Score: {top.get('score', 0):.4f}")
+                logger.info(f"      • ID: {top.get('id', 'N/A')}")
+                payload = top.get('payload', {})
+                logger.info(f"      • File: {payload.get('file_path', 'N/A')}")
+                logger.info(f"      • Repo: {payload.get('repo_name', 'N/A')}")
             
             return {
                 "success": True,
@@ -251,22 +286,26 @@ class CodeIntelligenceOrchestrator:
                 "results": results
             }
         except Exception as e:
-            logger.error(f"❌ Query failed: {e}")
+            logger.error(f"❌ Query failed: {e}", exc_info=True)
             return {
                 "success": False,
                 "error": str(e)
             }
     
-    async def get_stats(self, collection_name: str = "code_intelligence") -> Dict[str, Any]:
+    async def get_stats(self, collection_name: Optional[str] = None) -> Dict[str, Any]:
         """
         Get statistics about the vector database.
         
         Args:
-            collection_name: Qdrant collection name
+            collection_name: Qdrant collection name (defaults to settings)
             
         Returns:
             Statistics dictionary
         """
+        # Use collection name from settings if not provided
+        if collection_name is None:
+            collection_name = self.settings.vector_db_collection_name
+        
         logger.info("📊 Getting vector database statistics...")
         
         try:

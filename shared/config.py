@@ -83,6 +83,7 @@ class Settings(BaseSettings):
     qdrant_host: Optional[str] = None
     qdrant_port: Optional[int] = None
     vector_db_fallback_enabled: Optional[bool] = None
+    vector_db_collection_name: Optional[str] = "code_intelligence"  # Default collection name
     
     microsoft_app_id: Optional[str] = None
     microsoft_app_password: Optional[str] = None

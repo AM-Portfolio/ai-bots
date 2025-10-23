@@ -6,6 +6,8 @@ Handles LLM provider testing, orchestration, and streaming.
 
 import uuid
 import re
+import sys
+from pathlib import Path
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Body
@@ -47,7 +49,6 @@ async def test_llm(
     from shared.llm import llm_client
     from shared.thinking_process import create_llm_thinking_process
     from shared.utils.github_query_detector import is_github_query, get_github_context
-    from interfaces.vector_db_api import github_llm_orchestrator
     from orchestration.github_llm.models import QueryRequest, QueryType
     from orchestration.context_manager import ConversationContextManager
     
@@ -84,11 +85,9 @@ async def test_llm(
     
     logger.info(f"📊 Query Analysis: github_related={is_github}, context={github_context}")
     
-    # STEP 2: Route to GitHub-LLM Orchestrator if GitHub-related AND orchestrator is initialized
-    if is_github and github_llm_orchestrator is not None:
+    # STEP 2: Route to GitHub-LLM Orchestrator if GitHub-related
+    if is_github:
         return await _handle_github_orchestration(prompt, github_context, show_thinking)
-    elif is_github and github_llm_orchestrator is None:
-        logger.warning("⚠️  GitHub query detected but orchestrator not initialized yet. Using standard pipeline.")
     
     logger.info("🔄 Using standard orchestration pipeline...")
     
@@ -98,11 +97,11 @@ async def test_llm(
 
 async def _handle_github_orchestration(prompt: str, github_context: Dict, show_thinking: bool):
     """Handle GitHub-specific orchestration"""
-    from interfaces.vector_db_api import github_llm_orchestrator
     from orchestration.github_llm.models import QueryRequest, QueryType
+    from orchestration.github_llm.query_orchestrator import GitHubLLMOrchestrator
     
     logger.info("🚀 Routing to GitHub-LLM Orchestrator for intelligent processing...")
-    
+    try:
     try:
         # Convert string query_type to QueryType enum
         query_type_str = github_context.get('query_type', 'semantic_search')
