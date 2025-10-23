@@ -8,6 +8,7 @@ import type { Provider, ThinkingProcessData } from '../../types/api';
 import { logger } from '../../utils/logger';
 import ThinkingProcess from '../Shared/ThinkingProcess';
 import ApprovalDialog from '../Shared/ApprovalDialog';
+import ProviderSettings from '../Shared/ProviderSettings';
 import 'highlight.js/styles/github-dark.css';
 
 interface Message {
@@ -581,6 +582,10 @@ const LLMTestPanel = () => {
               />
               Voice
             </label>
+
+            <div className="ml-auto">
+              <ProviderSettings />
+            </div>
           </div>
 
           {/* Input Row */}

@@ -3,7 +3,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
 
-from shared.clients.github_replit_client import github_replit_client
+from shared.clients.github_client import GitHubClient
 from shared.llm_providers.factory import get_llm_client
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ class DocGeneratorService:
     """Service for generating documentation from natural language prompts"""
     
     def __init__(self):
-        self.github_client = github_replit_client
+        self.github_client = GitHubClient()
     
     async def parse_prompt(self, prompt: str) -> Dict[str, Any]:
         """Use LLM to parse user prompt and extract intent"""
@@ -64,6 +64,17 @@ Respond in JSON format:
                 messages=[{"role": "user", "content": parse_prompt}],
                 temperature=0.3
             )
+            
+            if response is None:
+                logger.error("LLM response is None, using fallback parsing")
+                return {
+                    "repository": None,
+                    "files": [],
+                    "task_type": "general",
+                    "focus_areas": [],
+                    "search_query": None
+                }
+            
             import json
             parsed = json.loads(response.strip().strip('```json').strip('```').strip())
             logger.info(f"Parsed prompt: {parsed}")

@@ -21,7 +21,7 @@ class TogetherAIProvider(BaseLLMProvider):
     
     def _initialize_client(self):
         if not self.api_key:
-            logger.warning("Together AI API key not configured", provider="together", status="not_configured")
+            logger.warning("Together AI API key not configured - provider=together status=not_configured")
             return
         
         try:
@@ -33,16 +33,11 @@ class TogetherAIProvider(BaseLLMProvider):
             # Initialize Together AI client (uses TOGETHER_API_KEY env var)
             self.client = Together()
             logger.info(
-                "Together AI client initialized successfully",
-                provider="together",
-                model=self.model,
-                status="ready"
+                f"Together AI client initialized successfully - provider=together, model={self.model}, status=ready"
             )
         except Exception as e:
             logger.error(
-                "Failed to initialize Together AI client",
-                provider="together",
-                error=str(e)
+                f"Failed to initialize Together AI client - provider=together error={str(e)}"
             )
             self.client = None
     
@@ -57,7 +52,7 @@ class TogetherAIProvider(BaseLLMProvider):
         stream: bool = False
     ) -> Optional[str]:
         if not self.client:
-            logger.error("Together AI client not initialized", provider="together", status="not_initialized")
+            logger.error("Together AI client not initialized - provider=together status=not_initialized")
             return None
         
         # Extract prompt for logging
@@ -74,6 +69,7 @@ class TogetherAIProvider(BaseLLMProvider):
         start_time = time.time()
         
         try:
+            # Together AI uses chat.completions for chat models
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,

@@ -14,14 +14,14 @@ class GitHubService(BaseService):
     """GitHub integration with LLM wrapper support"""
     
     async def connect(self) -> bool:
-        """Connect to GitHub using Replit connector"""
+        """Connect to GitHub using environment token"""
         try:
-            from shared.clients.github_replit_client import get_github_access_token
             from github import Github
+            from shared.config.settings import settings
             
-            token = await get_github_access_token()
+            token = settings.github_token
             if not token:
-                self._set_error("Failed to get GitHub access token")
+                self._set_error("No GitHub token configured")
                 return False
             
             self._client = Github(token)
@@ -32,9 +32,9 @@ class GitHubService(BaseService):
             
             self._set_connected()
             return True
-            
         except Exception as e:
-            self._set_error(str(e))
+            self._set_error(f"GitHub connection failed: {e}")
+            return False
             return False
     
     async def disconnect(self) -> bool:

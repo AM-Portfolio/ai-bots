@@ -17,13 +17,20 @@ logger = logging.getLogger(__name__)
 class ResponseBeautifier:
     """Beautifies responses for LLM consumption"""
     
-    def __init__(self, llm_provider: str = "together"):
+    def __init__(self, llm_provider: str = "auto"):
         """
-        Initialize response beautifier
+        Initialize response beautifier with role-based provider selection
         
         Args:
-            llm_provider: LLM provider to use for beautification
+            llm_provider: LLM provider to use ('auto', 'azure', 'together', 'openai')
         """
+        from shared.llm_providers.resilient_orchestrator import get_resilient_orchestrator
+        
+        # Get provider based on role
+        if llm_provider == "auto":
+            orchestrator = get_resilient_orchestrator()
+            llm_provider = orchestrator.get_provider_for_role("beautify")
+        
         self.provider_name = llm_provider
         logger.info(f"✨ Response Beautifier initialized with provider: {llm_provider}")
     
@@ -90,6 +97,12 @@ class ResponseBeautifier:
             llm_time = (time.time() - llm_start) * 1000
             
             logger.info(f"✅ LLM beautification completed ({llm_time:.2f}ms)")
+            
+            # Check if we got a valid response
+            if not beautified:
+                logger.warning("⚠️  LLM returned None, using fallback")
+                raise ValueError("LLM returned None")
+            
             logger.info(f"   Response length: {len(beautified)} characters")
             logger.info(f"   Response preview: {beautified[:200]}...")
             

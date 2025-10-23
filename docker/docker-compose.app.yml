@@ -1,0 +1,57 @@
+version: '3.8'
+
+# Application Services - Backend & Frontend
+# Run with: docker-compose -f docker-compose.app.yml up -d
+# Requires: docker-compose.databases.yml to be running first
+
+services:
+  # Python Backend API
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: ai-bots-backend
+    ports:
+      - "${BACKEND_PORT:-9000}:8000"
+    env_file:
+      - .env.docker
+    volumes:
+      - ./db:/app/db
+      - ./qdrant_data:/app/qdrant_data
+      - ./.code-intelligence-state.json:/app/.code-intelligence-state.json
+    depends_on:
+      - qdrant
+      - mongodb
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ai-bots-network
+
+  # React Frontend
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: ai-bots-frontend
+    ports:
+      - "${FRONTEND_PORT:-4000}:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-bots-network
+
+networks:
+  ai-bots-network:
+    driver: bridge
+    name: ai-bots-network

@@ -6,9 +6,10 @@ from datetime import datetime
 import uuid
 
 from features.doc_generator import generate_documentation
-from shared.clients.confluence_replit_client import confluence_replit_client
-from shared.clients.jira_client import jira_client
+from shared.clients.confluence_client import ConfluenceClient
+from shared.clients.jira_client import get_jira_client
 from shared.thinking_process import create_doc_orchestrator_thinking_process
+from shared.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -166,19 +167,28 @@ Provide well-structured documentation in markdown format with sections, examples
             
             # Step 3: Publish to Confluence (optional)
             confluence_page = None
-            if request.publish_to_confluence and request.confluence_space_key:
-                logger.info("Publishing documentation to Confluence...")
+            # Use default space key from configuration if not provided in request
+            effective_space_key = request.confluence_space_key or settings.confluence_space_key
+            effective_parent_id = request.confluence_parent_id or settings.parent_page_id
+            
+            if request.publish_to_confluence and effective_space_key:
+                logger.info(f"Publishing documentation to Confluence space: {effective_space_key}")
                 workflow_summary["step_3_confluence"] = "started"
                 thinking.start_step("publish_confluence")
                 
-                confluence_page = await confluence_replit_client.create_page(
-                    space_key=request.confluence_space_key,
+                confluence_client = ConfluenceClient()
+                confluence_page_id = await confluence_client.create_page(
+                    space_key=effective_space_key,
                     title=f"AI Documentation: {doc_result.repository or 'Generated'}",
                     content=doc_result.documentation or "",
-                    parent_id=request.confluence_parent_id
+                    parent_id=effective_parent_id
                 )
                 
-                if confluence_page:
+                if confluence_page_id:
+                    # Get full page information including URL
+                    confluence_page_info = await confluence_client.get_page(confluence_page_id)
+                    confluence_page = confluence_page_info or {"id": confluence_page_id, "url": f"{settings.confluence_url}/wiki/pages/{confluence_page_id}"}
+                    
                     workflow_summary["step_3_confluence"] = f"published: {confluence_page.get('url', 'N/A')}"
                     thinking.complete_step("publish_confluence", {"page_url": confluence_page.get('url')})
                     logger.info(f"Published to Confluence: {confluence_page.get('url')}")
@@ -193,15 +203,19 @@ Provide well-structured documentation in markdown format with sections, examples
             
             # Step 5: Create Jira ticket (optional)
             jira_ticket = None
-            if request.create_jira_ticket and request.jira_project_key:
-                logger.info("Creating Jira ticket...")
+            # Use default project key from configuration if not provided in request
+            effective_project_key = request.jira_project_key or settings.jira_project_key
+            
+            if request.create_jira_ticket and effective_project_key:
+                logger.info(f"Creating Jira ticket in project: {effective_project_key}")
                 workflow_summary["step_4_jira"] = "started"
                 if not thinking._find_step("create_jira"):
                     thinking.add_step("create_jira", "Create Jira Ticket", "Creating documentation ticket in Jira")
                 thinking.start_step("create_jira")
                 
+                jira_client = get_jira_client()
                 jira_ticket = jira_client.create_documentation_ticket(
-                    project_key=request.jira_project_key,
+                    project_key=effective_project_key,
                     repository=doc_result.repository or "Unknown",
                     doc_type=doc_result.metadata.get("task_type", "general"),
                     github_commit_url=github_commit.get("commit_url") if github_commit else None,
@@ -291,10 +305,10 @@ async def orchestrate_documentation(
         commit_path=commit_path,
         commit_message=commit_message,
         publish_to_confluence=publish_to_confluence,
-        confluence_space_key=confluence_space_key,
-        confluence_parent_id=confluence_parent_id,
+        confluence_space_key=confluence_space_key or settings.confluence_space_key,
+        confluence_parent_id=confluence_parent_id or settings.parent_page_id,
         create_jira_ticket=create_jira_ticket,
-        jira_project_key=jira_project_key
+        jira_project_key=jira_project_key or settings.jira_project_key
     )
     
     result = await orchestrator.orchestrate(request)

@@ -15,8 +15,18 @@ class ServiceManager:
     
     def __init__(self):
         self._services: Dict[str, BaseService] = {}
-        self._llm_wrapper = ServiceLLMWrapper()
+        self._llm_wrapper = None  # Lazy initialization to avoid startup crashes
         self._connection_pool: Dict[str, datetime] = {}
+    
+    def _get_llm_wrapper(self) -> Optional[ServiceLLMWrapper]:
+        """Lazy initialization of LLM wrapper"""
+        if self._llm_wrapper is None:
+            try:
+                self._llm_wrapper = ServiceLLMWrapper()
+            except Exception as e:
+                logger.warning(f"LLM wrapper not available: {e}")
+                return None
+        return self._llm_wrapper
     
     async def register_service(self, service: BaseService) -> bool:
         """Register a new service"""
@@ -86,7 +96,8 @@ class ServiceManager:
             
             # LLM enhancement (optional)
             enhanced_params = kwargs
-            if use_llm_enhancement:
+            llm_wrapper = self._get_llm_wrapper()
+            if use_llm_enhancement and llm_wrapper:
                 capabilities = await service.get_capabilities()
                 context = LLMServiceContext(
                     service_name=service_name,
@@ -94,7 +105,7 @@ class ServiceManager:
                     input_data=kwargs,
                     service_capabilities=capabilities
                 )
-                enhancement = await self._llm_wrapper.enhance_query(context)
+                enhancement = await llm_wrapper.enhance_query(context)
                 if enhancement.get("enhanced"):
                     logger.info(f"LLM enhanced query for {service_name}.{action}")
                     enhanced_params = enhancement.get("suggestion", kwargs)
@@ -103,14 +114,14 @@ class ServiceManager:
             result = await service.execute(action, **enhanced_params)
             
             # LLM interpretation (optional)
-            if use_llm_enhancement and result.get("success"):
+            if use_llm_enhancement and llm_wrapper and result.get("success"):
                 context = LLMServiceContext(
                     service_name=service_name,
                     action=action,
                     input_data=enhanced_params,
                     service_capabilities=await service.get_capabilities()
                 )
-                interpretation = await self._llm_wrapper.interpret_response(context, result)
+                interpretation = await llm_wrapper.interpret_response(context, result)
                 result["llm_insights"] = interpretation.get("interpretation")
             
             return result
@@ -120,8 +131,8 @@ class ServiceManager:
             logger.error(f"Service execution failed for {service_name}.{action}: {error_msg}")
             
             # LLM error analysis
-            if use_llm_enhancement:
-                error_analysis = await self._llm_wrapper.handle_error(
+            if use_llm_enhancement and llm_wrapper:
+                error_analysis = await llm_wrapper.handle_error(
                     service_name, error_msg, {"action": action, "params": kwargs}
                 )
                 return {

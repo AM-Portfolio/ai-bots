@@ -1,0 +1,58 @@
+# Kafka Producer Configuration
+kafka:
+  bootstrap-servers: kafka1:9092,kafka2:9092,kafka3:9092
+  
+  producer:
+    # Topic configuration
+    topics:
+      user-events:
+        name: user-events
+        partitions: 12
+        replication-factor: 3
+        retention-ms: 604800000  # 7 days
+        compression: snappy
+        
+      order-events:
+        name: order-events
+        partitions: 24
+        replication-factor: 3
+        retention-ms: 2592000000  # 30 days
+        
+    # Producer settings
+    acks: all  # Wait for all replicas
+    retries: 3
+    batch-size: 16384
+    linger-ms: 10  # Wait 10ms for batching
+    buffer-memory: 33554432  # 32MB
+    compression-type: snappy
+    max-in-flight-requests: 5
+    
+  consumer:
+    # Consumer group configuration
+    group-id: order-processor-service
+    auto-offset-reset: earliest
+    enable-auto-commit: false  # Manual commit for exactly-once
+    max-poll-records: 500
+    session-timeout-ms: 30000
+    heartbeat-interval-ms: 3000
+    
+    # Topics to consume
+    topics:
+      - order-events
+      - payment-events
+      
+  # Dead Letter Queue
+  dlq:
+    enabled: true
+    topic: failed-messages-dlq
+    max-retries: 3
+    
+  # Monitoring
+  metrics:
+    enabled: true
+    jmx-port: 9999
+    
+  # Security
+  security:
+    protocol: SASL_SSL
+    sasl-mechanism: SCRAM-SHA-256

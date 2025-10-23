@@ -1,0 +1,27 @@
+# Code Intelligence Embedding Pipeline Requirements
+
+# Tree-sitter for parsing
+tree-sitter==0.21.3
+tree-sitter-python==0.21.0
+tree-sitter-javascript==0.21.0
+tree-sitter-typescript==0.21.1
+tree-sitter-java==0.21.0
+tree-sitter-cpp==0.22.0
+tree-sitter-c==0.21.3
+tree-sitter-go==0.21.0
+tree-sitter-rust==0.21.2
+
+# Azure OpenAI (already in main requirements, listed for reference)
+# openai>=1.0.0
+# azure-identity
+
+# Vector DB (already in main requirements)
+# qdrant-client
+
+# Git operations
+gitpython==3.1.40
+
+# Utilities
+tiktoken==0.5.2  # Accurate token counting
+aiofiles==23.2.1  # Async file I/O
+tqdm==4.66.1  # Progress bars

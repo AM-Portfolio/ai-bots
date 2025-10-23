@@ -6,7 +6,10 @@ from typing import Dict, Any, Optional, List
 
 from shared.services.manager import service_manager
 from shared.services.base import ServiceConfig
-from shared.services.integrations import GitHubService, ConfluenceService, MongoDBService
+from shared.services.integrations import (
+    GitHubService, ConfluenceService, MongoDBService,
+    AzureSpeechService, AzureTranslatorService, AzureOpenAIService
+)
 from shared.logger import get_logger
 
 logger = get_logger(__name__)
@@ -44,7 +47,10 @@ async def connect_service(request: ServiceConnectionRequest):
         service_classes = {
             "github": GitHubService,
             "confluence": ConfluenceService,
-            "mongodb": MongoDBService
+            "mongodb": MongoDBService,
+            "azure_speech": AzureSpeechService,
+            "azure_translator": AzureTranslatorService,
+            "azure_openai": AzureOpenAIService
         }
         
         service_class = service_classes.get(request.service_type.lower())

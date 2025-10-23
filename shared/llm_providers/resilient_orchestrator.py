@@ -33,11 +33,21 @@ class ResilientLLMOrchestrator:
     """
     
     def __init__(self):
-        self.provider_priority = [
-            'together',  # Primary
-            'azure',     # Fallback 1
-            'openai'     # Fallback 2 (if configured)
-        ]
+        from shared.config import settings
+        
+        # Azure-first priority (configurable via settings)
+        if settings.llm_provider == "azure":
+            self.provider_priority = [
+                'azure',     # Primary
+                'together',  # Fallback 1
+                'openai'     # Fallback 2 (if configured)
+            ]
+        else:
+            self.provider_priority = [
+                'together',  # Primary
+                'azure',     # Fallback 1
+                'openai'     # Fallback 2 (if configured)
+            ]
         
         # Track provider health
         self.provider_failures = {
@@ -192,6 +202,13 @@ class ResilientLLMOrchestrator:
             timeout=self.timeout_seconds
         )
         
+        # Validate response
+        if response is None:
+            raise ValueError(f"{provider_name} returned None")
+        
+        if not isinstance(response, str) or len(response.strip()) == 0:
+            raise ValueError(f"{provider_name} returned empty or invalid response")
+        
         metadata = {
             'provider': provider_name,
             'model': getattr(provider, 'model', 'unknown'),
@@ -222,7 +239,32 @@ class ResilientLLMOrchestrator:
     def reset_circuit_breakers(self):
         """Reset all circuit breakers"""
         self.provider_failures = {k: 0 for k in self.provider_failures}
-        logger.info("🔄 Reset all circuit breakers")
+    
+    def get_provider_for_role(self, role: str = "chat") -> str:
+        """
+        Get the configured provider for a specific role
+        
+        Args:
+            role: Role type ('chat', 'embedding', 'beautify')
+            
+        Returns:
+            Provider name to use for this role
+        """
+        from shared.config import settings
+        
+        role_mapping = {
+            "chat": settings.chat_provider,
+            "embedding": settings.embedding_provider,
+            "beautify": settings.beautify_provider
+        }
+        
+        provider = role_mapping.get(role, "auto")
+        
+        # If 'auto', use the default llm_provider
+        if provider == "auto":
+            return settings.llm_provider
+        
+        return provider
     
     def get_provider_health(self) -> Dict[str, Any]:
         """Get health status of all providers"""

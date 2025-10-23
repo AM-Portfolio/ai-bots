@@ -20,15 +20,28 @@ class AzureOpenAIProvider(BaseLLMProvider):
     ):
         import os
         self.endpoint = endpoint or os.getenv("AZURE_OPENAI_ENDPOINT")
-        self.api_key = api_key or os.getenv("AZURE_OPENAI_API_KEY")
-        self.deployment_name = deployment_name or os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4")
+        self.api_key = api_key or os.getenv("AZURE_OPENAI_API_KEY") or os.getenv("AZURE_OPENAI_KEY")
+        self.deployment_name = deployment_name or os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME") or os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4")
         self.api_version = api_version
         self.client: Any = None
+        
+        # Debug logging
+        logger.info(f"🔧 Azure Provider Configuration:")
+        logger.info(f"   Endpoint: {self.endpoint[:50] if self.endpoint else 'NOT SET'}...")
+        logger.info(f"   API Key: {'SET' if self.api_key else 'NOT SET'}")
+        logger.info(f"   Deployment: {self.deployment_name}")
+        logger.info(f"   API Version: {self.api_version}")
+        
         self._initialize_client()
     
     def _initialize_client(self):
         if not self.endpoint or not self.api_key:
             logger.warning("Azure OpenAI credentials not configured")
+            return
+        
+        # Check deployment name
+        if not self.deployment_name:
+            logger.warning("Azure OpenAI deployment name not configured")
             return
         
         try:

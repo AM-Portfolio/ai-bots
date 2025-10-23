@@ -1,0 +1,60 @@
+# Infrastructure Stack - Network, Volumes, Databases
+# Run with: docker-compose -f docker-compose.infra.yml up -d
+# Creates: Network, Volumes, Qdrant, MongoDB
+
+services:
+  # Vector Database - Qdrant
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: ai-bots-qdrant
+    ports:
+      - "${QDRANT_HTTP_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:6333/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - ai-bots-network
+
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: ai-bots-mongodb
+    ports:
+      - "${MONGODB_PORT:-27018}:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=aibotspass
+      - MONGO_INITDB_DATABASE=ai_bots
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-bots-network
+
+networks:
+  ai-bots-network:
+    name: ai-bots-network
+    driver: bridge
+
+volumes:
+  qdrant_storage:
+    driver: local
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local

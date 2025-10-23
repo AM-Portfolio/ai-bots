@@ -35,8 +35,8 @@ class StructuredFormatter(logging.Formatter):
         if hasattr(record, 'structured_data'):
             structured_data = getattr(record, 'structured_data', None)
             if structured_data:
-                structured = json.dumps(structured_data, indent=2)
-                message = f"{message}\n{structured}"
+                structured = json.dumps(structured_data, ensure_ascii=False)
+                message = f"{message} {structured}"
         
         return message
 
@@ -84,70 +84,55 @@ class AppLogger:
     
     def log_method_call(self, method_name: str, args: tuple = (), kwargs: Optional[dict] = None, duration_ms: Optional[float] = None):
         """Log a method call with parameters and duration"""
-        data: Dict[str, Any] = {
-            'method': method_name,
-            'args_count': len(args),
-            'kwargs_keys': list(kwargs.keys()) if kwargs else []
-        }
+        parts = [f"Method: {method_name}", f"args_count={len(args)}"]
+        if kwargs:
+            parts.append(f"kwargs_keys={list(kwargs.keys())}")
         if duration_ms is not None:
-            data['duration_ms'] = float(round(duration_ms, 2))
+            parts.append(f"duration_ms={float(round(duration_ms, 2))}")
         
-        self.info(f"Method: {method_name}", **data)
+        self.info(" ".join(parts))
     
     def log_llm_request(self, provider: str, model: str, prompt: str, temperature: Optional[float] = None):
         """Log LLM request with details"""
-        data: Dict[str, Any] = {
-            'provider': provider,
-            'model': model,
-            'prompt_length': len(prompt),
-            'prompt_preview': prompt[:100] + "..." if len(prompt) > 100 else prompt
-        }
+        preview = prompt[:100] + "..." if len(prompt) > 100 else prompt
+        parts = [f"🤖 LLM Request to {provider}", f"model={model}", f"prompt_length={len(prompt)}", f"preview='{preview}'"]
         if temperature is not None:
-            data['temperature'] = temperature
+            parts.append(f"temperature={temperature}")
         
-        self.info(f"🤖 LLM Request to {provider}", **data)
+        self.info(" ".join(parts))
     
     def log_llm_response(self, provider: str, response: Optional[str], duration_ms: float, tokens: Optional[int] = None, error: Optional[str] = None):
         """Log LLM response with metrics"""
         if error:
             self.error(
-                f"❌ LLM Error from {provider}",
-                provider=provider,
-                error=error,
-                duration_ms=float(round(duration_ms, 2))
+                f"❌ LLM Error from {provider} - error={error} duration_ms={float(round(duration_ms, 2))}"
             )
         else:
-            data: Dict[str, Any] = {
-                'provider': provider,
-                'response_length': len(response) if response else 0,
-                'response_preview': response[:100] + "..." if response and len(response) > 100 else response,
-                'duration_ms': float(round(duration_ms, 2))
-            }
+            preview = response[:100] + "..." if response and len(response) > 100 else response
+            parts = [f"✅ LLM Response from {provider}", f"response_length={len(response) if response else 0}", f"preview='{preview}'", f"duration_ms={float(round(duration_ms, 2))}"]
             if tokens is not None:
-                data['tokens'] = tokens
+                parts.append(f"tokens={tokens}")
             
-            self.info(f"✅ LLM Response from {provider}", **data)
+            self.info(" ".join(parts))
     
     def log_api_request(self, method: str, path: str, status_code: Optional[int] = None, duration_ms: Optional[float] = None):
         """Log API request with metrics"""
-        data: Dict[str, Any] = {
-            'method': method,
-            'path': path,
-        }
-        if status_code is not None:
-            data['status_code'] = status_code
-        if duration_ms is not None:
-            data['duration_ms'] = float(round(duration_ms, 2))
-        
         status_emoji = "✅" if status_code and status_code < 400 else "❌"
-        self.info(f"{status_emoji} API {method} {path}", **data)
+        parts = [f"{status_emoji} API {method} {path}"]
+        if status_code is not None:
+            parts.append(f"status={status_code}")
+        if duration_ms is not None:
+            parts.append(f"duration_ms={float(round(duration_ms, 2))}")
+        
+        self.info(" ".join(parts))
     
     def log_github_operation(self, operation: str, repo: str, details: Optional[Dict[str, Any]] = None):
         """Log GitHub operation with details"""
-        data: Dict[str, Any] = {'operation': operation, 'repository': repo}
+        parts = [f"📦 GitHub: {operation} - {repo}"]
         if details:
-            data.update(details)
-        self.info(f"📦 GitHub: {operation} - {repo}", **data)
+            detail_str = " ".join([f"{k}={v}" for k, v in details.items()])
+            parts.append(detail_str)
+        self.info(" ".join(parts))
     
     def log_database_operation(self, operation: str, table: str, duration_ms: Optional[float] = None):
         """Log database operation with timing"""

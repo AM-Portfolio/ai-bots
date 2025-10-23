@@ -8,7 +8,7 @@ interface ApprovalDialogProps {
     template_data: any;
     expires_at: string;
   };
-  workflow: string;
+  workflow?: string;
   intent: {
     platform: string;
     action: string;
@@ -21,7 +21,7 @@ interface ApprovalDialogProps {
 
 const ApprovalDialog = ({
   approvalRequest,
-  workflow,
+  workflow: _workflow,  // Prefix with underscore to indicate intentionally unused
   intent,
   onApprove,
   onReject,

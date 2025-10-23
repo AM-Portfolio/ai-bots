@@ -1,4 +1,4 @@
-"""
+"""}
 Factory for creating Vector DB provider instances
 """
 
@@ -8,6 +8,7 @@ from .base import VectorDBProvider
 from .providers.in_memory_provider import InMemoryProvider
 from .providers.chromadb_provider import ChromaDBProvider
 from .providers.qdrant_provider import QdrantProvider
+from shared.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +42,8 @@ class VectorDBFactory:
                 return ChromaDBProvider(persist_directory=persist_dir)
             
             elif provider_type == "qdrant":
-                host = kwargs.get('host', 'localhost')
-                port = kwargs.get('port', 6333)
+                host = kwargs.get('host', settings.qdrant_host)
+                port = kwargs.get('port', settings.qdrant_port)
                 return QdrantProvider(host=host, port=port)
             
             else:

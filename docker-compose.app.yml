@@ -1,0 +1,61 @@
+# Application Services - Backend & Frontend
+# Run with: docker-compose -f docker-compose.app.yml up -d
+# Requires: docker-compose.infra.yml to be running first
+
+services:
+  # Python Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      # Use build cache from previous builds
+      cache_from:
+        - ai-bots-backend:latest
+    image: ai-bots-backend:latest
+    container_name: ai-bots-backend
+    ports:
+      - "${BACKEND_PORT:-9000}:8000"
+    env_file:
+      - .env.docker
+    volumes:
+      - ./db:/app/db
+      - ./qdrant_data:/app/qdrant_data
+      - ./.code-intelligence-state.json:/app/.code-intelligence-state.json
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ai-bots-network
+
+  # React Frontend (builds independently)
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      # Use build cache from previous builds
+      cache_from:
+        - ai-bots-frontend:latest
+    image: ai-bots-frontend:latest
+    container_name: ai-bots-frontend
+    ports:
+      - "${FRONTEND_PORT:-4000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-bots-network
+
+networks:
+  ai-bots-network:
+    name: ai-bots-network
+    external: true

@@ -1,0 +1,105 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+*.pyc
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+frontend/dist/
+frontend/node_modules/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Environment
+.env
+.env.local
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+tests/
+test_*.py
+
+# Logs
+*.log
+logs/
+
+# Database (local dev files)
+*.db-journal
+db/*.db
+ai_dev_agent.db
+
+# Documentation
+docs/
+*.md
+!requirements.txt
+!README.md
+
+# Docker files themselves
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Archives and temporary files
+archive/
+attached_assets/
+*.tmp
+*.bak
+
+# Scripts (not needed in container)
+scripts/
+*.ps1
+*.sh
+ai_dev_agent.db
+
+# Vector DB
+qdrant_data/
+
+# Docker
+Dockerfile
+Dockerfile.*
+docker-compose*.yml
+.dockerignore
+
+# Documentation
+*.md
+docs/
+attached_assets/
+
+# Scripts
+*.ps1
+*.sh
+
+# Replit
+.replit
+
+# Temporary
+tmp/
+temp/
+*.tmp

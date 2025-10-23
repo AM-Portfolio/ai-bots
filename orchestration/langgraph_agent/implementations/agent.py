@@ -1,4 +1,4 @@
-"""
+"""  
 LangGraph Agent Implementation
 
 Coordinates task execution using LLM-powered workflow
@@ -14,7 +14,8 @@ from orchestration.shared.models import (
     ContextSourceType
 )
 from shared.services.manager import ServiceManager
-from shared.llm_providers.factory import LLMFactory
+from shared.llm_providers.factory import LLMFactory, get_llm_client
+from shared.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +33,22 @@ class LangGraphAgent(ILangGraphAgent):
         
         Args:
             service_manager: Service manager for integrations
-            llm_factory: LLM factory for generating responses
+            llm_factory: LLM factory for generating responses (deprecated)
         """
         self.service_manager = service_manager
         self.llm_factory = llm_factory or LLMFactory()
+        
+        # Get LLM client with settings configuration
+        self.llm_client = get_llm_client(
+            provider_type=settings.llm_provider or "azure",
+            azure_endpoint=settings.azure_openai_endpoint,
+            azure_api_key=settings.azure_openai_api_key or settings.azure_openai_key,
+            azure_deployment=settings.azure_openai_deployment_name or "gpt-4.1-mini",
+            azure_api_version=settings.azure_openai_api_version or "2025-04-14",
+            together_api_key=settings.together_api_key,
+            together_model=settings.together_model or "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+        )
+        
         self.task_registry: Dict[str, AgentTask] = {}
     
     async def execute(
@@ -201,8 +214,7 @@ class LangGraphAgent(ILangGraphAgent):
     
     async def _execute_code_analysis(self, task: AgentTask) -> Dict[str, Any]:
         """Execute code analysis task"""
-        llm = self.llm_factory.create_provider()
-        
+        # Use configured LLM client (Azure by default)
         prompt = f"""Analyze the following code context:
 
 {self._format_context_for_llm(task.context)}
@@ -214,7 +226,7 @@ Provide:
 4. Security considerations
 """
         
-        response = await llm.chat_completion([{"role": "user", "content": prompt}])
+        response = await self.llm_client.chat_completion([{"role": "user", "content": prompt}])
         
         return {
             'analysis': response,
@@ -223,8 +235,7 @@ Provide:
     
     async def _execute_bug_diagnosis(self, task: AgentTask) -> Dict[str, Any]:
         """Execute bug diagnosis task"""
-        llm = self.llm_factory.create_provider()
-        
+        # Use configured LLM client (Azure by default)
         prompt = f"""Diagnose this bug:
 
 {self._format_context_for_llm(task.context)}
@@ -236,7 +247,7 @@ Provide:
 4. Prevention strategies
 """
         
-        response = await llm.chat_completion([{"role": "user", "content": prompt}])
+        response = await self.llm_client.chat_completion([{"role": "user", "content": prompt}])
         
         return {
             'diagnosis': response,
@@ -245,8 +256,7 @@ Provide:
     
     async def _execute_documentation(self, task: AgentTask) -> Dict[str, Any]:
         """Execute documentation generation task"""
-        llm = self.llm_factory.create_provider()
-        
+        # Use configured LLM client (Azure by default)
         doc_format = task.parameters.get('format', 'markdown')
         
         prompt = f"""Generate comprehensive documentation in {doc_format} format:
@@ -260,7 +270,7 @@ Include:
 4. Configuration details
 """
         
-        response = await llm.chat_completion([{"role": "user", "content": prompt}])
+        response = await self.llm_client.chat_completion([{"role": "user", "content": prompt}])
         
         return {
             'documentation': response,
@@ -270,8 +280,7 @@ Include:
     
     async def _execute_code_generation(self, task: AgentTask) -> Dict[str, Any]:
         """Execute code generation task"""
-        llm = self.llm_factory.create_provider()
-        
+        # Use configured LLM client (Azure by default)
         prompt = f"""Generate code based on this context:
 
 {self._format_context_for_llm(task.context)}
@@ -285,7 +294,7 @@ Provide:
 3. Usage examples
 """
         
-        response = await llm.chat_completion([{"role": "user", "content": prompt}])
+        response = await self.llm_client.chat_completion([{"role": "user", "content": prompt}])
         
         return {
             'code': response,
@@ -294,8 +303,7 @@ Provide:
     
     async def _execute_generic_task(self, task: AgentTask) -> Dict[str, Any]:
         """Execute generic task"""
-        llm = self.llm_factory.create_provider()
-        
+        # Use configured LLM client (Azure by default)
         prompt = f"""Task: {task.description}
 
 Context:
@@ -304,7 +312,7 @@ Context:
 Please complete this task comprehensively.
 """
         
-        response = await llm.chat_completion([{"role": "user", "content": prompt}])
+        response = await self.llm_client.chat_completion([{"role": "user", "content": prompt}])
         
         return {
             'response': response,

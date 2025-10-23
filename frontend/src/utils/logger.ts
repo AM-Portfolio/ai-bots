@@ -126,7 +126,18 @@ export const createLogger = (category: string): Logger => {
   return new Logger(category);
 };
 
-export const logger = {
+export type LoggerMap = {
+  chat: Logger;
+  voice: Logger;
+  integrations: Logger;
+  api: Logger;
+  orchestrator: Logger;
+  llm: Logger;
+  ui: Logger;
+  settings: Logger;
+};
+
+export const logger: LoggerMap = {
   chat: createLogger('Chat'),
   voice: createLogger('Voice'),
   integrations: createLogger('Integrations'),
@@ -134,4 +145,5 @@ export const logger = {
   orchestrator: createLogger('Orchestrator'),
   llm: createLogger('LLM'),
   ui: createLogger('UI'),
+  settings: createLogger('Settings'),
 };

@@ -162,6 +162,10 @@ class InMemoryProvider(VectorDBProvider):
             'provider': 'in-memory'
         }
     
+    async def list_collections(self) -> List[str]:
+        """List all collection names"""
+        return list(self.collections.keys())
+    
     async def health_check(self) -> bool:
         """Health check"""
         return self.initialized
