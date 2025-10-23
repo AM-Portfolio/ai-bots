@@ -53,15 +53,15 @@ class IntentClassifier:
         prompt = self._build_classification_prompt(user_input, conversation_history)
         
         try:
-            result = await self.llm.generate(
-                prompt=prompt,
-                max_tokens=200,
+            # Use chat completion instead of generate
+            result, metadata = await self.llm.chat_completion_with_fallback(
+                messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,  # Low temperature for consistent classification
-                step_name="intent_classification"
+                max_retries=1
             )
             
             # Parse LLM response
-            intent = self._parse_intent_response(result.get("content", ""), user_input)
+            intent = self._parse_intent_response(result if result else "", user_input)
             
             logger.info(f"✅ Classified as '{intent.type}' (confidence: {intent.confidence:.2f})")
             return intent

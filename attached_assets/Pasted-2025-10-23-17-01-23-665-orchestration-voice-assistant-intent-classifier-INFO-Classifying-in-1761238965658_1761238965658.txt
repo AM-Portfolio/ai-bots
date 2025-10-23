@@ -1,0 +1,35 @@
+2025-10-23 17:01:23,665 - orchestration.voice_assistant.intent_classifier - INFO - 🔍 Classifying intent for: '...'
+2025-10-23 17:01:23,665 - orchestration.voice_assistant.intent_classifier - ERROR - ❌ Intent classification failed: 'ResilientLLMOrchestrator' object has no attribute 'generate'
+2025-10-23 17:01:23,665 - orchestration.voice_assistant.voice_orchestrator - INFO - 🔀 Routing to orchestration: general_llm
+2025-10-23 17:01:23,666 - orchestration.voice_assistant.voice_orchestrator - INFO - 🌐 Detected language: en (confidence: 0.50)
+2025-10-23 17:01:23,666 - shared.llm_providers.resilient_orchestrator - INFO - 🔄 Starting resilient LLM request with 1 providers
+2025-10-23 17:01:23,666 - shared.llm_providers.resilient_orchestrator - INFO -    Provider order: azure
+2025-10-23 17:01:23,666 - shared.llm_providers.resilient_orchestrator - INFO - 🤖 Attempting azure (attempt 1/2)
+2025-10-23 17:01:23,666 - shared.llm_providers.factory - INFO - Creating Azure OpenAI provider
+2025-10-23 17:01:23,666 - shared.llm_providers.azure_provider - INFO - 🔧 Azure Provider Configuration:
+2025-10-23 17:01:23,667 - shared.llm_providers.azure_provider - INFO -    Endpoint: NOT SET...
+2025-10-23 17:01:23,667 - shared.llm_providers.azure_provider - INFO -    API Key: NOT SET
+2025-10-23 17:01:23,667 - shared.llm_providers.azure_provider - INFO -    Deployment: gpt-4
+2025-10-23 17:01:23,667 - shared.llm_providers.azure_provider - INFO -    API Version: 2024-02-15-preview
+2025-10-23 17:01:23,667 - shared.llm_providers.azure_provider - WARNING - Azure OpenAI credentials not configured
+2025-10-23 17:01:23,667 - shared.llm_providers.azure_provider - ERROR - Azure OpenAI client not initialized
+2025-10-23 17:01:23,667 - shared.llm_providers.resilient_orchestrator - WARNING - ❌ azure failed (attempt 1): azure returned None
+2025-10-23 17:01:24,167 - shared.llm_providers.resilient_orchestrator - INFO - 🤖 Attempting azure (attempt 2/2)
+2025-10-23 17:01:24,167 - shared.llm_providers.factory - INFO - Creating Azure OpenAI provider
+2025-10-23 17:01:24,167 - shared.llm_providers.azure_provider - INFO - 🔧 Azure Provider Configuration:
+2025-10-23 17:01:24,167 - shared.llm_providers.azure_provider - INFO -    Endpoint: NOT SET...
+2025-10-23 17:01:24,167 - shared.llm_providers.azure_provider - INFO -    API Key: NOT SET
+2025-10-23 17:01:24,167 - shared.llm_providers.azure_provider - INFO -    Deployment: gpt-4
+2025-10-23 17:01:24,167 - shared.llm_providers.azure_provider - INFO -    API Version: 2024-02-15-preview
+2025-10-23 17:01:24,167 - shared.llm_providers.azure_provider - WARNING - Azure OpenAI credentials not configured
+2025-10-23 17:01:24,167 - shared.llm_providers.azure_provider - ERROR - Azure OpenAI client not initialized
+2025-10-23 17:01:24,168 - shared.llm_providers.resilient_orchestrator - WARNING - ❌ azure failed (attempt 2): azure returned None
+2025-10-23 17:01:24,168 - shared.llm_providers.resilient_orchestrator - ERROR - ❌ All providers failed after 2 attempts
+2025-10-23 17:01:24,168 - orchestration.voice_assistant.voice_orchestrator - ERROR - ❌ Orchestration failed: All LLM providers failed. Tried: azure. Errors: azure: azure returned None | azure: azure returned None
+2025-10-23 17:01:24,168 - orchestration.voice_assistant.response_formatter - INFO - 🎤 Formatting response for voice (length: 134)
+2025-10-23 17:01:24,168 - orchestration.voice_assistant.response_formatter - INFO - ✅ Voice response ready (final length: 134)
+2025-10-23 17:01:24,169 - orchestration.voice_assistant.session_manager - INFO - 💬 Added assistant turn to session 759d8202-39a2-41ef-b417-07af79cbbfe5: Sorry, I encountered an error: All LLM providers f...
+2025-10-23 17:01:24,169 - orchestration.voice_assistant.voice_orchestrator - INFO - 🔊 Synthesizing speech (length: 134)
+2025-10-23 17:01:24,169 - orchestration.voice_assistant.voice_orchestrator - WARNING - Azure TTS not yet implemented
+2025-10-23T17:01:24.169511 - interfaces.api.core - INFO - [43890f26-8a2e-4812-a44d-6c9049e7a929] - ✅ API POST /api/voice/process status=200 duration_ms=3328.54
+2025-10-23 17:01:24,169 - interfaces.api.core - INFO - ✅ API POST /api/voice/process status=200 dura

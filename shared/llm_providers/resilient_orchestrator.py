@@ -188,10 +188,19 @@ class ResilientLLMOrchestrator:
             Tuple of (response, metadata)
         """
         from shared.llm_providers.factory import LLMFactory
+        from shared.config import settings
         
-        # Create provider
+        # Create provider with credentials from settings
         factory = LLMFactory()
-        provider = factory.create_provider(provider_name, together_model=model)
+        provider = factory.create_provider(
+            provider_type=provider_name,
+            together_api_key=settings.together_api_key if hasattr(settings, 'together_api_key') else None,
+            together_model=model,
+            azure_endpoint=settings.azure_openai_endpoint if hasattr(settings, 'azure_openai_endpoint') else None,
+            azure_api_key=settings.azure_openai_api_key if hasattr(settings, 'azure_openai_api_key') else None,
+            azure_deployment=settings.azure_openai_deployment_name if hasattr(settings, 'azure_openai_deployment_name') else "gpt-4.1-mini",
+            azure_api_version=settings.azure_openai_api_version if hasattr(settings, 'azure_openai_api_version') else "2025-01-01-preview"
+        )
         
         # Execute with timeout
         response = await asyncio.wait_for(
