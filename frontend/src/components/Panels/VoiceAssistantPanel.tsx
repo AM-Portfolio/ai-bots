@@ -223,9 +223,7 @@ const VoiceAssistantPanel = () => {
       setVoiceState('recording');
       setError(null);
       
-      console.log('[Voice] Recording started with', mimeType);
-      
-      startSilenceDetection();
+      console.log('[Voice] Recording started with', mimeType, '- Manual send mode');
       
     } catch (err: any) {
       console.error('[Voice] Failed to start recording:', err);
@@ -248,17 +246,8 @@ const VoiceAssistantPanel = () => {
       
       setAudioLevel(normalizedLevel);
       
-      // 🎯 SMART VOICE ACTIVITY DETECTION (VAD)
-      // Only reset timer if we detect significant speech (above noise floor)
-      if (voiceStateRef.current === 'recording') {
-        const SPEECH_THRESHOLD = 20;  // Adjusted for speech detection
-        
-        if (normalizedLevel > SPEECH_THRESHOLD) {
-          // Speech detected - keep resetting timer
-          resetSilenceTimer();
-        }
-        // If level drops below threshold, timer will naturally expire after 1200ms
-      }
+      // Manual send mode - no auto-send on silence
+      // User clicks "Send Now" button to submit
       
       animationFrameRef.current = requestAnimationFrame(checkLevel);
     };
@@ -266,24 +255,8 @@ const VoiceAssistantPanel = () => {
     checkLevel();
   };
 
-  const startSilenceDetection = () => {
-    resetSilenceTimer();
-  };
-
-  const resetSilenceTimer = () => {
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-    }
-    
-    // 1200ms silence = fast response while ensuring file integrity
-    silenceTimerRef.current = window.setTimeout(() => {
-      // Use ref to avoid stale closure
-      if (voiceStateRef.current === 'recording' && audioChunksRef.current.length > 0) {
-        console.log('[Voice] ⚡ Silence detected - sending command');
-        stopRecording();
-      }
-    }, 1200);  // Fast enough to feel instant, long enough for file integrity
-  };
+  // Manual send mode - user clicks "Send Now" button to submit
+  // No auto-send on silence
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && voiceStateRef.current === 'recording') {
@@ -654,7 +627,7 @@ const VoiceAssistantPanel = () => {
                   </div>
                   <div className="flex items-center justify-center gap-3 mt-2">
                     <p className="text-xs text-gray-600">
-                      Speak now • Sends instantly when you stop
+                      Speak now • Click "Send Now" when done
                     </p>
                     <button
                       onClick={stopRecording}
