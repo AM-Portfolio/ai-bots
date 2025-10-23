@@ -97,6 +97,12 @@ class ResponseBeautifier:
             llm_time = (time.time() - llm_start) * 1000
             
             logger.info(f"✅ LLM beautification completed ({llm_time:.2f}ms)")
+            
+            # Check if we got a valid response
+            if not beautified:
+                logger.warning("⚠️  LLM returned None, using fallback")
+                raise ValueError("LLM returned None")
+            
             logger.info(f"   Response length: {len(beautified)} characters")
             logger.info(f"   Response preview: {beautified[:200]}...")
             

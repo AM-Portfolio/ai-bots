@@ -202,6 +202,13 @@ class ResilientLLMOrchestrator:
             timeout=self.timeout_seconds
         )
         
+        # Validate response
+        if response is None:
+            raise ValueError(f"{provider_name} returned None")
+        
+        if not isinstance(response, str) or len(response.strip()) == 0:
+            raise ValueError(f"{provider_name} returned empty or invalid response")
+        
         metadata = {
             'provider': provider_name,
             'model': getattr(provider, 'model', 'unknown'),

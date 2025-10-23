@@ -126,10 +126,12 @@ async def _handle_github_orchestration(prompt: str, github_context: Dict, show_t
         
         logger.info(f"📋 GitHub-LLM Request: type={query_request.query_type}, repo={query_request.repository}")
         
-        # Instantiate GitHub-LLM orchestrator with beautifier
-        from orchestration.summary_layer.beautifier import ResponseBeautifier
-        beautifier = ResponseBeautifier()
-        github_llm_orchestrator = GitHubLLMOrchestrator(beautifier=beautifier)
+        # Instantiate GitHub-LLM orchestrator with config
+        from orchestration.github_llm.config import GitHubLLMConfig
+        from orchestration.github_llm.query_orchestrator import GitHubLLMOrchestrator
+        
+        config = GitHubLLMConfig.from_settings()
+        github_llm_orchestrator = GitHubLLMOrchestrator(config=config)
         
         # Process through GitHub-LLM orchestrator
         start_time = datetime.now()
