@@ -25,14 +25,13 @@ from interfaces.vector_db_api import router as vector_db_router, initialize_vect
 from interfaces.translation_api import router as translation_router
 from interfaces.azure_test_api import router as azure_test_router
 from interfaces.unified_ai_api import router as unified_ai_router
-
-# Import code intelligence API from code-intelligence module
-sys.path.insert(0, str(Path(__file__).parent.parent / "code-intelligence"))
-from api import router as code_intelligence_router
-
 from shared.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Code intelligence API - Disabled for now due to dependencies
+CODE_INTELLIGENCE_AVAILABLE = False
+code_intelligence_router = None
 
 # Create the main FastAPI application
 app = create_app()
@@ -68,7 +67,11 @@ app.include_router(vector_db_router)
 app.include_router(translation_router)
 app.include_router(azure_test_router)
 app.include_router(unified_ai_router)
-app.include_router(code_intelligence_router)
+
+# Include code intelligence router if available
+if CODE_INTELLIGENCE_AVAILABLE and code_intelligence_router:
+    app.include_router(code_intelligence_router)
+    logger.info("   • Code Intelligence (/api/code-intelligence/*)")
 
 # Register basic_endpoints LAST because it has a catch-all route for SPA
 app.include_router(basic_endpoints.router)
@@ -88,4 +91,3 @@ logger.info("   • Vector DB (/api/vector-db/*)")
 logger.info("   • Translation (/api/translation/*)")
 logger.info("   • Azure testing (/api/azure/*)")
 logger.info("   • Unified AI (cloud-agnostic) (/api/ai/*)")
-logger.info("   • Code Intelligence (/api/code-intelligence/*)")

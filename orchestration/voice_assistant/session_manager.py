@@ -7,7 +7,7 @@ Maintains conversation context across multiple turns for each user session.
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +25,10 @@ class VoiceSession(BaseModel):
     """Represents a voice conversation session"""
     session_id: str
     user_id: Optional[str] = None
-    turns: List[ConversationTurn] = []
+    turns: List[ConversationTurn] = Field(default_factory=list)
     created_at: datetime
     last_activity: datetime
-    context: Dict[str, Any] = {}
+    context: Dict[str, Any] = Field(default_factory=dict)
 
 
 class SessionManager:

@@ -59,7 +59,7 @@ class VoiceProcessResponse(BaseModel):
     response_text: str
     response_audio: Optional[str] = None
     orchestration_used: str
-    thinking: Optional[Dict] = None
+    thinking: Optional[Dict[str, Any]] = None
 
 
 @router.post("/session", response_model=VoiceSessionResponse)

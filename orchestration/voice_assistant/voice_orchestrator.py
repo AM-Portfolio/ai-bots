@@ -12,7 +12,7 @@ Handles the complete voice interaction flow:
 import logging
 import io
 import base64
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 from pydantic import BaseModel
 
 from shared.config import settings
@@ -42,7 +42,7 @@ class VoiceResponse(BaseModel):
     response_text: str
     response_audio: Optional[str] = None  # Base64 encoded audio
     orchestration_used: str
-    thinking: Optional[Dict] = None
+    thinking: Optional[Dict[str, Any]] = None
 
 
 class VoiceOrchestrator:
