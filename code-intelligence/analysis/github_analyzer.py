@@ -9,6 +9,8 @@ from shared.llm_providers.github_llm_provider import (
     RepoAnalysisRequest,
     QueryType
 )
+from shared.clients.wrappers.github_wrapper import GitHubWrapper
+from shared.vector_db.services.vector_query_service import VectorQueryService
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +18,9 @@ logger = logging.getLogger(__name__)
 class GitHubAnalyzer:
     """Handles GitHub repository analysis using LLM"""
     
-    def __init__(self):
+    def __init__(self, vector_service: Optional[VectorQueryService] = None, github_client: Optional[GitHubWrapper] = None):
+        self.vector_service = vector_service
+        self.github_client = github_client
         self.github_llm = None
     
     async def analyze_repository(
@@ -42,9 +46,16 @@ class GitHubAnalyzer:
         logger.info(f"   Repository: {repository}")
         
         try:
-            # Initialize GitHub LLM provider
+            # Initialize GitHub LLM provider with clients
             if not self.github_llm:
-                self.github_llm = GitHubLLMProvider()
+                # Initialize GitHub client if not provided
+                if not self.github_client:
+                    self.github_client = GitHubWrapper()
+                
+                self.github_llm = GitHubLLMProvider(
+                    vector_service=self.vector_service,
+                    github_client=self.github_client
+                )
             
             # Analyze repository
             analysis_request = RepoAnalysisRequest(
@@ -52,7 +63,7 @@ class GitHubAnalyzer:
                 query=query,
                 query_type=QueryType.SEMANTIC_SEARCH if query else QueryType.REPO_SUMMARY,
                 max_results=max_results,
-                filters={"language": language} if language else None
+                language=language
             )
             
             result = await self.github_llm.analyze_repository(analysis_request)
