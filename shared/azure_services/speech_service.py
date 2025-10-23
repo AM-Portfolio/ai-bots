@@ -8,6 +8,8 @@ using Azure Cognitive Services Speech SDK.
 import logging
 import base64
 import io
+import tempfile
+import subprocess
 from typing import Optional, Tuple
 import azure.cognitiveservices.speech as speechsdk
 
@@ -56,6 +58,54 @@ class AzureSpeechService:
             logger.error(f"❌ Failed to initialize Azure Speech Service: {e}")
             self._speech_config = None
     
+    def _convert_webm_to_wav(self, audio_bytes: bytes) -> bytes:
+        """
+        Convert WebM audio to WAV format using ffmpeg
+        
+        Args:
+            audio_bytes: Raw WebM audio bytes
+            
+        Returns:
+            WAV audio bytes
+        """
+        try:
+            # Create temporary files
+            with tempfile.NamedTemporaryFile(suffix='.webm', delete=False) as webm_file:
+                webm_file.write(audio_bytes)
+                webm_path = webm_file.name
+            
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as wav_file:
+                wav_path = wav_file.name
+            
+            # Convert using ffmpeg: WebM -> WAV (16kHz mono PCM)
+            result = subprocess.run([
+                'ffmpeg', '-i', webm_path,
+                '-ar', '16000',  # 16kHz sample rate
+                '-ac', '1',      # Mono
+                '-f', 'wav',     # WAV format
+                wav_path
+            ], capture_output=True, text=True, timeout=10)
+            
+            if result.returncode != 0:
+                logger.error(f"❌ FFmpeg conversion failed: {result.stderr}")
+                raise Exception(f"Audio conversion failed: {result.stderr}")
+            
+            # Read converted WAV file
+            with open(wav_path, 'rb') as f:
+                wav_bytes = f.read()
+            
+            # Cleanup
+            import os
+            os.unlink(webm_path)
+            os.unlink(wav_path)
+            
+            logger.info(f"✅ Converted WebM ({len(audio_bytes)} bytes) to WAV ({len(wav_bytes)} bytes)")
+            return wav_bytes
+            
+        except Exception as e:
+            logger.error(f"❌ Audio conversion error: {e}")
+            raise
+    
     async def transcribe_audio(
         self,
         audio_data: str,
@@ -77,6 +127,12 @@ class AzureSpeechService:
         try:
             # Decode base64 audio
             audio_bytes = base64.b64decode(audio_data)
+            logger.info(f"📥 Received audio: {len(audio_bytes)} bytes, format: {audio_format}")
+            
+            # Convert WebM to WAV if needed
+            if audio_format.lower() in ['webm', 'audio/webm']:
+                logger.info("🔄 Converting WebM to WAV for Azure STT...")
+                audio_bytes = self._convert_webm_to_wav(audio_bytes)
             
             # Create audio stream from bytes
             audio_stream = speechsdk.audio.PushAudioInputStream()

@@ -5,7 +5,7 @@ integrations = ["github:1.0.0", "confluence:1.0.0"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["libxcrypt"]
+packages = ["libxcrypt", "ffmpeg"]
 
 [workflows]
 runButton = "Project"
@@ -40,12 +40,12 @@ localPort = 8000
 externalPort = 8000
 
 [[ports]]
-localPort = 35735
-externalPort = 3000
+localPort = 33819
+externalPort = 3002
 
 [[ports]]
-localPort = 36065
-externalPort = 3001
+localPort = 35735
+externalPort = 3000
 
 [deployment]
 deploymentTarget = "autoscale"
