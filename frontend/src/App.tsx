@@ -90,8 +90,8 @@ function App() {
       
       <LogViewer />
       
-      {/* Floating Voice Assistant - Always available */}
-      {activeTab === 'voice' && <VoiceAssistantPanel />}
+      {/* Floating Voice Assistant - Always available from any tab */}
+      <VoiceAssistantPanel />
     </div>
   )
 }

@@ -26,7 +26,7 @@ const VoiceAssistantPanel = () => {
   const [hasGreeted, setHasGreeted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audioLevel, setAudioLevel] = useState<number>(0);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   
@@ -256,7 +256,10 @@ const VoiceAssistantPanel = () => {
       reader.onloadend = async () => {
         const base64Audio = (reader.result as string).split(',')[1];
         
-        console.log('[Voice] Sending to backend...');
+        console.log('[Voice] 📤 Sending audio to backend...');
+        console.log('[Voice] Session ID:', sessionId);
+        console.log('[Voice] Audio size (base64):', base64Audio.length, 'chars');
+        
         const response = await axios.post('/api/voice/process', {
           session_id: sessionId,
           audio_data: base64Audio,
