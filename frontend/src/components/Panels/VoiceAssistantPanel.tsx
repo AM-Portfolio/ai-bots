@@ -170,9 +170,9 @@ const VoiceAssistantPanel = () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
+          echoCancellation: false,  // Disabled - was removing voice
+          noiseSuppression: false,   // Disabled - was removing voice
+          autoGainControl: true,     // Keep this for volume boost
           sampleRate: 48000
         } 
       });

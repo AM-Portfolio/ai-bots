@@ -151,8 +151,14 @@ class AzureSpeechService:
                 logger.info("🔄 Converting WebM to WAV for Azure STT...")
                 audio_bytes = self._convert_webm_to_wav(audio_bytes)
             
-            # Create audio stream from bytes
-            audio_stream = speechsdk.audio.PushAudioInputStream()
+            # Create audio stream from bytes with specific format
+            # WAV format: 16kHz, 16-bit, mono
+            wave_format = speechsdk.audio.AudioStreamFormat(
+                samples_per_second=16000,
+                bits_per_sample=16,
+                channels=1
+            )
+            audio_stream = speechsdk.audio.PushAudioInputStream(stream_format=wave_format)
             audio_stream.write(audio_bytes)
             audio_stream.close()
             
