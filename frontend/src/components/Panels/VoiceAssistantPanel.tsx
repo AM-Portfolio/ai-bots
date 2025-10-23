@@ -167,6 +167,12 @@ const VoiceAssistantPanel = () => {
       return;
     }
 
+    // 🎯 INTERRUPTION: Stop AI if it's speaking
+    if (voiceState === 'speaking') {
+      console.log('[Voice] 🛑 User interrupted - stopping AI response');
+      window.speechSynthesis.cancel(); // Stop TTS immediately
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -242,11 +248,16 @@ const VoiceAssistantPanel = () => {
       
       setAudioLevel(normalizedLevel);
       
-      // Use ref to avoid stale closure
-      // Only reset timer if we detect significant audio (above background noise)
-      if (voiceStateRef.current === 'recording' && normalizedLevel > 15) {
-        console.log('[Voice] Audio detected, level:', normalizedLevel.toFixed(1));
-        resetSilenceTimer();
+      // 🎯 SMART VOICE ACTIVITY DETECTION (VAD)
+      // Only reset timer if we detect significant speech (above noise floor)
+      if (voiceStateRef.current === 'recording') {
+        const SPEECH_THRESHOLD = 20;  // Adjusted for speech detection
+        
+        if (normalizedLevel > SPEECH_THRESHOLD) {
+          // Speech detected - keep resetting timer
+          resetSilenceTimer();
+        }
+        // If level drops below threshold, timer will naturally expire after 700ms
       }
       
       animationFrameRef.current = requestAnimationFrame(checkLevel);
@@ -264,13 +275,14 @@ const VoiceAssistantPanel = () => {
       clearTimeout(silenceTimerRef.current);
     }
     
+    // 700ms silence = instant response like ChatGPT
     silenceTimerRef.current = window.setTimeout(() => {
       // Use ref to avoid stale closure
       if (voiceStateRef.current === 'recording' && audioChunksRef.current.length > 0) {
-        console.log('[Voice] Silence detected after speech - auto-sending');
+        console.log('[Voice] ⚡ Smart silence detected - instant send');
         stopRecording();
       }
-    }, 3000);
+    }, 700);  // ChatGPT-like instant response
   };
 
   const stopRecording = () => {
@@ -632,9 +644,18 @@ const VoiceAssistantPanel = () => {
                       );
                     })}
                   </div>
-                  <p className="text-xs text-center text-gray-600 mt-2">
-                    Speak now • Auto-sends after 3s silence
-                  </p>
+                  <div className="flex items-center justify-center gap-3 mt-2">
+                    <p className="text-xs text-gray-600">
+                      Speak now • Sends instantly when you stop
+                    </p>
+                    <button
+                      onClick={stopRecording}
+                      className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-xs rounded-full transition-colors"
+                      title="Send immediately"
+                    >
+                      Send Now
+                    </button>
+                  </div>
                 </div>
               )}
 
