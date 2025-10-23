@@ -87,8 +87,9 @@ class AzureSpeechService:
             audio_config = speechsdk.audio.AudioConfig(stream=audio_stream)
             
             # Create auto-detect source language config
+            # Azure STT only supports 4 languages in DetectAudioAtStart mode
             auto_detect_config = speechsdk.languageconfig.AutoDetectSourceLanguageConfig(
-                languages=["en-US", "hi-IN", "es-ES", "fr-FR", "de-DE", "ja-JP", "zh-CN"]
+                languages=["en-US", "hi-IN", "es-ES", "fr-FR"]
             )
             
             # Create speech recognizer with auto-detection

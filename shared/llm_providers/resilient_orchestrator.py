@@ -35,18 +35,15 @@ class ResilientLLMOrchestrator:
     def __init__(self):
         from shared.config import settings
         
-        # Azure-first priority (configurable via settings)
+        # Azure-only priority (Together AI and OpenAI disabled by default)
         if settings.llm_provider == "azure":
             self.provider_priority = [
-                'azure',     # Primary
-                'together',  # Fallback 1
-                'openai'     # Fallback 2 (if configured)
+                'azure',     # Azure only - no fallbacks to Together/OpenAI
             ]
         else:
+            # If not Azure, default to together only
             self.provider_priority = [
-                'together',  # Primary
-                'azure',     # Fallback 1
-                'openai'     # Fallback 2 (if configured)
+                'together',  # Together AI only
             ]
         
         # Track provider health

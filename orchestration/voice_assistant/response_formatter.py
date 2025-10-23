@@ -47,11 +47,9 @@ class VoiceResponseFormatter:
         """
         logger.info(f"🎤 Formatting response for voice (length: {len(response)})")
         
-        # Step 1: Beautify using existing beautifier
-        beautified = await self.beautifier.beautify_response(response)
-        
-        # Step 2: Remove markdown formatting
-        clean_text = self._remove_markdown(beautified)
+        # Step 1: Remove markdown formatting (skip beautifier for voice)
+        # Beautifier needs sources and query_type which we don't have in voice context
+        clean_text = self._remove_markdown(response)
         
         # Step 3: If too long, summarize
         if len(clean_text) > self.max_length:
@@ -106,15 +104,14 @@ Original response:
 Voice-friendly summary:"""
         
         try:
-            result = await self.llm.generate(
-                prompt=prompt,
-                max_tokens=200,
+            # Use chat completion instead of generate
+            summary, metadata = await self.llm.chat_completion_with_fallback(
+                messages=[{"role": "user", "content": prompt}],
                 temperature=0.5,
-                step_name="voice_summarization"
+                max_retries=1
             )
             
-            summary = result.get("content", text[:self.max_length])
-            return summary
+            return summary if summary else text[:self.max_length]
             
         except Exception as e:
             logger.error(f"❌ Summarization failed: {e}")
