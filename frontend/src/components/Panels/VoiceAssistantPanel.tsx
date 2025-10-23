@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, Sparkles, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Volume2, Send, Settings, MessageCircle, X } from 'lucide-react';
 import axios from 'axios';
 
 interface Message {
@@ -26,82 +26,32 @@ const VoiceAssistantPanel = () => {
   const [autoListen, setAutoListen] = useState(true);
   const [hasGreeted, setHasGreeted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [liveTranscript, setLiveTranscript] = useState<string>('');
+  const [audioLevel, setAudioLevel] = useState<number>(0);
+  const [showSettings, setShowSettings] = useState(false);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>(0);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
-  const pauseDetectionTimerRef = useRef<number | null>(null);
+  const silenceTimerRef = useRef<number | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, liveTranscript]);
 
   // Initialize session on mount
   useEffect(() => {
     initializeSession();
   }, []);
 
-  // Animated voice visualization
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    let angle = 0;
-
-    const animate = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      const isActive = voiceState === 'recording' || voiceState === 'speaking';
-      
-      // Draw animated circles
-      const numCircles = 3;
-      for (let i = 0; i < numCircles; i++) {
-        const radius = 80 + i * 30;
-        const alpha = isActive ? 0.6 - i * 0.15 : 0.2 - i * 0.05;
-        
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius + Math.sin(angle + i) * 10, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(59, 130, 246, ${alpha})`;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
-
-      // Draw dots around the circle
-      if (isActive) {
-        const numDots = 24;
-        for (let i = 0; i < numDots; i++) {
-          const dotAngle = (i / numDots) * Math.PI * 2 + angle;
-          const dotRadius = 120;
-          const x = centerX + Math.cos(dotAngle) * dotRadius;
-          const y = centerY + Math.sin(dotAngle) * dotRadius;
-          
-          ctx.beginPath();
-          ctx.arc(x, y, 2, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(59, 130, 246, ${0.4 + Math.sin(angle + i * 0.5) * 0.3})`;
-          ctx.fill();
-        }
-      }
-
-      angle += 0.03;
-      animationRef.current = requestAnimationFrame(animate);
-    };
-
-    animate();
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [voiceState]);
-
   // Auto-greeting
   useEffect(() => {
     if (!hasGreeted && sessionId) {
-      const greetingMessage = "Hi! I'm your AI assistant. I can help you with code questions, commit workflows, and general conversations. How can I help you today?";
+      const greetingMessage = "Hi! I'm here to help. What can I do for you?";
       
       setTimeout(() => {
         const aiMessage: Message = {
@@ -117,9 +67,9 @@ const VoiceAssistantPanel = () => {
         if (autoListen) {
           setTimeout(() => {
             startRecording();
-          }, 4000);
+          }, 2000);
         }
-      }, 1000);
+      }, 500);
     }
   }, [hasGreeted, sessionId]);
 
@@ -144,7 +94,23 @@ const VoiceAssistantPanel = () => {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      
+      // Setup audio context for level monitoring
+      audioContextRef.current = new AudioContext();
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 256;
+      source.connect(analyserRef.current);
+      
+      // Start level monitoring
+      monitorAudioLevel();
       
       // Use webm for compatibility
       const mediaRecorder = new MediaRecorder(stream, {
@@ -152,6 +118,7 @@ const VoiceAssistantPanel = () => {
       });
       
       audioChunksRef.current = [];
+      setLiveTranscript('Listening...');
       
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -162,6 +129,12 @@ const VoiceAssistantPanel = () => {
       mediaRecorder.onstop = async () => {
         // Stop all tracks
         stream.getTracks().forEach(track => track.stop());
+        
+        // Stop audio context
+        if (audioContextRef.current) {
+          audioContextRef.current.close();
+          audioContextRef.current = null;
+        }
         
         // Process the recorded audio
         await processRecordedAudio();
@@ -174,36 +147,64 @@ const VoiceAssistantPanel = () => {
       
       console.log('🎤 Started recording...');
       
-      // Auto-stop after 1.5 seconds of silence (pause detection)
-      resetPauseDetection();
+      // Auto-stop after 2 seconds of silence
+      resetSilenceDetection();
       
     } catch (err: any) {
       console.error('❌ Failed to start recording:', err);
       setError('Microphone access denied');
       setVoiceState('idle');
+      setLiveTranscript('');
     }
+  };
+
+  const monitorAudioLevel = () => {
+    if (!analyserRef.current) return;
+    
+    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+    
+    const checkLevel = () => {
+      if (!analyserRef.current || voiceState !== 'recording') return;
+      
+      analyserRef.current.getByteFrequencyData(dataArray);
+      const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+      const normalizedLevel = Math.min(100, (average / 255) * 200);
+      
+      setAudioLevel(normalizedLevel);
+      
+      // Voice activity detection
+      if (normalizedLevel > 15) {
+        // Reset silence timer when voice detected
+        resetSilenceDetection();
+      }
+      
+      requestAnimationFrame(checkLevel);
+    };
+    
+    checkLevel();
+  };
+
+  const resetSilenceDetection = () => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+    }
+    
+    // Auto-send after 2 seconds of silence
+    silenceTimerRef.current = window.setTimeout(() => {
+      console.log('🔕 Silence detected - auto-sending');
+      stopRecording();
+    }, 2000);
   };
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && voiceState === 'recording') {
       mediaRecorderRef.current.stop();
-      clearPauseDetection();
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+      setAudioLevel(0);
       console.log('⏹️ Stopped recording');
-    }
-  };
-
-  const resetPauseDetection = () => {
-    clearPauseDetection();
-    pauseDetectionTimerRef.current = window.setTimeout(() => {
-      console.log('🔕 Pause detected - stopping recording');
-      stopRecording();
-    }, 1500); // 1.5 second pause detection
-  };
-
-  const clearPauseDetection = () => {
-    if (pauseDetectionTimerRef.current) {
-      window.clearTimeout(pauseDetectionTimerRef.current);
-      pauseDetectionTimerRef.current = null;
     }
   };
 
@@ -211,14 +212,28 @@ const VoiceAssistantPanel = () => {
     if (audioChunksRef.current.length === 0) {
       console.warn('No audio chunks to process');
       setVoiceState('idle');
+      setLiveTranscript('');
       return;
     }
 
     setVoiceState('processing');
+    setLiveTranscript('Processing...');
     
     try {
       // Create audio blob
       const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      
+      console.log(`📤 Sending ${audioBlob.size} bytes to backend...`);
+      
+      if (audioBlob.size < 1000) {
+        console.warn('⚠️ Audio too small, likely no speech detected');
+        setVoiceState('idle');
+        setLiveTranscript('');
+        if (autoListen) {
+          setTimeout(() => startRecording(), 500);
+        }
+        return;
+      }
       
       // Convert to base64
       const reader = new FileReader();
@@ -226,8 +241,6 @@ const VoiceAssistantPanel = () => {
       
       reader.onloadend = async () => {
         const base64Audio = (reader.result as string).split(',')[1];
-        
-        console.log(`📤 Sending ${audioBlob.size} bytes to backend...`);
         
         // Send to backend
         const response = await axios.post('/api/voice/process', {
@@ -240,6 +253,8 @@ const VoiceAssistantPanel = () => {
         
         console.log(`📝 Transcript: "${transcript}"`);
         console.log(`🎯 Intent: ${intent} (${(confidence * 100).toFixed(1)}%)`);
+        
+        setLiveTranscript('');
         
         // Add user message
         const userMessage: Message = {
@@ -275,13 +290,13 @@ const VoiceAssistantPanel = () => {
         } else {
           setVoiceState('idle');
         }
-        
       };
       
     } catch (err: any) {
       console.error('❌ Failed to process audio:', err);
       setError(err.response?.data?.detail || 'Failed to process voice');
       setVoiceState('idle');
+      setLiveTranscript('');
       
       // Retry if auto-listen is on
       if (autoListen) {
@@ -295,7 +310,6 @@ const VoiceAssistantPanel = () => {
   const playAudioResponse = async (base64Audio: string): Promise<void> => {
     return new Promise((resolve, reject) => {
       try {
-        // Convert base64 to audio
         const audioData = atob(base64Audio);
         const arrayBuffer = new ArrayBuffer(audioData.length);
         const view = new Uint8Array(arrayBuffer);
@@ -340,7 +354,6 @@ const VoiceAssistantPanel = () => {
   };
 
   const speakText = (text: string) => {
-    // Fallback to browser TTS
     window.speechSynthesis.cancel();
     
     const utterance = new SpeechSynthesisUtterance(text);
@@ -363,11 +376,16 @@ const VoiceAssistantPanel = () => {
     window.speechSynthesis.speak(utterance);
   };
 
-  const toggleAutoListen = () => {
-    if (autoListen) {
-      setAutoListen(false);
+  const toggleVoice = () => {
+    if (voiceState === 'recording') {
       stopRecording();
-      clearPauseDetection();
+      setAutoListen(false);
+    } else if (voiceState === 'speaking') {
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
+      window.speechSynthesis.cancel();
       setVoiceState('idle');
     } else {
       setAutoListen(true);
@@ -375,184 +393,210 @@ const VoiceAssistantPanel = () => {
     }
   };
 
-  const stopSpeaking = () => {
-    if (currentAudioRef.current) {
-      currentAudioRef.current.pause();
-      currentAudioRef.current = null;
-    }
-    window.speechSynthesis.cancel();
-    setVoiceState('idle');
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   };
 
-  const getStateIcon = () => {
+  const getStatusBadge = () => {
     switch (voiceState) {
       case 'recording':
-        return <Mic className="w-16 h-16 text-white animate-pulse" />;
+        return (
+          <div className="flex items-center space-x-2 px-4 py-2 bg-green-500/20 border border-green-500 rounded-full">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <span className="text-sm font-medium text-green-700">Listening</span>
+          </div>
+        );
       case 'processing':
-        return <Loader2 className="w-16 h-16 text-white animate-spin" />;
+        return (
+          <div className="flex items-center space-x-2 px-4 py-2 bg-blue-500/20 border border-blue-500 rounded-full">
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+            <span className="text-sm font-medium text-blue-700">Processing</span>
+          </div>
+        );
       case 'speaking':
-        return <Volume2 className="w-16 h-16 text-white animate-pulse" />;
+        return (
+          <div className="flex items-center space-x-2 px-4 py-2 bg-purple-500/20 border border-purple-500 rounded-full">
+            <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+            <span className="text-sm font-medium text-purple-700">Speaking</span>
+          </div>
+        );
       default:
-        return <Sparkles className="w-16 h-16 text-white" />;
+        return (
+          <div className="flex items-center space-x-2 px-4 py-2 bg-gray-500/20 border border-gray-400 rounded-full">
+            <div className="w-2 h-2 bg-gray-500 rounded-full" />
+            <span className="text-sm font-medium text-gray-700">Ready</span>
+          </div>
+        );
     }
   };
-
-  const getStateColor = () => {
-    switch (voiceState) {
-      case 'recording':
-        return 'bg-blue-500 shadow-2xl shadow-blue-500/50';
-      case 'processing':
-        return 'bg-purple-500 shadow-2xl shadow-purple-500/50';
-      case 'speaking':
-        return 'bg-indigo-500 shadow-2xl shadow-indigo-500/50';
-      default:
-        return 'bg-gray-300';
-    }
-  };
-
-  const getStateText = () => {
-    switch (voiceState) {
-      case 'recording':
-        return { title: 'Listening...', subtitle: '🎤 Speak now, I\'m listening' };
-      case 'processing':
-        return { title: 'Processing...', subtitle: '🤔 Understanding your request' };
-      case 'speaking':
-        return { title: 'Speaking...', subtitle: '🔊 AI is responding' };
-      default:
-        return { 
-          title: 'AI Voice Assistant', 
-          subtitle: autoListen ? '✨ Ready for continuous conversation' : '⏸️ Voice paused' 
-        };
-    }
-  };
-
-  const stateText = getStateText();
 
   return (
-    <div className="h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
-      <div className="max-w-4xl w-full px-8">
-        {/* Animated Voice Visualization */}
-        <div className="flex justify-center mb-8">
-          <div className="relative">
-            <canvas
-              ref={canvasRef}
-              width={400}
-              height={400}
-              className="max-w-full"
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className={`w-32 h-32 rounded-full flex items-center justify-center transition-all duration-300 ${getStateColor()}`}>
-                {getStateIcon()}
-              </div>
+    <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+              <MessageCircle className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">AI Voice Assistant</h1>
+              <p className="text-sm text-gray-500">Powered by Azure AI</p>
             </div>
           </div>
+          
+          <div className="flex items-center space-x-3">
+            {getStatusBadge()}
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <Settings className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
         </div>
+      </div>
 
-        {/* Status Text */}
-        <div className="text-center mb-6">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            {stateText.title}
-          </h2>
-          <p className="text-gray-600">
-            {stateText.subtitle}
-          </p>
-          {error && (
-            <p className="text-red-500 text-sm mt-2">⚠️ {error}</p>
-          )}
-        </div>
-
-        {/* Controls */}
-        <div className="flex justify-center space-x-4 mb-8">
-          <button
-            onClick={toggleAutoListen}
-            disabled={voiceState === 'processing'}
-            className={`px-6 py-3 rounded-full font-semibold transition-all flex items-center space-x-2 ${
-              autoListen 
-                ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-lg' 
-                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-            } ${voiceState === 'processing' ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            {autoListen ? (
-              <>
-                <Mic className="w-5 h-5" />
-                <span>Voice Active</span>
-              </>
-            ) : (
-              <>
-                <MicOff className="w-5 h-5" />
-                <span>Voice Paused</span>
-              </>
-            )}
-          </button>
-
-          <button
-            onClick={stopSpeaking}
-            disabled={voiceState !== 'speaking'}
-            className={`px-6 py-3 rounded-full font-semibold transition-all flex items-center space-x-2 ${
-              voiceState === 'speaking'
-                ? 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-lg'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            {voiceState === 'speaking' ? (
-              <>
-                <VolumeX className="w-5 h-5" />
-                <span>Stop Speaking</span>
-              </>
-            ) : (
-              <>
-                <Volume2 className="w-5 h-5" />
-                <span>Not Speaking</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Conversation History */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 max-h-96 overflow-y-auto">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Conversation</h3>
-          {messages.length === 0 ? (
-            <p className="text-gray-400 text-center py-8">
-              {sessionId ? 'Say something to get started...' : 'Initializing AI assistant...'}
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {messages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-[80%] px-4 py-2 rounded-2xl ${
-                      message.role === 'user'
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 text-gray-900'
-                    }`}
-                  >
-                    <p className="text-sm font-medium mb-1">
-                      {message.role === 'user' ? 'You' : '🤖 AI Assistant'}
-                      {message.intent && (
-                        <span className="ml-2 text-xs opacity-70">
-                          • {message.intent}
-                          {message.confidence && ` (${(message.confidence * 100).toFixed(0)}%)`}
-                        </span>
-                      )}
-                    </p>
-                    <p className="whitespace-pre-wrap">{message.content}</p>
+      {/* Conversation Area */}
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        {messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Mic className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">Ready to listen</h3>
+              <p className="text-gray-500">Click the microphone to start talking</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {messages.map((message, index) => (
+              <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[70%] ${message.role === 'user' ? 'order-2' : 'order-1'}`}>
+                  <div className="flex items-end space-x-2">
+                    {message.role === 'assistant' && (
+                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
+                        <MessageCircle className="w-5 h-5 text-white" />
+                      </div>
+                    )}
+                    <div
+                      className={`px-4 py-3 rounded-2xl shadow-sm ${
+                        message.role === 'user'
+                          ? 'bg-blue-600 text-white rounded-br-none'
+                          : 'bg-white text-gray-900 rounded-bl-none border border-gray-200'
+                      }`}
+                    >
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                      <div className="flex items-center justify-between mt-2 text-xs opacity-70">
+                        <span>{formatTime(message.timestamp)}</span>
+                        {message.intent && (
+                          <span className="ml-3">
+                            {message.intent} {message.confidence && `• ${(message.confidence * 100).toFixed(0)}%`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              ))}
+              </div>
+            ))}
+            
+            {/* Live Transcription */}
+            {liveTranscript && (
+              <div className="flex justify-start">
+                <div className="max-w-[70%]">
+                  <div className="flex items-end space-x-2">
+                    <div className="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center flex-shrink-0 animate-pulse">
+                      <Mic className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="px-4 py-3 rounded-2xl rounded-bl-none bg-gray-200 text-gray-700 border border-gray-300">
+                      <p className="text-sm italic">{liveTranscript}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div ref={messagesEndRef} />
+          </>
+        )}
+      </div>
+
+      {/* Controls Footer */}
+      <div className="bg-white border-t border-gray-200 px-6 py-4">
+        {error && (
+          <div className="mb-3 px-4 py-2 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
+            <p className="text-sm text-red-600">⚠️ {error}</p>
+            <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+        
+        <div className="flex items-center space-x-4">
+          {/* Audio Level Indicator */}
+          {voiceState === 'recording' && (
+            <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-green-400 to-blue-500 transition-all duration-100"
+                style={{ width: `${audioLevel}%` }}
+              />
             </div>
           )}
+          
+          {voiceState !== 'recording' && (
+            <div className="flex-1">
+              <p className="text-sm text-gray-500">
+                {autoListen ? '🎤 Continuous mode active' : '⏸️ Press mic to talk'}
+              </p>
+            </div>
+          )}
+          
+          {/* Main Control Button */}
+          <button
+            onClick={toggleVoice}
+            disabled={voiceState === 'processing'}
+            className={`relative p-4 rounded-full transition-all shadow-lg ${
+              voiceState === 'recording'
+                ? 'bg-red-500 hover:bg-red-600 text-white scale-110'
+                : voiceState === 'speaking'
+                ? 'bg-purple-500 hover:bg-purple-600 text-white'
+                : voiceState === 'processing'
+                ? 'bg-blue-500 text-white cursor-not-allowed'
+                : 'bg-gradient-to-br from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white'
+            } ${voiceState === 'processing' ? 'animate-pulse' : ''}`}
+          >
+            {voiceState === 'recording' ? (
+              <MicOff className="w-6 h-6" />
+            ) : voiceState === 'speaking' ? (
+              <Volume2 className="w-6 h-6" />
+            ) : (
+              <Mic className="w-6 h-6" />
+            )}
+          </button>
+          
+          {/* Send Button (Manual Mode) */}
+          {!autoListen && voiceState === 'recording' && (
+            <button
+              onClick={stopRecording}
+              className="p-4 bg-green-500 hover:bg-green-600 text-white rounded-full transition-all shadow-lg"
+            >
+              <Send className="w-6 h-6" />
+            </button>
+          )}
         </div>
-
-        {/* Helper Text */}
-        <div className="mt-6 text-center text-sm text-gray-500">
-          <p>💡 Powered by OpenAI Whisper (STT) and GPT (LLM) with intelligent routing</p>
-          <p className="mt-1">🔄 Continuous conversation mode is {autoListen ? 'ON' : 'OFF'}</p>
-          <p className="mt-1 text-xs">
-            🎯 Auto-detects: Code questions → GitHub | Commits → Workflow | Other → Assistant
-          </p>
+        
+        <div className="mt-3 flex items-center justify-center space-x-2">
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={autoListen}
+              onChange={(e) => setAutoListen(e.target.checked)}
+              className="rounded text-blue-600 focus:ring-2 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-600">Auto-send when I stop speaking</span>
+          </label>
         </div>
       </div>
     </div>
