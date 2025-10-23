@@ -257,7 +257,7 @@ const VoiceAssistantPanel = () => {
           // Speech detected - keep resetting timer
           resetSilenceTimer();
         }
-        // If level drops below threshold, timer will naturally expire after 700ms
+        // If level drops below threshold, timer will naturally expire after 1200ms
       }
       
       animationFrameRef.current = requestAnimationFrame(checkLevel);
@@ -275,14 +275,14 @@ const VoiceAssistantPanel = () => {
       clearTimeout(silenceTimerRef.current);
     }
     
-    // 700ms silence = instant response like ChatGPT
+    // 1200ms silence = fast response while ensuring file integrity
     silenceTimerRef.current = window.setTimeout(() => {
       // Use ref to avoid stale closure
       if (voiceStateRef.current === 'recording' && audioChunksRef.current.length > 0) {
-        console.log('[Voice] ⚡ Smart silence detected - instant send');
+        console.log('[Voice] ⚡ Silence detected - sending command');
         stopRecording();
       }
-    }, 700);  // ChatGPT-like instant response
+    }, 1200);  // Fast enough to feel instant, long enough for file integrity
   };
 
   const stopRecording = () => {
@@ -326,6 +326,11 @@ const VoiceAssistantPanel = () => {
       setTimeout(() => startRecording(), 1000);
       return;
     }
+    
+    // Wait a bit for browser to finalize the WebM file
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    console.log('[Voice] Audio chunks ready');
 
     const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
     console.log('[Voice] Audio blob size:', audioBlob.size, 'bytes');
