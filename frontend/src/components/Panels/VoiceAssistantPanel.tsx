@@ -243,7 +243,9 @@ const VoiceAssistantPanel = () => {
       setAudioLevel(normalizedLevel);
       
       // Use ref to avoid stale closure
-      if (voiceStateRef.current === 'recording' && normalizedLevel > 10) {
+      // Only reset timer if we detect significant audio (above background noise)
+      if (voiceStateRef.current === 'recording' && normalizedLevel > 15) {
+        console.log('[Voice] Audio detected, level:', normalizedLevel.toFixed(1));
         resetSilenceTimer();
       }
       
