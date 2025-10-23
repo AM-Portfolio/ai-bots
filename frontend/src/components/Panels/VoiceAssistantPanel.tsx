@@ -651,7 +651,7 @@ const VoiceAssistantPanel = () => {
                   {voiceState === 'recording' && '🎤 Listening for your voice...'}
                   {voiceState === 'processing' && '⚡ Processing your request...'}
                   {voiceState === 'speaking' && '🔊 AI is responding...'}
-                  {voiceState === 'idle' && '✨ Continuous conversation mode'}
+                  {voiceState === 'idle' && '✋ Manual send mode - Click to start'}
                 </div>
               </div>
 
