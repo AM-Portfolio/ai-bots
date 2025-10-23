@@ -207,12 +207,14 @@ class GitHubLLMOrchestrator:
         try:
             logger.info(f"🔍 Querying Code Intelligence API: '{request.query[:100]}...'")
             
-            # Determine collection name - use repository-specific if provided
+            # Use default collection name (repository-specific collections not yet implemented)
             collection_name = self.collection_name
-            if request.repository:
-                # Convert repository name to collection name format (owner/repo -> owner_repo)
-                collection_name = request.repository.replace("/", "_").replace("-", "_").lower()
-                logger.info(f"📂 Using repository-specific collection: {collection_name}")
+            logger.info(f"📂 Using default collection: {collection_name}")
+            
+            # TODO: Repository-specific collections - need to implement indexing first
+            # if request.repository:
+            #     collection_name = request.repository.replace("/", "_").replace("-", "_").lower()
+            #     logger.info(f"📂 Using repository-specific collection: {collection_name}")
             
             # Prepare API request
             api_payload = {
@@ -250,13 +252,17 @@ class GitHubLLMOrchestrator:
                 # Extract metadata from result
                 payload = result.get('payload', {})
                 
+                # Extract repo and file info with fallbacks
+                repo_name = payload.get('repo_name') or payload.get('repository') or 'unknown'
+                file_path = payload.get('file_path') or payload.get('path') or 'unknown'
+                
                 source = SourceResult(
                     source_type='code_intelligence',
                     content=payload.get('content', ''),
                     metadata={
                         'doc_id': result.get('id'),
-                        'repo': payload.get('repo_name', 'unknown'),
-                        'file_path': payload.get('file_path', 'unknown'),
+                        'repo': repo_name,  # Use 'repo' key for consistency
+                        'file_path': file_path,
                         'language': payload.get('language', 'unknown'),
                         'chunk_index': payload.get('chunk_index', 0)
                     },

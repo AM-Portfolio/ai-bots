@@ -251,7 +251,7 @@ class CodeIntelligenceOrchestrator:
             
             # Check collection stats
             try:
-                collection_info = vector_store.get_collection_info()
+                collection_info = await vector_store.get_collection_info()
                 vectors_count = collection_info.get("vectors_count", 0)
                 logger.info(f"   📊 Collection stats: {vectors_count} vectors in '{collection_name}'")
             except Exception as stats_error:

@@ -358,10 +358,10 @@ class VectorStore:
             logger.exception(e)
             return []
     
-    def get_collection_info(self) -> Dict[str, Any]:
+    async def get_collection_info(self) -> Dict[str, Any]:
         """Get collection statistics"""
         try:
-            stats = asyncio.run(self.provider.get_collection_stats(self.collection_name))
+            stats = await self.provider.get_collection_stats(self.collection_name)
             return stats
         except Exception as e:
             logger.error(f"❌ Failed to get collection info: {e}")

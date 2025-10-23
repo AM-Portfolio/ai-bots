@@ -101,7 +101,7 @@ async def _handle_github_orchestration(prompt: str, github_context: Dict, show_t
     from orchestration.github_llm.query_orchestrator import GitHubLLMOrchestrator
     
     logger.info("🚀 Routing to GitHub-LLM Orchestrator for intelligent processing...")
-    try:
+
     try:
         # Convert string query_type to QueryType enum
         query_type_str = github_context.get('query_type', 'semantic_search')
@@ -125,6 +125,9 @@ async def _handle_github_orchestration(prompt: str, github_context: Dict, show_t
         )
         
         logger.info(f"📋 GitHub-LLM Request: type={query_request.query_type}, repo={query_request.repository}")
+        
+        # Instantiate GitHub-LLM orchestrator
+        github_llm_orchestrator = GitHubLLMOrchestrator()
         
         # Process through GitHub-LLM orchestrator
         start_time = datetime.now()
