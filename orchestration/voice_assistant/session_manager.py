@@ -6,7 +6,7 @@ Maintains conversation context across multiple turns for each user session.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ class VoiceSession(BaseModel):
     turns: List[ConversationTurn] = []
     created_at: datetime
     last_activity: datetime
-    context: Dict[str, any] = {}
+    context: Dict[str, Any] = {}
 
 
 class SessionManager:
@@ -113,14 +113,14 @@ class SessionManager:
             })
         return history
     
-    def update_context(self, session_id: str, key: str, value: any) -> None:
+    def update_context(self, session_id: str, key: str, value: Any) -> None:
         """Update session context (e.g., detected repository, last commit)"""
         session = self.get_session(session_id)
         if session:
             session.context[key] = value
             logger.info(f"🔧 Updated context for {session_id}: {key} = {value}")
     
-    def get_context(self, session_id: str, key: str, default: any = None) -> any:
+    def get_context(self, session_id: str, key: str, default: Any = None) -> Any:
         """Retrieve context value"""
         session = self.get_session(session_id)
         if session:

@@ -223,31 +223,39 @@ async def get_orchestrator_status():
 async def list_providers():
     """
     List all registered cloud providers and their capabilities
+    
+    Note: Returns configured providers only to avoid initializing unused providers
     """
     try:
         from orchestration.cloud_providers.templates.base import ProviderCapability
-        from orchestration.cloud_providers.factory import ProviderFactory
+        from orchestration.cloud_providers.factory import ProviderFactory, get_provider_preference
         
         providers = []
         
+        # Only check providers that are configured/preferred
         for provider_name in ["azure", "together", "openai"]:
             capabilities = []
             available_status = False
             
-            for capability in ProviderCapability:
+            # Check key capabilities to determine availability
+            for capability in [ProviderCapability.LLM_CHAT, ProviderCapability.SPEECH_TO_TEXT, ProviderCapability.TEXT_TO_SPEECH]:
                 try:
-                    available = ProviderFactory.get_available_providers(capability)
-                    if provider_name in available:
-                        capabilities.append(capability.value)
-                        available_status = True
+                    # Only check availability if this is the preferred provider for this capability
+                    preference = get_provider_preference(capability)
+                    if preference == provider_name or preference == "auto":
+                        available = ProviderFactory.get_available_providers(capability, check_only_preferred=True)
+                        if provider_name in available:
+                            capabilities.append(capability.value)
+                            available_status = True
                 except:
                     continue
             
-            providers.append({
-                "provider": provider_name,
-                "available": available_status,
-                "capabilities": capabilities
-            })
+            if available_status or provider_name == "azure":  # Always show Azure
+                providers.append({
+                    "provider": provider_name,
+                    "available": available_status,
+                    "capabilities": capabilities
+                })
         
         return {"providers": providers}
     

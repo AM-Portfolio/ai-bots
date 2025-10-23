@@ -136,19 +136,36 @@ class ProviderFactory:
             return ProviderConfig(provider_name=provider_name)
     
     @classmethod
-    def get_available_providers(cls, capability: ProviderCapability) -> List[str]:
+    def get_available_providers(cls, capability: ProviderCapability, check_only_preferred: bool = True) -> List[str]:
         """
         Get list of available providers for a capability
         
         Args:
             capability: Required capability
+            check_only_preferred: If True, only check preferred provider + azure fallback (default: True)
             
         Returns:
             List of provider names that support the capability and are configured
         """
         available = []
         
-        for provider_name in cls._provider_registry.keys():
+        # Determine which providers to check
+        if check_only_preferred:
+            # Only check preferred provider and Azure (as fallback)
+            providers_to_check = []
+            preference = get_provider_preference(capability)
+            
+            if preference != "auto" and preference in cls._provider_registry:
+                providers_to_check.append(preference)
+            
+            # Always include Azure as fallback if not already included
+            if "azure" not in providers_to_check and "azure" in cls._provider_registry:
+                providers_to_check.append("azure")
+        else:
+            # Check all registered providers (legacy behavior)
+            providers_to_check = list(cls._provider_registry.keys())
+        
+        for provider_name in providers_to_check:
             try:
                 config = cls._auto_detect_config(provider_name)
                 provider_class = cls._provider_registry[provider_name]

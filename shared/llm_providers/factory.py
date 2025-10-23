@@ -179,17 +179,13 @@ def get_llm_client(
     else:
         primary_type = provider_type.lower()
     
-    # Create primary provider
+    # Create primary provider only (lazy fallback initialization)
     if primary_type == "azure":
         primary = AzureOpenAIProvider(
             endpoint=azure_endpoint,
             api_key=azure_api_key,
             deployment_name=azure_deployment,
             api_version=azure_api_version
-        )
-        fallback = TogetherAIProvider(
-            api_key=together_api_key,
-            model=together_model
         )
         primary_name = "Azure OpenAI"
         fallback_name = "Together AI"
@@ -198,23 +194,31 @@ def get_llm_client(
             api_key=together_api_key,
             model=together_model
         )
-        fallback = AzureOpenAIProvider(
-            endpoint=azure_endpoint,
-            api_key=azure_api_key,
-            deployment_name=azure_deployment,
-            api_version=azure_api_version
-        )
         primary_name = "Together AI"
         fallback_name = "Azure OpenAI"
     
     # Try primary provider
     if primary.is_available():
         logger.info(f"   • ✅ {primary_name} is available (primary)")
-        logger.info(f"   • 🔄 {fallback_name} ready as fallback")
+        logger.info(f"   • 🔄 {fallback_name} ready as fallback (will load on-demand if needed)")
         return primary
     
-    # Primary failed, try fallback
+    # Primary failed, create and try fallback
     logger.warning(f"   • ⚠️  {primary_name} not available, trying fallback...")
+    
+    # Lazy initialize fallback only when needed
+    if primary_type == "azure":
+        fallback = TogetherAIProvider(
+            api_key=together_api_key,
+            model=together_model
+        )
+    else:
+        fallback = AzureOpenAIProvider(
+            endpoint=azure_endpoint,
+            api_key=azure_api_key,
+            deployment_name=azure_deployment,
+            api_version=azure_api_version
+        )
     
     if fallback.is_available():
         logger.info(f"   • ✅ {fallback_name} is available (fallback activated)")
