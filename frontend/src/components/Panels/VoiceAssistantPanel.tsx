@@ -39,6 +39,7 @@ const VoiceAssistantPanel = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const lastAudioWhileMutedRef = useRef<Blob | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -49,6 +50,74 @@ const VoiceAssistantPanel = () => {
       initializeSession();
     }
   }, [isVisible]);
+  
+  // Process stored audio when unmuted
+  useEffect(() => {
+    const processStoredAudio = async () => {
+      if (!isMuted && lastAudioWhileMutedRef.current && sessionId) {
+        console.log('[Voice] 🔊 Unmuted - processing last command');
+        const audioBlob = lastAudioWhileMutedRef.current;
+        lastAudioWhileMutedRef.current = null;
+        
+        setVoiceState('processing');
+        
+        try {
+          const reader = new FileReader();
+          reader.readAsDataURL(audioBlob);
+          
+          reader.onloadend = async () => {
+            const base64Audio = (reader.result as string).split(',')[1];
+            
+            console.log('[Voice] 📤 Sending stored audio to backend...');
+            console.log('[Voice] Audio size (base64):', base64Audio.length, 'chars');
+            
+            const response = await axios.post('/api/voice/process', {
+              session_id: sessionId,
+              audio_data: base64Audio,
+              audio_format: 'webm'
+            });
+            
+            const { transcript, response_text, response_audio, intent, confidence } = response.data;
+            
+            console.log('[Voice] Transcript:', transcript);
+            console.log('[Voice] Intent:', intent, `(${(confidence * 100).toFixed(1)}%)`);
+            
+            const userMessage: Message = {
+              role: 'user',
+              content: transcript || '(no speech detected)',
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, userMessage]);
+            
+            const aiMessage: Message = {
+              role: 'assistant',
+              content: response_text,
+              timestamp: new Date(),
+              intent,
+              confidence
+            };
+            setMessages(prev => [...prev, aiMessage]);
+            
+            if (response_audio) {
+              await playAudioResponse(response_audio);
+            } else {
+              speakText(response_text);
+            }
+            
+            setVoiceState('idle');
+            setTimeout(() => startRecording(), 1000);
+          };
+        } catch (err: any) {
+          console.error('[Voice] Failed to process stored audio:', err);
+          setError(err.response?.data?.detail || 'Failed to process voice');
+          setVoiceState('idle');
+          setTimeout(() => startRecording(), 2000);
+        }
+      }
+    };
+    
+    processStoredAudio();
+  }, [isMuted, sessionId]);
 
   useEffect(() => {
     if (!hasGreeted && sessionId) {
@@ -236,20 +305,28 @@ const VoiceAssistantPanel = () => {
       return;
     }
 
+    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+    console.log('[Voice] Audio blob size:', audioBlob.size, 'bytes');
+    
+    if (audioBlob.size < 5000) {
+      console.warn('[Voice] Audio too small, likely no speech');
+      setVoiceState('idle');
+      setTimeout(() => startRecording(), 1000);
+      return;
+    }
+    
+    // If muted, store the audio and restart recording
+    if (isMuted) {
+      console.log('[Voice] 🔇 Muted - storing last command');
+      lastAudioWhileMutedRef.current = audioBlob;
+      setVoiceState('idle');
+      setTimeout(() => startRecording(), 1000);
+      return;
+    }
+
     setVoiceState('processing');
     
     try {
-      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-      
-      console.log('[Voice] Audio blob size:', audioBlob.size, 'bytes');
-      
-      if (audioBlob.size < 5000) {
-        console.warn('[Voice] Audio too small, likely no speech');
-        setVoiceState('idle');
-        setTimeout(() => startRecording(), 1000);
-        return;
-      }
-      
       const reader = new FileReader();
       reader.readAsDataURL(audioBlob);
       
@@ -433,13 +510,18 @@ const VoiceAssistantPanel = () => {
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setIsMuted(!isMuted)}
-                  className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
-                  title={isMuted ? 'Unmute' : 'Mute'}
+                  className={`relative p-2 hover:bg-gray-200 rounded-lg transition-colors ${
+                    isMuted && lastAudioWhileMutedRef.current ? 'bg-orange-100' : ''
+                  }`}
+                  title={isMuted ? (lastAudioWhileMutedRef.current ? 'Unmute to send command' : 'Unmute') : 'Mute'}
                 >
                   {isMuted ? (
-                    <VolumeX className="w-4 h-4 text-gray-600" />
+                    <VolumeX className={`w-4 h-4 ${lastAudioWhileMutedRef.current ? 'text-orange-600' : 'text-gray-600'}`} />
                   ) : (
                     <Volume2 className="w-4 h-4 text-gray-600" />
+                  )}
+                  {isMuted && lastAudioWhileMutedRef.current && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full animate-pulse"></span>
                   )}
                 </button>
                 <button
