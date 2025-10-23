@@ -62,10 +62,7 @@ def create_app() -> FastAPI:
         path = request.url.path
         
         logger.info(
-            f"→ Incoming {method} {path}",
-            method=method,
-            path=path,
-            client_host=request.client.host if request.client else "unknown"
+            f"→ Incoming {method} {path} from {request.client.host if request.client else 'unknown'}"
         )
         
         try:
@@ -83,11 +80,7 @@ def create_app() -> FastAPI:
         except Exception as e:
             duration_ms = (time.time() - start_time) * 1000
             logger.error(
-                f"← Request {method} {path} failed",
-                method=method,
-                path=path,
-                error=str(e),
-                duration_ms=duration_ms
+                f"← Request {method} {path} failed - error={str(e)} duration_ms={duration_ms:.2f}"
             )
             raise
         finally:

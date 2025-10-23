@@ -1,7 +1,6 @@
-version: '3.8'
-
-# Database Infrastructure - MongoDB & Qdrant
-# Run with: docker-compose -f docker-compose.databases.yml up -d
+# Infrastructure Stack - Network, Volumes, Databases
+# Run with: docker-compose -f docker-compose.infra.yml up -d
+# Creates: Network, Volumes, Qdrant, MongoDB
 
 services:
   # Vector Database - Qdrant
@@ -9,8 +8,8 @@ services:
     image: qdrant/qdrant:latest
     container_name: ai-bots-qdrant
     ports:
-      - "${QDRANT_HTTP_PORT:-6335}:6333"
-      - "${QDRANT_GRPC_PORT:-6336}:6334"
+      - "${QDRANT_HTTP_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
     volumes:
       - qdrant_storage:/qdrant/storage
     environment:

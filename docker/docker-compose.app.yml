@@ -53,5 +53,5 @@ services:
 
 networks:
   ai-bots-network:
-    external: true
+    driver: bridge
     name: ai-bots-network

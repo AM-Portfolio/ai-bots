@@ -3,7 +3,7 @@ FROM python:3.11-slim as backend
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (cached layer)
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
@@ -11,16 +11,27 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
+# Copy requirements files first (better caching)
 COPY requirements.txt .
 COPY code-intelligence/requirements.txt ./code-intelligence-requirements.txt
 
-# Install both main and code-intelligence dependencies
+# Install dependencies (cached if requirements haven't changed)
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir -r code-intelligence-requirements.txt
 
-# Copy application code
-COPY . .
+# Copy only necessary application code (excludes node_modules, .git, etc.)
+COPY main.py .
+COPY shared/ ./shared/
+COPY db/ ./db/
+COPY features/ ./features/
+COPY interfaces/ ./interfaces/
+COPY observability/ ./observability/
+COPY orchestration/ ./orchestration/
+COPY vector_db/ ./vector_db/
+COPY code-intelligence/ ./code-intelligence/
+COPY ui/ ./ui/
+COPY .env* ./
+COPY openapi.json .
 
 # Expose port
 EXPOSE 8000

@@ -8,11 +8,14 @@ __pycache__/
 venv/
 ENV/
 env/
+*.pyc
 
 # Node
 node_modules/
 npm-debug.log
 yarn-error.log
+frontend/dist/
+frontend/node_modules/
 
 # IDEs
 .vscode/
@@ -24,6 +27,7 @@ yarn-error.log
 # Git
 .git/
 .gitignore
+.gitattributes
 
 # Environment
 .env
@@ -39,15 +43,39 @@ build/
 .coverage
 htmlcov/
 *.cover
+tests/
+test_*.py
 
 # Logs
 *.log
 logs/
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
+# Database (local dev files)
+*.db-journal
+db/*.db
+ai_dev_agent.db
+
+# Documentation
+docs/
+*.md
+!requirements.txt
+!README.md
+
+# Docker files themselves
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Archives and temporary files
+archive/
+attached_assets/
+*.tmp
+*.bak
+
+# Scripts (not needed in container)
+scripts/
+*.ps1
+*.sh
 ai_dev_agent.db
 
 # Vector DB
