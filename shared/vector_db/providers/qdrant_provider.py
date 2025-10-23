@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class QdrantProvider(VectorDBProvider):
     """Qdrant vector database provider with persistence"""
     
-    def __init__(self, host: str = "localhost", port: int = 6333):
+    def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
         self.client: Optional[QdrantClient] = None

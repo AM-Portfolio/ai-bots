@@ -70,6 +70,9 @@ class VectorStore:
         # Note: For local Qdrant, we use path-based connection (localhost:6333)
         logger.info("🏭 Initializing VectorStore with shared VectorDBProvider...")
         
+        # Import settings for Qdrant configuration
+        from shared.config import settings
+        
         if qdrant_url:
             # Parse URL to extract host and port
             from urllib.parse import urlparse
@@ -83,13 +86,15 @@ class VectorStore:
             )
             logger.info(f"✅ Using remote Qdrant: {host}:{port}")
         else:
-            # Use localhost:6333 for local Qdrant (assumes running or will use embedded)
+            # Use settings for host/port, fallback to localhost:6333
+            host = settings.qdrant_host or "localhost"
+            port = settings.qdrant_port or 6333
             self.provider = VectorDBFactory.create(
                 provider_type="qdrant",
-                host="localhost",
-                port=6333
+                host=host,
+                port=port
             )
-            logger.info(f"✅ Using local Qdrant at localhost:6333 (data: {qdrant_path})")
+            logger.info(f"✅ Using Qdrant at {host}:{port} (data: {qdrant_path})")
         
         if not self.provider:
             raise RuntimeError("Failed to create VectorDBProvider")

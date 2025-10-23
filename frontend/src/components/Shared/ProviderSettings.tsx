@@ -22,7 +22,6 @@ const ProviderSettings = () => {
     tts_provider: 'openai'
   });
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');

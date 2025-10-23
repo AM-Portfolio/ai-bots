@@ -49,7 +49,7 @@ services:
   # Python Backend API
   backend:
     build:
-      context: .
+      context: ..
       dockerfile: docker/Dockerfile
     container_name: ai-bots-backend
     ports:
@@ -78,7 +78,7 @@ services:
   # React Frontend
   frontend:
     build:
-      context: .
+      context: ..
       dockerfile: docker/Dockerfile.frontend
     container_name: ai-bots-frontend
     ports:

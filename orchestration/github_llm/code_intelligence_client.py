@@ -176,3 +176,38 @@ class CodeIntelligenceClient:
     ) -> str:
         """Build prompt for beautification"""
         return f"""You are a helpful code assistant. Format this search result into a clear, readable response.
+
+Original Query: {query}
+Query Type: {query_type}
+
+Context Retrieved:
+{context}
+
+Summary:
+{summary}
+
+Please provide a well-formatted, helpful response that:
+1. Directly answers the user's query
+2. Highlights the most relevant code snippets
+3. Explains key concepts clearly
+4. Uses proper markdown formatting
+5. Includes file paths and references where relevant
+
+Response:"""
+    
+    def _format_fallback(self, query: str, summary: str) -> str:
+        """Format fallback response when LLM fails"""
+        return f"""# Query Results
+
+**Query:** {query}
+
+**Summary:**
+{summary}
+
+---
+*Note: This is a simplified response due to LLM unavailability*
+"""
+    
+    async def close(self):
+        """Close HTTP client"""
+        await self.http_client.aclose()

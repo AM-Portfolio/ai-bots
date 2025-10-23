@@ -57,6 +57,7 @@ async def initialize_vector_db():
                 "host": settings.qdrant_host,
                 "port": settings.qdrant_port
             }
+            logger.info(f"   Qdrant configuration: host={settings.qdrant_host}, port={settings.qdrant_port}")
         
         vector_db = VectorDBFactory.create(provider_type=provider_type, **provider_kwargs)
         if not vector_db:
