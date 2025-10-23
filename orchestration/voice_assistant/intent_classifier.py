@@ -5,7 +5,7 @@ Uses LLM to understand user intent and route to appropriate orchestration.
 """
 
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 from pydantic import BaseModel
 
 from shared.llm_providers.resilient_orchestrator import ResilientLLMOrchestrator
@@ -17,7 +17,7 @@ class Intent(BaseModel):
     """Classified user intent"""
     type: str  # 'commit', 'github_query', 'general', 'help'
     confidence: float
-    entities: Dict[str, any] = {}  # Extracted entities (repo, branch, etc.)
+    entities: Dict[str, Any] = {}  # Extracted entities (repo, branch, etc.)
     orchestration: str  # Which orchestration to use
 
 
