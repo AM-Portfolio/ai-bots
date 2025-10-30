@@ -13,11 +13,11 @@ const DocOrchestratorPanel = () => {
   const [repository, setRepository] = useState('AM-Portfolio/am-portfolio');
   
   const [enableGithub, setEnableGithub] = useState(true);
-  const [enableConfluence, setEnableConfluence] = useState(false);
-  const [enableJira, setEnableJira] = useState(false);
+  const [enableConfluence, setEnableConfluence] = useState(true);
+  const [enableJira, setEnableJira] = useState(true);
   
-  const [confluenceSpace, setConfluenceSpace] = useState('');
-  const [jiraProject, setJiraProject] = useState('');
+  const [confluenceSpace, setConfluenceSpace] = useState('~712020d4f71b3abac74895ba25e7e54d4cfc10');
+  const [jiraProject, setJiraProject] = useState('KAN');
   
   const [isRunning, setIsRunning] = useState(false);
   const [steps, setSteps] = useState<Step[]>([]);

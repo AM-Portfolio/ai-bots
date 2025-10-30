@@ -197,7 +197,7 @@ class GitHubClient:
                     'name': item.name,
                     'repository': item.repository.full_name,
                     'html_url': item.html_url,
-                    'score': item.score,
+                    'score': getattr(item, 'score', 1.0),
                     'sha': item.sha
                 })
             
@@ -299,7 +299,7 @@ class GitHubClient:
                     "html_url": result.html_url,
                     "git_url": result.git_url,
                     "download_url": result.download_url,
-                    "score": result.score
+                    "score": getattr(result, 'score', 1.0)
                 })
             
             logger.info(f"Found {len(search_results)} code search results for query: {query}")

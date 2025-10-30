@@ -39,7 +39,8 @@ class DocGeneratorService:
     
     async def parse_prompt(self, prompt: str) -> Dict[str, Any]:
         """Use LLM to parse user prompt and extract intent"""
-        llm_provider = get_llm_client()
+        from shared.llm import llm_client
+        llm_provider = llm_client
         
         parse_prompt = f"""You are a documentation assistant. Parse this user request and extract:
 1. Repository name (owner/repo format) - if mentioned
@@ -140,7 +141,8 @@ Respond in JSON format:
         focus_areas: List[str]
     ) -> str:
         """Fetch files and generate documentation using LLM"""
-        llm_provider = get_llm_client()
+        from shared.llm import llm_client
+        llm_provider = llm_client
         
         # Fetch file contents
         file_contents = await self.github_client.get_multiple_files(
