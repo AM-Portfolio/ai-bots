@@ -71,15 +71,19 @@ class ConfluenceClient:
         try:
             page = self.client.get_page_by_id(
                 page_id,
-                expand='body.storage,version'
+                expand='body.storage,version,space'
             )
+            
+            # Safely get space key with fallback
+            space_key = page.get('space', {}).get('key', settings.confluence_space_key or 'unknown')
             
             return {
                 "id": page['id'],
                 "title": page['title'],
                 "content": page['body']['storage']['value'],
                 "version": page['version']['number'],
-                "url": f"{settings.confluence_url}/wiki/spaces/{page['space']['key']}/pages/{page['id']}"
+                "space_key": space_key,
+                "url": f"{settings.confluence_url}/wiki/spaces/{space_key}/pages/{page['id']}"
             }
         except Exception as e:
             logger.error(f"Failed to get Confluence page {page_id}: {e}")
