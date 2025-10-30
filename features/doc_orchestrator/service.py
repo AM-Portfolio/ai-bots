@@ -97,10 +97,10 @@ class DocOrchestrator:
                 thinking.skip_step("analyze_code", "GitHub not selected - generating from prompt only")
                 thinking.start_step("generate_docs")
                 
-                from shared.llm_providers.factory import get_llm_client
+                from shared.llm import llm_client
                 from features.doc_generator.service import DocumentationResult
                 
-                llm_provider = get_llm_client()
+                llm_provider = llm_client
                 prompt_for_llm = f"""Generate comprehensive documentation based on this request:
 
 {request.prompt}
